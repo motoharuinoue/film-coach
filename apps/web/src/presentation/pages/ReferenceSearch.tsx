@@ -1,6 +1,6 @@
 // お手本を探す：YouTube Data API で候補を探し、人気度（P）と発信者（C）の見込みを添えて並べる。
 // 気に入った候補は、埋め込みプレイヤーで確かめてから、区間だけを取り込む（ADR-0005）。
-// 取り込んだ映像は、本人を選んで追跡し、投球を解析すると、お手本として登録できる（M2-2）。
+// 取り込んだ映像は、お手本の選手を選んで追跡し、投球を解析すると、「見る」画面でお手本として登録できる。
 
 import { IconBrandYoutube, IconClock, IconEye, IconKey, IconLoader2, IconSearch, IconThumbUp, IconUsers } from "@tabler/icons-react";
 import { motion } from "motion/react";
@@ -276,7 +276,7 @@ function Search() {
 
       <p className="flex items-center gap-1.5 text-[11px] text-faint">
         <IconClock size={12} aria-hidden />
-        取り込んだ映像は、本人（お手本の選手）を選んで追跡し、投球を解析すると、お手本として登録できるようにします（次の段階）。
+        取り込んだら、お手本の選手を選んで追跡し、「見る」画面で投球を解析して「お手本として登録」すると、判定の基準に加わります。
       </p>
     </div>
   );

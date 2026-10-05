@@ -24,7 +24,7 @@ from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application import library
 from film_coach.application.jobs import JobRunner
 from film_coach.domain.pose import PoseSequence
-from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
+from film_coach.infrastructure.library_fs import FilePracticeStore, FileReferenceStore, FileVideoStore
 from film_coach.infrastructure.youtube_api import FileQuotaLedger
 
 REPO = Path(__file__).resolve().parents[3]
@@ -44,6 +44,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
     ids = itertools.count(1)
     monkeypatch.setattr(FileVideoStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(FilePracticeStore, "new_id", lambda _self: f"{next(ids):012x}")
+    monkeypatch.setattr(FileReferenceStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(library, "_now", lambda: "2026-10-05T12:00:00+00:00")
     deps = HttpDeps(
         store=FileVideoStore(tmp_path / "library"),
@@ -62,6 +63,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         youtube=FakeSearch(),  # 架空の候補を返す
         quota=FileQuotaLedger(tmp_path / "quota.json"),
         clock=lambda: NOW,
+        references=FileReferenceStore(tmp_path / "references"),
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()
@@ -85,6 +87,12 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "videoIds": [side["id"], up["id"]],
     }
     practice = c.post("/api/practices", json=practice_request).json()
+    # お手本：YouTube の区間を取り込み、お手本の選手の投球を解析してから登録する
+    model = c.post("/api/videos/youtube", json={"url": "https://youtu.be/Qb7Throw_03", "start": 10, "end": 40}).json()
+    deps.store.save_track(model["id"], synth_track(base_sequence))
+    c.post(f"/api/videos/{model['id']}/throws", json={"heightCm": 188})
+    reference_request = {"footageId": model["id"], "kind": "model", "trustedChannel": False, "playerHeightCm": 188}
+    reference = c.post("/api/references", json=reference_request).json()
     return {
         "schemaVersion": 1,
         "generatedBy": "services/analyzer/tests/test_api_samples.py",
@@ -103,6 +111,10 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "practiceRequest": practice_request,
         "practice": practice,
         "practices": c.get("/api/practices").json(),
+        "referenceRequest": reference_request,
+        "reference": reference,
+        "references": c.get("/api/references").json(),
+        "referenceFootage": c.get(f"/api/videos/{model['id']}").json(),
         "youtubeStatus": c.get("/api/youtube/status").json(),
         "youtubeSearch": c.get("/api/youtube/search", params={"q": "QB throwing mechanics", "max": 3}).json(),
     }

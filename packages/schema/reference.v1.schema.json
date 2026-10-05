@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reference.v1.schema.json",
+  "title": "Reference",
+  "description": "お手本の登録。YouTube から取り込み、お手本の選手を追跡して投球を解析した映像（videoId）を、判定の基準にする。重み（P × C × Q × K × M、ADR-0006）は画面で計算する。",
+  "type": "object",
+  "required": ["schemaVersion", "id", "videoId", "youtubeId", "title", "channel", "channelId", "license", "kind", "trustedChannel", "playerHeightCm", "stats", "manual", "createdAt"],
+  "additionalProperties": false,
+  "$defs": {
+    "count": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "videoId": { "type": "string", "pattern": "^[0-9a-f]{12}$", "description": "元になった映像（取り込んだ YouTube の区間）の ID" },
+    "youtubeId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+    "title": { "type": "string" },
+    "channel": { "type": "string" },
+    "channelId": { "type": "string" },
+    "license": { "type": "string" },
+    "kind": { "enum": ["model", "drill", "ng"], "description": "お手本の投球／ドリル解説／NG 例" },
+    "trustedChannel": { "type": "boolean", "description": "利用者が信頼するチャンネル（発信者 C に加点）" },
+    "playerHeightCm": { "type": "number", "minimum": 120, "maximum": 230, "description": "お手本の選手の身長（縮尺と cm の指標に使う）" },
+    "stats": {
+      "type": "object",
+      "description": "登録したとき（または取り直したとき）の YouTube の統計。非公開の値は null",
+      "required": ["views", "likes", "comments", "subscribers", "durationSec", "publishedAt", "fetchedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "views": { "type": "integer", "minimum": 0 },
+        "likes": { "$ref": "#/$defs/count" },
+        "comments": { "$ref": "#/$defs/count" },
+        "subscribers": { "$ref": "#/$defs/count" },
+        "durationSec": { "type": "integer", "minimum": 0 },
+        "publishedAt": { "type": "string" },
+        "fetchedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "manual": {
+      "type": "object",
+      "description": "手動調整：ピン留め（×1.5）・除外（×0）・星（1〜5）",
+      "required": ["pinned", "excluded", "stars"],
+      "additionalProperties": false,
+      "properties": {
+        "pinned": { "type": "boolean" },
+        "excluded": { "type": "boolean" },
+        "stars": { "type": "integer", "minimum": 1, "maximum": 5 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

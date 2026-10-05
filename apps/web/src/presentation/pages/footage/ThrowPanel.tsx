@@ -3,14 +3,32 @@
 
 import { IconAlertTriangle, IconLoader2, IconRefresh, IconRulerMeasure, IconTarget } from "@tabler/icons-react";
 import { useState } from "react";
-import { CAMERA_LABEL } from "../../../domain/camera";
+import { CAMERA_LABEL, type CameraAngle } from "../../../domain/camera";
 import { formatMetric, invalidReason, isValidFor, METRICS } from "../../../domain/metrics";
 import { HEIGHT_CM, isValidHeightCm, releaseFrame, spread, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
 import { PhaseBar } from "../../components/charts";
-import { Badge, Button, Card, DemoNote, SectionTitle, cx } from "../../components/ui";
+import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, cx } from "../../components/ui";
 
-function HeightForm({ initial, busy, label, onSubmit }: { initial?: number; busy: boolean; label: string; onSubmit: (cm: number) => void }) {
+/** 投球を測れる角度。エンドゾーン・サイドラインからの試合映像は M4 で扱う */
+const ANGLES: CameraAngle[] = ["side", "behind", "front"];
+
+function HeightForm({
+  initial,
+  initialCamera = "side",
+  busy,
+  label,
+  heightLabel = "身長（cm）",
+  onSubmit,
+}: {
+  initial?: number;
+  initialCamera?: CameraAngle;
+  busy: boolean;
+  label: string;
+  heightLabel?: string;
+  onSubmit: (cm: number, camera: CameraAngle) => void;
+}) {
   const [text, setText] = useState(initial ? String(initial) : "");
+  const [camera, setCamera] = useState<CameraAngle>(initialCamera);
   const cm = Number(text);
   const ok = isValidHeightCm(cm);
   return (
@@ -18,12 +36,12 @@ function HeightForm({ initial, busy, label, onSubmit }: { initial?: number; busy
       className="flex flex-wrap items-end gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ok && !busy) onSubmit(cm);
+        if (ok && !busy) onSubmit(cm, camera);
       }}
     >
       <div>
         <label htmlFor="height-cm" className="mb-1 block text-xs text-muted">
-          身長（cm）
+          {heightLabel}
         </label>
         <input
           id="height-cm"
@@ -37,6 +55,10 @@ function HeightForm({ initial, busy, label, onSubmit }: { initial?: number; busy
           disabled={busy}
           className="w-28 rounded-lg border border-line bg-ink px-3 py-2 font-mono text-sm focus:border-ice/50 focus:outline-none"
         />
+      </div>
+      <div>
+        <span className="mb-1 block text-xs text-muted">撮った角度</span>
+        <Segmented label="撮った角度" size="sm" value={camera} onChange={setCamera} options={ANGLES.map((a) => ({ value: a, label: CAMERA_LABEL[a] }))} />
       </div>
       <Button type="submit" variant="primary" disabled={!ok || busy}>
         {busy ? <IconLoader2 size={16} className="animate-spin" aria-hidden /> : <IconTarget size={16} aria-hidden />}
@@ -112,6 +134,7 @@ function MetricGrid({ analysis, rep }: { analysis: ThrowAnalysis; rep: ThrowRep 
 export function ThrowPanel({
   analysis,
   heightCm,
+  forReference = false,
   busy,
   error,
   frame,
@@ -123,13 +146,15 @@ export function ThrowPanel({
 }: {
   analysis?: ThrowAnalysis;
   heightCm?: number;
+  /** YouTube から取り込んだお手本の映像か（身長はお手本の選手のもので、自分の身長としては保存しない） */
+  forReference?: boolean;
   busy: boolean;
   error?: string;
   /** 再生中の映像のフレーム番号 */
   frame: number;
   fps: number;
   selected: number;
-  onAnalyze: (cm: number) => void;
+  onAnalyze: (cm: number, camera: CameraAngle) => void;
   onPick: (rep: ThrowRep) => void;
   onSeekFrame: (frame: number) => void;
 }) {
@@ -141,9 +166,11 @@ export function ThrowPanel({
       <Card className="space-y-4 p-5">
         <SectionTitle>投球の解析</SectionTitle>
         <p className="text-sm leading-relaxed text-muted">
-          追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。横から全身が映った映像が向いています。身長は縮尺と cm の指標に使い、この端末の中にだけ保存します。
+          {forReference
+            ? "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。お手本の選手の身長を入れてください（分からなければ 188 cm）。縮尺と cm の指標に使います。"
+            : "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。横から全身が映った映像が向いています。身長は縮尺と cm の指標に使い、この端末の中にだけ保存します。"}
         </p>
-        <HeightForm initial={heightCm} busy={busy} label="投球を見つける" onSubmit={onAnalyze} />
+        <HeightForm initial={heightCm} busy={busy} label="投球を見つける" heightLabel={forReference ? "お手本の選手の身長（cm）" : undefined} onSubmit={onAnalyze} />
         {error && <p className="text-xs text-flag">{error}</p>}
       </Card>
     );
@@ -204,8 +231,10 @@ export function ThrowPanel({
           initial={heightCm ?? height}
           busy={busy}
           label="計算し直す"
-          onSubmit={(cm) => {
-            onAnalyze(cm);
+          heightLabel={forReference ? "お手本の選手の身長（cm）" : undefined}
+          initialCamera={analysis.camera}
+          onSubmit={(cm, camera) => {
+            onAnalyze(cm, camera);
             setEditing(false);
           }}
         />

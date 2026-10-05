@@ -2,7 +2,9 @@ import { IconBrandYoutube, IconDownload, IconFocusCentered, IconTarget } from "@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { coverage, type Footage, type TargetTrack } from "../../../domain/footage";
+import type { CameraAngle } from "../../../domain/camera";
 import { PHASE_LABEL } from "../../../domain/phases";
+import { DEFAULT_PLAYER_HEIGHT_CM } from "../../../domain/reference";
 import { releaseFrame, throwAt, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
 import { VideoFootagePlayer, YouTubeFootagePlayer, type Layers, type SeekRequest, type ThrowMark } from "../../components/footage";
 import { Badge, Button, Card, PageHeader, SectionTitle, Toggle } from "../../components/ui";
@@ -10,6 +12,7 @@ import { PageGuide } from "../../guide/PageGuide";
 import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
 import { AnalyzerGate } from "./AnalyzerGate";
+import { RegisterReference } from "./RegisterReference";
 import { ThrowPanel } from "./ThrowPanel";
 
 function Viewer() {
@@ -77,12 +80,13 @@ function Viewer() {
     setSelected(r.index);
     seekFrame(releaseFrame(r));
   };
-  const analyze = async (cm: number) => {
+  const analyze = async (cm: number, camera: CameraAngle) => {
     setThrowsBusy(true);
     setThrowsError(undefined);
     try {
-      profile.saveHeightCm(cm);
-      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera: throws?.camera ?? "side" });
+      // YouTube のお手本の映像では、お手本の選手の身長なので、自分の身長としては保存しない
+      if (footage.source === "upload") profile.saveHeightCm(cm);
+      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera });
       setThrows(a);
       setSelected(a.reps[0]?.index ?? 1);
       if (a.reps[0]) seekFrame(releaseFrame(a.reps[0]));
@@ -145,7 +149,8 @@ function Viewer() {
         </div>
         <ThrowPanel
           analysis={throws}
-          heightCm={profile.heightCm()}
+          heightCm={footage.source === "youtube" ? Math.round((throws?.heightM ?? DEFAULT_PLAYER_HEIGHT_CM / 100) * 100) : profile.heightCm()}
+          forReference={footage.source === "youtube"}
           busy={throwsBusy}
           error={throwsError}
           frame={frame}
@@ -158,6 +163,7 @@ function Viewer() {
       </div>
 
       <aside className="space-y-4">
+        {yt && throws && <RegisterReference footage={footage} throws={throws} />}
         <Card className="p-5">
           <SectionTitle right={label && <Badge tone="pylon">{label}</Badge>}>追跡の結果</SectionTitle>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">

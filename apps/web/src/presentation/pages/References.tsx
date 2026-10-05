@@ -1,30 +1,36 @@
-import { IconBrandYoutube, IconEyeOff, IconPin, IconRefresh, IconSearch, IconStar } from "@tabler/icons-react";
+import { IconBrandYoutube, IconEyeOff, IconLoader2, IconMovie, IconPin, IconRefresh, IconSearch, IconStar, IconTrash } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import { KIND_LABEL, type Reference, type ReferenceKind } from "../../domain/entities";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
-import { popularity, weightedQuantile, type ManualAdjust } from "../../domain/weighting";
+import { popularity, weightedQuantile } from "../../domain/weighting";
 import { FactorBars, Histogram } from "../components/charts";
 import { FieldScene, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, Toggle, cx } from "../components/ui";
 import { usePlayback } from "../hooks/usePlayback";
 import { PageGuide } from "../guide/PageGuide";
 import { useAnalyzer } from "../state/analyzer";
-import { useBenchmarks, useCoach } from "../state/benchmarks";
+import { useDemoLibrary, useLocalLibrary, type LibraryView } from "../state/library";
 
 const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 
 export function References() {
-  const { coach, bench } = useCoach();
-  const { manual, update, reset, changed } = useBenchmarks();
   const analyzer = useAnalyzer();
-  const refs = coach.references();
+  const demo = useDemoLibrary();
+  const local = useLocalLibrary();
+  const localCount = local.view?.refs.length ?? 0;
+  // 手元のお手本があれば、そちらを先に出す
+  const [source, setSource] = useState<"demo" | "local">();
+  const current = source ?? (localCount > 0 ? "local" : "demo");
+  const view: LibraryView = current === "local" && local.view ? local.view : demo;
+  const { manual, reset, changed } = view;
+  const refs = view.refs;
   const [query, setQuery] = useState("");
   const [ccOnly, setCcOnly] = useState(false);
   const [kind, setKind] = useState<"all" | ReferenceKind>("all");
-  const [selectedId, setSelectedId] = useState(refs[0]!.id);
+  const [selectedId, setSelectedId] = useState<string>();
   const [metric, setMetric] = useState<MetricKey>("strideRatio");
 
   const list = refs.filter((r) => {
@@ -33,8 +39,8 @@ export function References() {
     const q = query.trim().toLowerCase();
     return !q || [r.title, r.channel, ...r.tags].some((t) => t.toLowerCase().includes(q));
   });
-  const selected = coach.reference(selectedId) ?? refs[0]!;
-  const maxW = Math.max(...Object.values(bench.weights.overall));
+  const selected = refs.find((r) => r.id === selectedId) ?? refs[0];
+  const maxW = Math.max(1e-6, ...Object.values(view.weights.overall));
 
   return (
     <div className="space-y-6">
@@ -42,7 +48,19 @@ export function References() {
         title="お手本ライブラリ"
         sub="YouTube のお手本を取り込み、人気度・発信者・解析品質・合意度・手動調整で重み付けします"
         right={
-          <span className="flex gap-2">
+          <span className="flex flex-wrap items-center gap-2">
+            {analyzer.status === "online" && (
+              <Segmented
+                label="お手本の出どころ"
+                size="sm"
+                value={current}
+                onChange={setSource}
+                options={[
+                  { value: "local", label: local.loading ? "手元のお手本…" : `手元のお手本（${localCount}）` },
+                  { value: "demo", label: "デモ" },
+                ]}
+              />
+            )}
             {changed && (
               <Button variant="ghost" onClick={reset}>
                 <IconRefresh size={15} aria-hidden /> 手動調整を元に戻す
@@ -60,6 +78,23 @@ export function References() {
       />
 
       <PageGuide id="references" />
+      {local.error && current === "local" && <p className="text-sm text-flag">{local.error}</p>}
+      {current === "local" && !selected ? (
+        <Card className="max-w-2xl space-y-3 p-6">
+          <h2 className="font-semibold">手元のお手本はまだありません</h2>
+          <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted">
+            <li>「YouTube で探す」で候補を探し、投げている場面を区間で取り込む</li>
+            <li>お手本の選手を選んで追跡し、「見る」画面で選手の身長を入れて投球を解析する</li>
+            <li>「見る」画面の「お手本として登録」で登録する</li>
+          </ol>
+          <Link to="/references/search" className="inline-block">
+            <Button variant="primary">
+              <IconBrandYoutube size={15} aria-hidden /> YouTube で探す
+            </Button>
+          </Link>
+        </Card>
+      ) : selected ? (
+        <>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         {/* 一覧 */}
@@ -93,7 +128,7 @@ export function References() {
 
           <div className="grid gap-3 md:grid-cols-2">
             {list.map((r) => {
-              const w = bench.weights.overall[r.id] ?? 0;
+              const w = view.weights.overall[r.id] ?? 0;
               const m = manual[r.id]!;
               return (
                 <button
@@ -127,14 +162,22 @@ export function References() {
             })}
             {list.length === 0 && <p className="text-sm text-muted">条件に合うお手本はありません。検索語やフィルタを変えてください。</p>}
           </div>
-          <DemoNote>チャンネル・動画はすべて架空のデモデータです。M2 で YouTube Data API の検索と、区間の取り込み・解析につなぎます。</DemoNote>
+          {view.source === "demo" ? (
+            <DemoNote>チャンネル・動画はすべて架空のデモデータです。手元の解析サービスにつなぐと、「YouTube で探す」で取り込んだお手本を使えます。</DemoNote>
+          ) : (
+            local.library?.broken.length ? (
+              <p className="text-xs text-caution">元の映像か投球の解析結果が読めないお手本が {local.library.broken.length} 件あります（{local.library.broken.map((b) => b.title).join("、")}）。</p>
+            ) : null
+          )}
         </div>
 
         {/* 詳細 */}
-        <ReferenceDetail r={selected} metric={metric} setMetric={setMetric} manual={manual[selected.id]!} update={(p) => update(selected.id, p)} />
+        <ReferenceDetail key={`${view.source}-${selected.id}`} view={view} r={selected} metric={metric} setMetric={setMetric} />
       </div>
 
-      <Distribution metric={metric} setMetric={setMetric} />
+      <Distribution view={view} metric={metric} setMetric={setMetric} />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -152,11 +195,26 @@ function RefThumb({ r }: { r: Reference }) {
   );
 }
 
-function ReferenceDetail({ r, metric, setMetric, manual, update }: { r: Reference; metric: MetricKey; setMetric: (k: MetricKey) => void; manual: ManualAdjust; update: (p: Partial<ManualAdjust>) => void }) {
-  const { bench } = useCoach();
+function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r: Reference; metric: MetricKey; setMetric: (k: MetricKey) => void }) {
+  const manual = view.manual[r.id]!;
+  const update = (p: Partial<typeof manual>) => view.update(r.id, p);
+  const record = view.local?.records[r.id];
+  const [busy, setBusy] = useState<"refresh" | "remove">();
+  const [error, setError] = useState<string>();
+  const act = async (kind: "refresh" | "remove", run: () => Promise<void>) => {
+    setBusy(kind);
+    setError(undefined);
+    try {
+      await run();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(undefined);
+    }
+  };
   const rep = r.reps[0]!;
   const pb = usePlayback(rep.seq.frames.length, rep.seq.fps, { autoplay: true, initialRate: 0.5 });
-  const parts = bench.weights.parts[r.id]?.[metric];
+  const parts = view.weights.parts[r.id]?.[metric];
   const pop = popularity(r.stats);
   const def = METRIC_BY_KEY[metric];
   const valid = isValidFor(def, r.stats.camera);
@@ -189,7 +247,33 @@ function ReferenceDetail({ r, metric, setMetric, manual, update }: { r: Referenc
             </div>
           ))}
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-faint">元の動画は保持せず、骨格・指標と出典だけを残しています。表示は YouTube の埋め込みプレイヤーで行います（架空の動画のためデモでは骨格のみ）。</p>
+        {record ? (
+          <div className="mt-3 space-y-2">
+            <p className="text-[11px] leading-relaxed text-faint">
+              統計は {new Date(record.stats.fetchedAt).toLocaleString("ja-JP")} に取得しました。お手本の選手の身長 {record.playerHeightCm} cm で解析しています。元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link to={`/footage/${record.videoId}`}>
+                <Button>
+                  <IconMovie size={14} aria-hidden /> 映像で見る
+                </Button>
+              </Link>
+              <Button onClick={() => void act("refresh", () => view.local!.refresh(r.id))} disabled={busy !== undefined} title="YouTube Data API の無料枠を 2 ユニット使います">
+                {busy === "refresh" ? <IconLoader2 size={14} className="animate-spin" aria-hidden /> : <IconRefresh size={14} aria-hidden />} 統計を取り直す
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => window.confirm(`「${r.title}」をお手本から外します。元の映像と解析結果は残ります。よろしいですか？`) && void act("remove", () => view.local!.remove(r.id))}
+                disabled={busy !== undefined}
+              >
+                <IconTrash size={14} aria-hidden /> お手本から外す
+              </Button>
+            </div>
+            {error && <p className="text-xs text-flag">{error}</p>}
+          </div>
+        ) : (
+          <p className="mt-3 text-[11px] leading-relaxed text-faint">元の動画は保持せず、骨格・指標と出典だけを残しています。表示は YouTube の埋め込みプレイヤーで行います（架空の動画のためデモでは骨格のみ）。</p>
+        )}
       </div>
 
       <div>
@@ -233,21 +317,19 @@ function ReferenceDetail({ r, metric, setMetric, manual, update }: { r: Referenc
   );
 }
 
-function Distribution({ metric, setMetric }: { metric: MetricKey; setMetric: (k: MetricKey) => void }) {
-  const { coach, bench } = useCoach();
+function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: MetricKey; setMetric: (k: MetricKey) => void }) {
   const [popularityOnly, setPopularityOnly] = useState(false);
-  const { session, rep } = coach.focus();
   const def = METRIC_BY_KEY[metric];
-  const refs = coach.references();
+  const refs = view.refs;
 
   const samples = useMemo(
     () =>
       refs.flatMap((r) =>
         r.reps
-          .map((x) => ({ value: x.metrics[metric], weight: bench.weights.samples[x.id]?.[metric]?.w ?? 0, P: bench.weights.samples[x.id]?.[metric]?.P ?? 0, Q: bench.weights.samples[x.id]?.[metric]?.Q ?? 0 }))
+          .map((x) => ({ value: x.metrics[metric], weight: view.weights.samples[x.id]?.[metric]?.w ?? 0, P: view.weights.samples[x.id]?.[metric]?.P ?? 0, Q: view.weights.samples[x.id]?.[metric]?.Q ?? 0 }))
           .filter((s): s is { value: number; weight: number; P: number; Q: number } => s.value !== undefined),
       ),
-    [refs, bench, metric],
+    [refs, view, metric],
   );
   // 比較用：人気度だけで重み付けした場合のゾーン（撮影角度が合わないものは同じく除く）
   const popZone = useMemo(() => {
@@ -256,8 +338,8 @@ function Distribution({ metric, setMetric }: { metric: MetricKey; setMetric: (k:
     const q = (p: number) => weightedQuantile(vs, ws, p)!;
     return ws.some((w) => w > 0) ? { p10: q(0.1), p25: q(0.25), p50: q(0.5), p75: q(0.75), p90: q(0.9) } : undefined;
   }, [samples]);
-  const zone = bench.zones[metric];
-  const you = isValidFor(def, session.camera) ? rep.metrics[metric] : undefined;
+  const zone = view.zones[metric];
+  const you = view.you(metric);
   const used = samples.filter((s) => s.weight > 0).length;
 
   return (
@@ -280,7 +362,7 @@ function Distribution({ metric, setMetric }: { metric: MetricKey; setMetric: (k:
       </div>
       {samples.length ? (
         <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
-          <Histogram samples={samples} zone={zone} you={you} best={bench.best?.metrics[metric]} digits={def.digits} compareZone={popularityOnly ? popZone : undefined} />
+          <Histogram samples={samples} zone={zone} you={you} best={view.best?.[metric]} digits={def.digits} compareZone={popularityOnly ? popZone : undefined} />
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-xs text-muted">お手本ゾーン（重み付き四分位）</dt>
@@ -300,7 +382,7 @@ function Distribution({ metric, setMetric }: { metric: MetricKey; setMetric: (k:
             </div>
             <div>
               <dt className="text-xs text-muted">今回のあなた</dt>
-              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${def.unit}` : "判定不可"}</dd>
+              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${def.unit}` : view.source === "local" ? "自分の映像とは次の段階で比べます" : "判定不可"}</dd>
             </div>
           </dl>
         </div>
