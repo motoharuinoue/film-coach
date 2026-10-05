@@ -1,4 +1,6 @@
-"""記録・練習・YouTube の候補と JSON の対応（video-record.v1 / practice.v1 / youtube-search.v1 の形）。
+"""記録・練習・お手本・YouTube の候補と JSON の対応。
+
+video-record.v1 / practice.v1 / reference.v1 / youtube-search.v1 の形。
 
 保存（infrastructure）と API の応答（adapters）の両方が使うので、この層に置く。
 スキーマによる検証は、外部ライブラリを使う infrastructure の側で行う。
@@ -10,6 +12,7 @@ from typing import Any
 
 from ..domain.library import VideoInfo, VideoRecord, YouTubeSource
 from ..domain.practice import Practice
+from ..domain.reference import Manual, Reference, YouTubeStats
 from ..domain.youtube import watch_url
 from ..domain.youtube_data import QuotaStatus, YouTubeCandidate
 
@@ -114,3 +117,58 @@ def candidate_to_json(c: YouTubeCandidate) -> dict[str, Any]:
         "thumbnail": c.thumbnail,
         "url": watch_url(c.video_id),
     }
+
+
+def reference_to_json(r: Reference) -> dict[str, Any]:
+    st = r.stats
+    return {
+        "schemaVersion": 1,
+        "id": r.id,
+        "videoId": r.video_id,
+        "youtubeId": r.youtube_id,
+        "title": r.title,
+        "channel": r.channel,
+        "channelId": r.channel_id,
+        "license": r.license,
+        "kind": r.kind,
+        "trustedChannel": r.trusted_channel,
+        "playerHeightCm": r.player_height_cm,
+        "stats": {
+            "views": st.views,
+            "likes": st.likes,
+            "comments": st.comments,
+            "subscribers": st.subscribers,
+            "durationSec": st.duration_sec,
+            "publishedAt": st.published_at,
+            "fetchedAt": st.fetched_at,
+        },
+        "manual": {"pinned": r.manual.pinned, "excluded": r.manual.excluded, "stars": r.manual.stars},
+        "createdAt": r.created_at,
+    }
+
+
+def reference_from_json(d: dict[str, Any]) -> Reference:
+    st, m = d["stats"], d["manual"]
+    return Reference(
+        id=d["id"],
+        video_id=d["videoId"],
+        youtube_id=d["youtubeId"],
+        title=d["title"],
+        channel=d["channel"],
+        channel_id=d["channelId"],
+        license=d["license"],
+        kind=d["kind"],
+        trusted_channel=bool(d["trustedChannel"]),
+        player_height_cm=float(d["playerHeightCm"]),
+        stats=YouTubeStats(
+            int(st["views"]),
+            st["likes"],
+            st["comments"],
+            st["subscribers"],
+            int(st["durationSec"]),
+            st["publishedAt"],
+            st["fetchedAt"],
+        ),
+        manual=Manual(bool(m["pinned"]), bool(m["excluded"]), int(m["stars"])),
+        created_at=d["createdAt"],
+    )

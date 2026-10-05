@@ -128,6 +128,14 @@ class YouTubeDataApi:
             for i in self._get("search", params).get("items", [])
             if i.get("id", {}).get("videoId")
         ]
+        return self._details(ids)
+
+    def video(self, video_id: str) -> YouTubeCandidate | None:
+        found = self._details([video_id])
+        return found[0] if found else None
+
+    def _details(self, ids: list[str]) -> list[YouTubeCandidate]:
+        """動画の情報・統計と、チャンネルの登録者数（2 ユニット）。ids の順を保ち、埋め込めない動画は除く"""
         if not ids:
             return []
         videos = self._get("videos", {"part": "snippet,statistics,contentDetails,status", "id": ",".join(ids)})
@@ -141,7 +149,7 @@ class YouTubeDataApi:
             for c in channels.get("items", [])
         }
         out: list[YouTubeCandidate] = []
-        for vid in ids:  # 検索の順（関連の高い順）を保つ
+        for vid in ids:  # 渡された順（検索なら関連の高い順）を保つ
             v = by_id.get(vid)
             if v is None or not v.get("status", {}).get("embeddable", True):
                 continue

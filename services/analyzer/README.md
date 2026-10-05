@@ -102,6 +102,11 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
 | GET | `/api/youtube/status` | YouTube Data API のキーがあるか（キーそのものは返さない）と、今日の無料枠 |
 | GET | `/api/youtube/search?q=&cc=&max=` | お手本の候補を探す（`youtube-search.v1.schema.json`）。1 回 102 ユニット。キーがなければ 503、無料枠を超えたら 429 |
+| GET | `/api/references` | 手元のお手本の一覧（`reference.v1.schema.json`）。新しい順 |
+| POST | `/api/references` | 投球を解析した YouTube の映像をお手本にする（`{footageId, kind, trustedChannel, playerHeightCm}`）。YouTube の統計を取り直す（2 ユニット）。`data/references/<id>.json` に置く |
+| PATCH | `/api/references/{id}` | 種類・信頼チャンネル・手動調整（ピン留め・除外・星）を変える |
+| POST | `/api/references/{id}/refresh` | YouTube の統計を取り直す（2 ユニット） |
+| DELETE | `/api/references/{id}` | お手本の登録だけを消す（元の映像と解析結果は残す） |
 | GET | `/api/practices` | 練習（映像のまとめ）の一覧。新しい順 |
 | POST | `/api/practices` | 練習を作る（`{name, date, kind, camera, memo, videoIds}`、映像は 50 本まで）。`data/practices/<id>.json` に置く |
 | GET | `/api/practices/{id}` | 練習（`practice.v1.schema.json`） |

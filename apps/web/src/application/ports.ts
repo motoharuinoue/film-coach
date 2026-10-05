@@ -8,6 +8,7 @@ import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
 import type { PoseFrame } from "../domain/pose";
 import type { Practice, PracticeInput } from "../domain/practice";
+import type { LocalReference, ReferencePatch, ReferenceRequest } from "../domain/reference";
 import type { ThrowAnalysis, ThrowsRequest } from "../domain/throws";
 import type { QuotaStatus, YouTubeSearchResult } from "../domain/youtube";
 import type { ManualAdjust } from "../domain/weighting";
@@ -113,6 +114,16 @@ export interface FootageLibrary {
   youtubeStatus(): Promise<{ configured: boolean; quota: QuotaStatus | null }>;
   /** お手本の候補を探す。1 回で 102 ユニット使う */
   searchYouTube(query: string, opts?: { creativeCommonsOnly?: boolean; max?: number }): Promise<YouTubeSearchResult>;
+  /** 手元のお手本（新しい順） */
+  references(): Promise<LocalReference[]>;
+  /** 投球を解析した YouTube の映像をお手本にする。YouTube の統計を取り直す（2 ユニット） */
+  registerReference(req: ReferenceRequest): Promise<LocalReference>;
+  /** 種類・信頼チャンネル・手動調整を変える */
+  updateReference(id: string, patch: ReferencePatch): Promise<LocalReference>;
+  /** YouTube の統計を取り直す（2 ユニット） */
+  refreshReference(id: string): Promise<LocalReference>;
+  /** お手本の登録だけを消す（元の映像と解析結果は残す） */
+  deleteReference(id: string): Promise<void>;
 }
 
 /** 選手の身体の情報。指標の計算に使い、この端末の中にだけ保存する（リポジトリにもサーバーにも置かない） */

@@ -9,7 +9,8 @@ import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFootage } from "../../application/footage";
-import { HttpFootageLibrary, parseFootage, parsePractice, parseThrows, parseTrack } from "./httpFootageLibrary";
+import { toReference } from "../../application/localReferences";
+import { HttpFootageLibrary, parseFootage, parsePractice, parseReference, parseThrows, parseTrack } from "./httpFootageLibrary";
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/schema");
 const read = (name: string) => JSON.parse(readFileSync(resolve(SCHEMA, name), "utf8")) as Record<string, unknown>;
@@ -24,6 +25,7 @@ ajv.addSchema(read("pose-sequence.v1.schema.json"));
 const validThrows = ajv.compile(read("throw-analysis.v1.schema.json"));
 const validPractice = ajv.compile(read("practice.v1.schema.json"));
 const validYouTubeSearch = ajv.compile(read("youtube-search.v1.schema.json"));
+const validReference = ajv.compile(read("reference.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -37,6 +39,10 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("追跡結果", () => {
     expect(validTrack(samples.track), JSON.stringify(validTrack.errors)).toBe(true);
+  });
+
+  it("お手本", () => {
+    expect(validReference(withoutLinks(samples.reference!)), JSON.stringify(validReference.errors)).toBe(true);
   });
 
   it("YouTube の検索", () => {
@@ -106,6 +112,20 @@ describe("投球の解析の読み込み", () => {
     const f = parseFootage(samples.uploadWithThrows!);
     expect(f.links.throws).toBe(`/api/videos/${f.id}/throws`);
     expect(parseFootage(samples.upload!).links.throws).toBeNull();
+  });
+});
+
+describe("お手本の読み込み", () => {
+  it("登録を読み、元の映像と投球の解析結果と合わせて、デモと同じ形に写せる", () => {
+    const r = parseReference(samples.reference!);
+    expect(r).toMatchObject({ kind: "model", trustedChannel: false, playerHeightCm: 188, manual: { pinned: false, excluded: false, stars: 3 } });
+    expect(r.videoId).toBe((samples.referenceRequest as { footageId: string }).footageId);
+    const footage = parseFootage(samples.referenceFootage!);
+    expect(footage.source).toBe("youtube");
+    const ref = toReference(r, footage, parseThrows(samples.throws!));
+    expect(ref.reps.length).toBeGreaterThan(0);
+    expect(ref.stats.camera).toBe("side");
+    expect((samples.references as unknown as Record<string, unknown>[]).map(parseReference).map((x) => x.id)).toEqual([r.id]);
   });
 });
 
@@ -233,6 +253,28 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
     const r = await lib.searchYouTube("QB throwing mechanics", { creativeCommonsOnly: true, max: 3 });
     expect(urls[1]).toBe("http://127.0.0.1:8787/api/youtube/search?q=QB+throwing+mechanics&cc=true&max=3");
     expect(r.candidates[0]).toMatchObject({ videoId: expect.stringMatching(/^[A-Za-z0-9_-]{11}$/), license: "youtube" });
-    expect(r.quota.used).toBe(102);
+    expect(r.quota.remaining).toBe(r.quota.limit - r.quota.used);
+    expect(r.quota.used).toBeGreaterThanOrEqual(102); // 検索 1 回ぶん以上
+  });
+
+  it("お手本を登録し、調整し、統計を取り直し、外す", async () => {
+    const calls: { url: string; method?: string; body?: unknown }[] = [];
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return init?.method === "DELETE" ? new Response(null, { status: 204 }) : jsonResponse(samples.reference, 201);
+    }) as unknown as typeof globalThis.fetch;
+    const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
+    const req = samples.referenceRequest as unknown as Parameters<typeof lib.registerReference>[0];
+    const r = await lib.registerReference(req);
+    await lib.updateReference(r.id, { manual: { pinned: true, excluded: false, stars: 5 } });
+    await lib.refreshReference(r.id);
+    await lib.deleteReference(r.id);
+    const base = "http://127.0.0.1:8787/api/references";
+    expect(calls).toEqual([
+      { url: base, method: "POST", body: samples.referenceRequest },
+      { url: `${base}/${r.id}`, method: "PATCH", body: { manual: { pinned: true, excluded: false, stars: 5 } } },
+      { url: `${base}/${r.id}/refresh`, method: "POST", body: undefined },
+      { url: `${base}/${r.id}`, method: "DELETE", body: undefined },
+    ]);
   });
 });

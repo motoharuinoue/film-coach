@@ -5,6 +5,7 @@ import type { FootageLibrary, TrackingHandlers, TrackingProgress, TrackingSummar
 import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFrame, TrackHint } from "../../domain/footage";
 import type { PoseSequence } from "../../domain/pose";
 import type { Practice, PracticeInput } from "../../domain/practice";
+import type { LocalReference, ReferencePatch, ReferenceRequest } from "../../domain/reference";
 import type { ThrowAnalysis, ThrowRep, ThrowsRequest } from "../../domain/throws";
 import type { QuotaStatus, YouTubeSearchResult } from "../../domain/youtube";
 
@@ -99,6 +100,11 @@ export function parsePractice(j: Json): Practice {
     videoIds: (j.videoIds as string[]) ?? [],
     createdAt: String(j.createdAt),
   };
+}
+
+export function parseReference(j: Json): LocalReference {
+  const { links: _links, schemaVersion: _v, ...rest } = j;
+  return rest as unknown as LocalReference;
 }
 
 type EventSourceLike = { addEventListener(type: string, fn: (e: MessageEvent) => void): void; close(): void; onerror: ((e: Event) => void) | null };
@@ -232,6 +238,27 @@ export class HttpFootageLibrary implements FootageLibrary {
   async searchYouTube(query: string, opts: { creativeCommonsOnly?: boolean; max?: number } = {}) {
     const params = new URLSearchParams({ q: query, cc: String(Boolean(opts.creativeCommonsOnly)), max: String(opts.max ?? 12) });
     return (await this.json(`/api/youtube/search?${params}`)) as unknown as YouTubeSearchResult;
+  }
+
+  async references() {
+    return ((await this.json("/api/references")) as unknown as Json[]).map(parseReference);
+  }
+
+  async registerReference(req: ReferenceRequest) {
+    return parseReference(await this.json("/api/references", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(req) }));
+  }
+
+  async updateReference(id: string, patch: ReferencePatch) {
+    const init = { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) };
+    return parseReference(await this.json(`/api/references/${encodeURIComponent(id)}`, init));
+  }
+
+  async refreshReference(id: string) {
+    return parseReference(await this.json(`/api/references/${encodeURIComponent(id)}/refresh`, { method: "POST" }));
+  }
+
+  async deleteReference(id: string) {
+    await this.json(`/api/references/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   follow(events: string, handlers: TrackingHandlers) {

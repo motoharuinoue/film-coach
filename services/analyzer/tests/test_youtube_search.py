@@ -5,6 +5,7 @@
 
 import io
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -90,6 +91,12 @@ class FakeSearch:
         if self.error:
             raise self.error
         return [candidate(i) for i in range(1, 4)]
+
+    def video(self, video_id: str) -> YouTubeCandidate | None:
+        self.calls.append((video_id, 1, False))
+        if self.error:
+            raise self.error
+        return None if video_id == "Gone0000000" else replace(candidate(7), video_id=video_id)
 
 
 class MemoryLedger:

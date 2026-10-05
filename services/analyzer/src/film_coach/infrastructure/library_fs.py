@@ -1,5 +1,5 @@
 """VideoStore と PracticeStore のファイル実装。data/library/<id>/ に、記録・元の動画・解析結果を置く。
-練習（映像のまとめ）は data/practices/<id>.json に置く。
+練習（映像のまとめ）は data/practices/<id>.json、お手本の登録は data/references/<id>.json に置く。
 
 data/library/<id>/
   record.json        記録（video-record.v1.schema.json）
@@ -24,13 +24,15 @@ from ..application.throws import ThrowAnalysis
 from ..application.track_target import TargetTrack
 from ..domain.library import VideoRecord
 from ..domain.practice import Practice
-from .json_throws import write_throws
+from ..domain.reference import Reference
+from .json_throws import read_throws, write_throws
 from .json_track import read_track, write_track
 from .paths import data_dir
 from .schema import validate
 
 RECORD_SCHEMA = "video-record.v1.schema.json"
 PRACTICE_SCHEMA = "practice.v1.schema.json"
+REFERENCE_SCHEMA = "reference.v1.schema.json"
 _ID = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -120,6 +122,10 @@ class FileVideoStore:
     def save_throws(self, video_id: str, throws: ThrowAnalysis) -> None:
         write_throws(throws, self.output_dir(video_id) / "throws.json")
 
+    def load_throws(self, video_id: str) -> ThrowAnalysis | None:
+        p = self.throws_path(video_id)
+        return read_throws(p) if p else None
+
     def throws_path(self, video_id: str) -> Path | None:
         p = self._dir(video_id) / "outputs" / "throws.json"
         return p if p.exists() else None
@@ -131,45 +137,86 @@ class FileVideoStore:
         return p if p.exists() else None
 
 
-class FilePracticeStore:
-    def __init__(self, root: Path | None = None) -> None:
-        self.root = root or data_dir() / "practices"
+class _JsonDir:
+    """ID ごとに 1 つの JSON を置くディレクトリ。保存の前と読み込みのあとにスキーマで確かめる"""
 
-    def _path(self, practice_id: str) -> Path | None:
+    def __init__(self, root: Path, schema: str) -> None:
+        self.root = root
+        self.schema = schema
+
+    def path(self, item_id: str) -> Path | None:
         # ID は自分で作った 12 桁の 16 進数だけを受け付ける（パスに使うため）
-        return self.root / f"{practice_id}.json" if _ID.match(practice_id) else None
+        return self.root / f"{item_id}.json" if _ID.match(item_id) else None
 
-    def new_id(self) -> str:
-        return uuid.uuid4().hex[:12]
-
-    def save(self, practice: Practice) -> None:
-        path = self._path(practice.id)
+    def write(self, item_id: str, data: dict[str, Any]) -> None:
+        path = self.path(item_id)
         if path is None:
-            raise ValueError(f"不正な ID です：{practice.id!r}")
-        data = dto.practice_to_json(practice)
-        validate(PRACTICE_SCHEMA, data)
+            raise ValueError(f"不正な ID です：{item_id!r}")
+        validate(self.schema, data)
         self.root.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(path)
 
-    def get(self, practice_id: str) -> Practice | None:
-        path = self._path(practice_id)
+    def read(self, item_id: str) -> dict[str, Any] | None:
+        path = self.path(item_id)
         if path is None or not path.exists():
             return None
-        data = json.loads(path.read_text(encoding="utf-8"))
-        validate(PRACTICE_SCHEMA, data)
-        return dto.practice_from_json(data)
+        data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        validate(self.schema, data)
+        return data
 
-    def list(self) -> list[Practice]:
-        if not self.root.exists():
-            return []
-        found = [self.get(p.stem) for p in sorted(self.root.glob("*.json"))]
-        return [p for p in found if p]
+    def ids(self) -> list[str]:
+        return [p.stem for p in sorted(self.root.glob("*.json"))] if self.root.exists() else []
 
-    def delete(self, practice_id: str) -> bool:
-        path = self._path(practice_id)
+    def delete(self, item_id: str) -> bool:
+        path = self.path(item_id)
         if path is None or not path.exists():
             return False
         path.unlink()
         return True
+
+
+class FilePracticeStore:
+    def __init__(self, root: Path | None = None) -> None:
+        self._dir = _JsonDir(root or data_dir() / "practices", PRACTICE_SCHEMA)
+        self.root = self._dir.root
+
+    def new_id(self) -> str:
+        return uuid.uuid4().hex[:12]
+
+    def save(self, practice: Practice) -> None:
+        self._dir.write(practice.id, dto.practice_to_json(practice))
+
+    def get(self, practice_id: str) -> Practice | None:
+        data = self._dir.read(practice_id)
+        return dto.practice_from_json(data) if data else None
+
+    def list(self) -> list[Practice]:
+        return [p for i in self._dir.ids() if (p := self.get(i))]
+
+    def delete(self, practice_id: str) -> bool:
+        return self._dir.delete(practice_id)
+
+
+class FileReferenceStore:
+    """お手本の登録を data/references/<id>.json に置く"""
+
+    def __init__(self, root: Path | None = None) -> None:
+        self._dir = _JsonDir(root or data_dir() / "references", REFERENCE_SCHEMA)
+
+    def new_id(self) -> str:
+        return uuid.uuid4().hex[:12]
+
+    def save(self, reference: Reference) -> None:
+        self._dir.write(reference.id, dto.reference_to_json(reference))
+
+    def get(self, reference_id: str) -> Reference | None:
+        data = self._dir.read(reference_id)
+        return dto.reference_from_json(data) if data else None
+
+    def list(self) -> list[Reference]:
+        return [r for i in self._dir.ids() if (r := self.get(i))]
+
+    def delete(self, reference_id: str) -> bool:
+        return self._dir.delete(reference_id)

@@ -107,7 +107,7 @@ film-coach/
 | YouTube の取得 | yt-dlp（区間のみ） |
 | YouTube の検索・情報 | YouTube Data API v3（標準ライブラリの urllib で呼ぶ。キーは macOS のキーチェーンか環境変数 `YOUTUBE_API_KEY`。無料枠は `data/youtube-quota.json` に、米国太平洋時間の日ごとに数える） |
 | LLM | Ollama |
-| 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果、`data/practices/<id>.json` に練習）。件数が増えたら SQLite に移す |
+| 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果、`data/practices/<id>.json` に練習、`data/references/<id>.json` にお手本の登録）。件数が増えたら SQLite に移す |
 
 ## 4. データモデル
 

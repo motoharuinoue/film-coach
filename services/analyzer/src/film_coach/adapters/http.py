@@ -35,6 +35,14 @@ from ..application.library import (
 )
 from ..application.ports import ModelStore
 from ..application.practice import PracticeStore, create_practice, delete_practice, get_practice, list_practices
+from ..application.reference import (
+    ReferenceStore,
+    delete_reference,
+    list_references,
+    refresh_reference,
+    register_reference,
+    update_reference,
+)
 from ..application.track_target import (
     CameraMotionEstimator,
     FrameSink,
@@ -58,6 +66,7 @@ from ..application.youtube_search import (
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord
 from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
+from ..domain.reference import Manual, Reference, ReferenceError, ReferenceKind
 from ..domain.world import NotEnoughPoseError
 from ..domain.youtube import SegmentError
 
@@ -85,6 +94,8 @@ class HttpDeps:
     quota: QuotaLedger | None = None
     """YouTube Data API の無料枠の記録"""
     clock: Clock | None = None
+    references: ReferenceStore | None = None
+    """お手本の登録"""
     motion: Callable[[], CameraMotionEstimator] | None = None
     """カメラの動きを見積もる（追跡ごとに新しく作る）"""
 
@@ -104,6 +115,25 @@ class PracticeRequest(BaseModel):
     videoIds: list[str] = Field(max_length=MAX_VIDEOS)
 
 
+class ManualBody(BaseModel):
+    pinned: bool = False
+    excluded: bool = False
+    stars: int = Field(default=3, ge=1, le=5)
+
+
+class ReferenceRequest(BaseModel):
+    footageId: str
+    kind: ReferenceKind = "model"
+    trustedChannel: bool = False
+    playerHeightCm: float | None = Field(default=None, ge=120, le=230)
+
+
+class ReferencePatch(BaseModel):
+    kind: ReferenceKind | None = None
+    trustedChannel: bool | None = None
+    manual: ManualBody | None = None
+
+
 class ThrowsRequest(BaseModel):
     heightCm: float = Field(ge=120, le=230, description="選手の身長（cm）")
     camera: CameraAngle = "side"
@@ -121,7 +151,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=deps.allowed_origins,
-        allow_methods=["GET", "POST", "DELETE"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Content-Type"],
     )
 
@@ -153,6 +183,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     @app.exception_handler(ImportRejected)
     @app.exception_handler(SegmentError)
     @app.exception_handler(PracticeError)
+    @app.exception_handler(ReferenceError)
     async def bad_request(_req: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
@@ -310,6 +341,86 @@ def create_app(deps: HttpDeps) -> FastAPI:
             "candidates": [dto.candidate_to_json(c) for c in found],
             "quota": dto.quota_to_json(quota),
         }
+
+    def reference_view(r: Reference) -> dict[str, Any]:
+        throws = deps.store.throws_path(r.video_id)
+        links = {
+            "self": f"/api/references/{r.id}",
+            "footage": f"/api/videos/{r.video_id}",
+            "throws": f"/api/videos/{r.video_id}/throws" if throws else None,
+        }
+        return {**dto.reference_to_json(r), "links": links}
+
+    def reference_store() -> ReferenceStore:
+        if deps.references is None:
+            raise HTTPException(503, "お手本の保存先がありません")
+        return deps.references
+
+    def youtube_deps() -> tuple[YouTubeSearch, QuotaLedger]:
+        if deps.youtube is None or deps.quota is None:
+            raise HTTPException(503, "YouTube Data API は使えません")
+        return deps.youtube, deps.quota
+
+    @app.get("/api/references")
+    def references() -> list[dict[str, Any]]:
+        return [reference_view(r) for r in list_references(reference_store())]
+
+    @app.post("/api/references", status_code=201)
+    def new_reference(body: ReferenceRequest) -> dict[str, Any]:
+        api, ledger = youtube_deps()
+        try:
+            r = register_reference(
+                reference_store(),
+                deps.store,
+                api,
+                ledger,
+                body.footageId,
+                body.kind,
+                body.trustedChannel,
+                body.playerHeightCm,
+                now,
+            )
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        except YouTubeNotConfigured as e:
+            raise HTTPException(503, str(e)) from e
+        except QuotaExceeded as e:
+            raise HTTPException(429, str(e)) from e
+        except YouTubeApiError as e:
+            raise HTTPException(502, str(e)) from e
+        return reference_view(r)
+
+    @app.patch("/api/references/{reference_id}")
+    def patch_reference(reference_id: str, body: ReferencePatch) -> dict[str, Any]:
+        manual = Manual(body.manual.pinned, body.manual.excluded, body.manual.stars) if body.manual else None
+        try:
+            r = update_reference(reference_store(), reference_id, body.kind, body.trustedChannel, manual)
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        return reference_view(r)
+
+    @app.post("/api/references/{reference_id}/refresh")
+    def refresh(reference_id: str) -> dict[str, Any]:
+        """YouTube の統計を取り直す（2 ユニット）"""
+        api, ledger = youtube_deps()
+        try:
+            r = refresh_reference(reference_store(), api, ledger, reference_id, now)
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        except QuotaExceeded as e:
+            raise HTTPException(429, str(e)) from e
+        except (YouTubeNotConfigured, YouTubeApiError) as e:
+            raise HTTPException(502, str(e)) from e
+        return reference_view(r)
+
+    @app.delete("/api/references/{reference_id}", status_code=204)
+    def remove_reference(reference_id: str) -> Response:
+        """お手本の登録だけを消す。元の映像と解析結果は残す"""
+        try:
+            delete_reference(reference_store(), reference_id)
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        return Response(status_code=204)
 
     @app.get("/api/practices")
     def practices() -> list[dict[str, Any]]:

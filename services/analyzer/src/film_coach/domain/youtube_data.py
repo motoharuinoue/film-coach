@@ -15,6 +15,8 @@ from zoneinfo import ZoneInfo
 DAILY_QUOTA = 10_000
 SEARCH_COST = 100 + 1 + 1
 """1 回の検索で使うユニット（検索 + 動画の情報 + チャンネルの情報）"""
+VIDEO_COST = 1 + 1
+"""1 本の動画の統計を取り直すのに使うユニット（動画の情報 + チャンネルの情報）"""
 MAX_RESULTS = 25
 """1 回の検索で受け取る候補の上限"""
 MAX_QUERY = 100

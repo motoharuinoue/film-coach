@@ -42,6 +42,10 @@ class YouTubeSearch(Protocol):
         """埋め込みで再生できる動画を、関連の高い順に。高評価数・登録者数も添える"""
         ...
 
+    def video(self, video_id: str) -> YouTubeCandidate | None:
+        """1 本の動画の情報と統計。なければ（削除・非公開・埋め込み不可）None"""
+        ...
+
 
 class QuotaLedger(Protocol):
     """その日に使ったユニット数の記録"""

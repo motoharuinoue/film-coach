@@ -1,4 +1,4 @@
-"""投球の解析結果の JSON 書き出し（packages/schema/throw-analysis.v1.schema.json）。"""
+"""投球の解析結果の JSON 入出力（packages/schema/throw-analysis.v1.schema.json）。"""
 
 from __future__ import annotations
 
@@ -6,8 +6,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..application.throws import ThrowAnalysis
+from ..application.analyze_pose import RepAnalysis
+from ..application.throws import ThrowAnalysis, ThrowRep
+from ..domain.library import VideoInfo
+from ..domain.phases import Events, Phase
 from ..domain.pose import Keypoint, PoseSequence
+from ..domain.world import WorldTransform
+from .json_pose import sequence_from_json
 from .schema import validate
 
 THROWS_SCHEMA = "throw-analysis.v1.schema.json"
@@ -69,3 +74,35 @@ def throws_to_json(ta: ThrowAnalysis) -> dict[str, Any]:
 def write_throws(ta: ThrowAnalysis, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(throws_to_json(ta), ensure_ascii=False), encoding="utf-8")
+
+
+def throws_from_json(data: dict[str, Any]) -> ThrowAnalysis:
+    validate(THROWS_SCHEMA, data)
+    v = data["video"]
+    reps = []
+    for r in data["reps"]:
+        e, t = r["events"], r["transform"]
+        events = Events(e["setStart"], e["strideStart"], e["plant"], e["release"], e["followStart"], e["last"])
+        analysis = RepAnalysis(
+            camera=data["camera"],
+            sequence=sequence_from_json(r["sequence"]),
+            events=events,
+            phases=[Phase(p["key"], int(p["start"]), int(p["end"])) for p in r["phases"]],
+            metrics={k: float(val) for k, val in r["metrics"].items()},
+        )
+        transform = WorldTransform(
+            float(t["mPerPx"]), float(t["originX"]), float(t["groundY"]), t["direction"], float(t["ankleM"])
+        )
+        reps.append(ThrowRep(int(r["index"]), int(r["start"]), int(r["end"]), transform, analysis))
+    return ThrowAnalysis(
+        VideoInfo(v["name"], float(v["fps"]), int(v["width"]), int(v["height"]), int(v["frameCount"])),
+        float(data["heightM"]),
+        data["camera"],
+        data["hand"],
+        reps,
+        list(data["warnings"]),
+    )
+
+
+def read_throws(source: Path) -> ThrowAnalysis:
+    return throws_from_json(json.loads(source.read_text(encoding="utf-8")))

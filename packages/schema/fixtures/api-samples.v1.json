@@ -4264,13 +4264,125 @@
    }
   }
  ],
+ "referenceRequest": {
+  "footageId": "000000000005",
+  "kind": "model",
+  "trustedChannel": false,
+  "playerHeightCm": 188
+ },
+ "reference": {
+  "schemaVersion": 1,
+  "id": "000000000006",
+  "videoId": "000000000005",
+  "youtubeId": "Qb7Throw_03",
+  "title": "QB の投げ方 7",
+  "channel": "架空の QB 研究所",
+  "channelId": "UCfake",
+  "license": "youtube",
+  "kind": "model",
+  "trustedChannel": false,
+  "playerHeightCm": 188.0,
+  "stats": {
+   "views": 7000,
+   "likes": 350,
+   "comments": 3,
+   "subscribers": 12000,
+   "durationSec": 95,
+   "publishedAt": "2025-01-01T00:00:00Z",
+   "fetchedAt": "2026-10-05T12:00:00+00:00"
+  },
+  "manual": {
+   "pinned": false,
+   "excluded": false,
+   "stars": 3
+  },
+  "createdAt": "2026-10-05T12:00:00+00:00",
+  "links": {
+   "self": "/api/references/000000000006",
+   "footage": "/api/videos/000000000005",
+   "throws": "/api/videos/000000000005/throws"
+  }
+ },
+ "references": [
+  {
+   "schemaVersion": 1,
+   "id": "000000000006",
+   "videoId": "000000000005",
+   "youtubeId": "Qb7Throw_03",
+   "title": "QB の投げ方 7",
+   "channel": "架空の QB 研究所",
+   "channelId": "UCfake",
+   "license": "youtube",
+   "kind": "model",
+   "trustedChannel": false,
+   "playerHeightCm": 188.0,
+   "stats": {
+    "views": 7000,
+    "likes": 350,
+    "comments": 3,
+    "subscribers": 12000,
+    "durationSec": 95,
+    "publishedAt": "2025-01-01T00:00:00Z",
+    "fetchedAt": "2026-10-05T12:00:00+00:00"
+   },
+   "manual": {
+    "pinned": false,
+    "excluded": false,
+    "stars": 3
+   },
+   "createdAt": "2026-10-05T12:00:00+00:00",
+   "links": {
+    "self": "/api/references/000000000006",
+    "footage": "/api/videos/000000000005",
+    "throws": "/api/videos/000000000005/throws"
+   }
+  }
+ ],
+ "referenceFootage": {
+  "schemaVersion": 1,
+  "id": "000000000005",
+  "name": "QB の 3 ステップドロップ",
+  "source": "youtube",
+  "info": {
+   "name": "QB の 3 ステップドロップ",
+   "fps": 30.0,
+   "width": 1920,
+   "height": 1080,
+   "frameCount": 60,
+   "duration": 2.0
+  },
+  "createdAt": "2026-10-05T12:00:00+00:00",
+  "youtube": {
+   "videoId": "Qb7Throw_03",
+   "start": 10,
+   "end": 40,
+   "title": "QB の 3 ステップドロップ",
+   "channel": "Spiral Lab",
+   "license": "creativeCommon",
+   "url": "https://www.youtube.com/watch?v=Qb7Throw_03&t=10s"
+  },
+  "mediaRetained": true,
+  "trackStatus": "none",
+  "label": "",
+  "errors": [],
+  "links": {
+   "self": "/api/videos/000000000005",
+   "frame": "/api/videos/000000000005/frame",
+   "media": "/api/videos/000000000005/media",
+   "track": null,
+   "preview": null,
+   "focus": null,
+   "throws": "/api/videos/000000000005/throws",
+   "events": null
+  }
+ },
  "youtubeStatus": {
   "configured": true,
   "quota": {
    "day": "2026-10-05",
-   "used": 0,
+   "used": 2,
    "limit": 10000,
-   "remaining": 10000,
+   "remaining": 9998,
    "resetsAt": "2026-10-06T07:00:00+00:00"
   }
  },
@@ -4329,9 +4441,9 @@
   ],
   "quota": {
    "day": "2026-10-05",
-   "used": 102,
+   "used": 104,
    "limit": 10000,
-   "remaining": 9898,
+   "remaining": 9896,
    "resetsAt": "2026-10-06T07:00:00+00:00"
   }
  }
