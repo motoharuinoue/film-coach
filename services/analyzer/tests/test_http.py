@@ -10,7 +10,7 @@ from test_youtube_library import FakeFetcher, FakeGrabber
 
 from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application.jobs import JobRunner
-from film_coach.infrastructure.library_fs import FileVideoStore
+from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
 
 ORIGIN = "http://localhost:5173"
 
@@ -27,6 +27,7 @@ class FakeModels:
 def client(tmp_path: Path) -> TestClient:
     deps = HttpDeps(
         store=FileVideoStore(tmp_path / "library"),
+        practices=FilePracticeStore(tmp_path / "practices"),
         grabber=FakeGrabber(),
         fetcher=FakeFetcher(),
         jobs=JobRunner(),

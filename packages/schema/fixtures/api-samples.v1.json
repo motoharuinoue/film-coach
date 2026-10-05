@@ -4216,5 +4216,52 @@
    "throws": "/api/videos/000000000003/throws",
    "events": null
   }
- }
+ },
+ "practiceRequest": {
+  "name": "投球ドリル",
+  "date": "2026-10-05",
+  "kind": "drill",
+  "camera": "side",
+  "memo": "",
+  "videoIds": [
+   "000000000003",
+   "000000000001"
+  ]
+ },
+ "practice": {
+  "schemaVersion": 1,
+  "id": "000000000004",
+  "name": "投球ドリル",
+  "date": "2026-10-05",
+  "kind": "drill",
+  "camera": "side",
+  "memo": "",
+  "videoIds": [
+   "000000000003",
+   "000000000001"
+  ],
+  "createdAt": "2026-10-05T12:00:00+00:00",
+  "links": {
+   "self": "/api/practices/000000000004"
+  }
+ },
+ "practices": [
+  {
+   "schemaVersion": 1,
+   "id": "000000000004",
+   "name": "投球ドリル",
+   "date": "2026-10-05",
+   "kind": "drill",
+   "camera": "side",
+   "memo": "",
+   "videoIds": [
+    "000000000003",
+    "000000000001"
+   ],
+   "createdAt": "2026-10-05T12:00:00+00:00",
+   "links": {
+    "self": "/api/practices/000000000004"
+   }
+  }
+ ]
 }

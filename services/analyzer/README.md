@@ -100,6 +100,10 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
 | POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera}`）。追跡した骨格だけを使うので、YouTube の区間でも動く |
 | GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
+| GET | `/api/practices` | 練習（映像のまとめ）の一覧。新しい順 |
+| POST | `/api/practices` | 練習を作る（`{name, date, kind, camera, memo, videoIds}`、映像は 50 本まで）。`data/practices/<id>.json` に置く |
+| GET | `/api/practices/{id}` | 練習（`practice.v1.schema.json`） |
+| DELETE | `/api/practices/{id}` | 練習を消す。まとめを消すだけで、映像と解析結果は残す |
 
 - 解析は 1 本ずつ裏で動かします（ONNX Runtime が CPU を使い切るため）
 - YouTube から取り込んだ区間は、追跡が終わったら元の動画を消し、枠・骨格と出典だけを残します。元の動画の複製になる確認用の動画も作りません（ADR-0005）

@@ -270,6 +270,7 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
   const player = useRef<YTPlayer | null>(null);
+  const pending = useRef<number | null>(null);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.5);
@@ -287,7 +288,13 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
         host: "https://www.youtube-nocookie.com",
         playerVars: { start, end, rel: 0, controls: 0, modestbranding: 1, playsinline: 1, mute: 1 },
         events: {
-          onReady: () => player.current?.setPlaybackRate(rate),
+          onReady: () => {
+            player.current?.setPlaybackRate(rate);
+            if (pending.current !== null) {
+              player.current?.seekTo(start + pending.current, true);
+              pending.current = null;
+            }
+          },
           onStateChange: (e: { data: number }) => setPlaying(e.data === 1),
         },
       });
@@ -317,8 +324,10 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
   };
   useEffect(() => {
     if (!seekTo) return;
-    player.current?.pauseVideo();
-    player.current?.seekTo(start + seekTo.t, true);
+    // プレイヤーの準備ができる前なら、準備ができたときに移る
+    if (!player.current?.seekTo) pending.current = seekTo.t;
+    player.current?.pauseVideo?.();
+    player.current?.seekTo?.(start + seekTo.t, true);
     setT(seekTo.t);
   }, [seekTo, start]);
 

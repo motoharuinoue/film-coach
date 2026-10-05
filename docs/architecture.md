@@ -107,7 +107,7 @@ film-coach/
 | YouTube の取得 | yt-dlp（区間のみ） |
 | YouTube の検索・情報 | YouTube Data API v3 |
 | LLM | Ollama |
-| 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果）。件数が増えたら SQLite に移す |
+| 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果、`data/practices/<id>.json` に練習）。件数が増えたら SQLite に移す |
 
 ## 4. データモデル
 
@@ -116,7 +116,7 @@ film-coach/
 | エンティティ | 主な項目 |
 |---|---|
 | Player | 名前、背番号、身長、利き腕、ポジション |
-| Session | 日付、種別（ドリル／試合）、カメラ角度、メモ |
+| Session | 日付、種別（ドリル／試合）、カメラ角度、メモ。実際の映像のまとめは「練習」（`practice.v1`、`data/practices/`）として実装した。デモの Session（合成データ）と区別するため |
 | Video | 取り込み元（local / youtube）、出典 URL、fps、解像度、長さ |
 | Rep | 開始・終了フレーム、対象の追跡 ID、フェーズの境界 |
 | PoseSequence | 骨格データのパス、関節ごとの信頼度 |

@@ -22,7 +22,7 @@ from film_coach.bootstrap import cli_deps
 from film_coach.domain.pose import PoseSequence
 from film_coach.infrastructure.json_throws import throws_to_json
 from film_coach.infrastructure.json_track import read_track, track_from_json, track_to_json, write_track
-from film_coach.infrastructure.library_fs import FileVideoStore
+from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
 from film_coach.infrastructure.schema import validate
 
 
@@ -72,6 +72,7 @@ def api(tmp_path: Path) -> tuple[TestClient, FileVideoStore]:
     store = FileVideoStore(tmp_path / "library")
     deps = HttpDeps(
         store=store,
+        practices=FilePracticeStore(tmp_path / "practices"),
         grabber=FakeGrabber(),
         fetcher=FakeFetcher(),
         jobs=JobRunner(),

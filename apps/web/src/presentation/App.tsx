@@ -32,6 +32,7 @@ const router = createHashRouter([
       { path: "/progress", ...page(() => import("./pages/Progress"), "Progress") },
       { path: "/footage", ...page(() => import("./pages/footage/FootageList"), "FootageList") },
       { path: "/footage/:id/pick", ...page(() => import("./pages/footage/FootagePick"), "FootagePick") },
+      { path: "/footage/practices/:id", ...page(() => import("./pages/footage/PracticePage"), "PracticePage") },
       { path: "/footage/:id", ...page(() => import("./pages/footage/FootageViewer"), "FootageViewer") },
       { path: "*", element: <NotFound /> },
     ],

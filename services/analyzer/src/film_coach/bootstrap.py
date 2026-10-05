@@ -97,13 +97,14 @@ def http_deps() -> HttpDeps:
 
     from .adapters.http import HttpDeps
     from .application.jobs import JobRunner
-    from .infrastructure.library_fs import FileVideoStore
+    from .infrastructure.library_fs import FilePracticeStore, FileVideoStore
     from .infrastructure.video_cv import OpenCvFrameGrabber
     from .infrastructure.youtube_dlp import YtDlpFetcher
 
     origins = os.environ.get("FILM_COACH_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
     return HttpDeps(
         store=FileVideoStore(),
+        practices=FilePracticeStore(),
         grabber=OpenCvFrameGrabber(),
         fetcher=YtDlpFetcher(),
         jobs=JobRunner(),

@@ -4,7 +4,7 @@ import type { CameraAngle } from "../domain/camera";
 import type { AnalyzedRep, BestRep, Session } from "../domain/entities";
 import { evaluateMetric, type MetricEvaluation, type Zones } from "../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey, type RadarAxis } from "../domain/metrics";
-import { kp } from "../domain/pose";
+import { releasePoint, releaseSpread } from "../domain/practice";
 
 /** 各指標を、自分の値・自己ベスト・お手本ゾーンで評価する。カメラ角度で測れない指標は判定不可 */
 export function evaluateRep(rep: AnalyzedRep, camera: CameraAngle, zones: Zones, best?: AnalyzedRep): MetricEvaluation[] {
@@ -46,23 +46,12 @@ export function strengths(evals: MetricEvaluation[]): MetricKey[] {
 
 /** 各レップのリリース点（接地時の後ろ足からの前後位置と高さ、cm） */
 export function releasePoints(s: Session) {
-  return s.reps.map((r) => {
-    const back = kp(r.seq.frames[r.events.plant]!, "rAnkle");
-    const w = kp(r.seq.frames[r.events.release]!, "rWrist");
-    return { id: r.id, x: (w.x - back.x) * 100, y: w.y * 100 };
-  });
+  return s.reps.map((r) => ({ id: r.id, ...releasePoint(r.seq, r.events) }));
 }
 
-const sd = (xs: number[]) => {
-  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
-  return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
-};
-
-/** リリース点のばらつき（cm）と、それを 0〜100 にしたスコア（4cm 以下が満点） */
+/** リリース点のばらつき（cm）と、それを 0〜100 にしたスコア（4cm 以下が満点）。1 本だけならばらつきは 0 */
 export function consistency(s: Session) {
-  const pts = releasePoints(s);
-  const spread = Math.hypot(sd(pts.map((p) => p.x)), sd(pts.map((p) => p.y)));
-  return { spread, score: Math.round(Math.max(40, Math.min(100, 100 - (spread - 4) * 6))) };
+  return releaseSpread(releasePoints(s)) ?? { spread: 0, score: 100 };
 }
 
 /** レーダーチャートの観点ごとのスコア。判定できる指標がない観点は undefined */

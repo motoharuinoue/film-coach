@@ -1,4 +1,5 @@
-"""VideoStore のファイル実装。data/library/<id>/ に、記録・元の動画・解析結果を置く。
+"""VideoStore と PracticeStore のファイル実装。data/library/<id>/ に、記録・元の動画・解析結果を置く。
+練習（映像のまとめ）は data/practices/<id>.json に置く。
 
 data/library/<id>/
   record.json        記録（video-record.v1.schema.json）
@@ -22,12 +23,14 @@ from ..application import dto
 from ..application.throws import ThrowAnalysis
 from ..application.track_target import TargetTrack
 from ..domain.library import VideoRecord
+from ..domain.practice import Practice
 from .json_throws import write_throws
 from .json_track import read_track, write_track
 from .paths import data_dir
 from .schema import validate
 
 RECORD_SCHEMA = "video-record.v1.schema.json"
+PRACTICE_SCHEMA = "practice.v1.schema.json"
 _ID = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -126,3 +129,47 @@ class FileVideoStore:
             return None
         p = self._dir(video_id) / "outputs" / name
         return p if p.exists() else None
+
+
+class FilePracticeStore:
+    def __init__(self, root: Path | None = None) -> None:
+        self.root = root or data_dir() / "practices"
+
+    def _path(self, practice_id: str) -> Path | None:
+        # ID は自分で作った 12 桁の 16 進数だけを受け付ける（パスに使うため）
+        return self.root / f"{practice_id}.json" if _ID.match(practice_id) else None
+
+    def new_id(self) -> str:
+        return uuid.uuid4().hex[:12]
+
+    def save(self, practice: Practice) -> None:
+        path = self._path(practice.id)
+        if path is None:
+            raise ValueError(f"不正な ID です：{practice.id!r}")
+        data = dto.practice_to_json(practice)
+        validate(PRACTICE_SCHEMA, data)
+        self.root.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(path)
+
+    def get(self, practice_id: str) -> Practice | None:
+        path = self._path(practice_id)
+        if path is None or not path.exists():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        validate(PRACTICE_SCHEMA, data)
+        return dto.practice_from_json(data)
+
+    def list(self) -> list[Practice]:
+        if not self.root.exists():
+            return []
+        found = [self.get(p.stem) for p in sorted(self.root.glob("*.json"))]
+        return [p for p in found if p]
+
+    def delete(self, practice_id: str) -> bool:
+        path = self._path(practice_id)
+        if path is None or not path.exists():
+            return False
+        path.unlink()
+        return True
