@@ -34,6 +34,7 @@ from ..application.library import (
 )
 from ..application.ports import ModelStore
 from ..application.track_target import (
+    CameraMotionEstimator,
     FrameSink,
     PersonDetector,
     PoseEstimator,
@@ -65,6 +66,8 @@ class HttpDeps:
     allowed_origins: list[str]
     shots: Callable[[], ShotBoundaryDetector] | None = None
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
+    motion: Callable[[], CameraMotionEstimator] | None = None
+    """カメラの動きを見積もる（追跡ごとに新しく作る）"""
 
 
 class YouTubeImport(BaseModel):
@@ -226,6 +229,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
                     body.label,
                     report,
                     deps.shots() if deps.shots else None,
+                    deps.motion() if deps.motion else None,
                 )
             except TargetNotFoundError as e:
                 raise ValueError(str(e)) from e

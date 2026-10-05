@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from test_http import FakeModels, events
 from test_throws_io_api import synth_track
-from test_track_target import FakeDetector, FakePose, FakeShots, FakeVideo
+from test_track_target import FakeDetector, FakeMotion, FakePose, FakeShots, FakeVideo
 from test_youtube_library import FakeFetcher, FakeGrabber
 
 from film_coach.adapters.http import HttpDeps, create_app
@@ -54,6 +54,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         sink_for=None,
         allowed_origins=[],
         shots=lambda: FakeShots(50),  # 50 フレーム目で場面が変わる
+        motion=FakeMotion,  # カメラが 1 フレームに 3 px ずつ振れる
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()

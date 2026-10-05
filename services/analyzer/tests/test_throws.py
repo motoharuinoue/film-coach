@@ -237,3 +237,23 @@ def test_投球が見つからなければ注意を添える(base_sequence: Pose
     rep = project(base_sequence)
     result = analyze_throws(track_of([rep[0]] * 120, 60), 1.8)
     assert result.reps == [] and any("投球が見つかりません" in w for w in result.warnings)
+
+
+def test_カメラが動いても_見積もった動きを打ち消して同じ結果を出す(base_sequence: PoseSequence) -> None:
+    from dataclasses import replace
+
+    from film_coach.domain.motion import Affine
+
+    rep = project(base_sequence)
+    poses = [rep[0]] * 60 + rep
+    still = analyze_throws(track_of(poses, 60), 1.8)
+    # カメラが 1 フレームに 4 px 右へ、1 px 下へ振れる（画は左上へ流れる）
+    panned = [[(x - 4 * k, y - 1 * k, c) for x, y, c in p] for k, p in enumerate(poses)]
+    camera = [Affine(tx=4 * k, ty=1 * k) for k in range(len(poses))]
+    moving = analyze_throws(replace(track_of(panned, 60), camera=camera), 1.8)
+    assert [r.analysis.events for r in moving.reps] == [r.analysis.events for r in still.reps]
+    for key, value in still.reps[0].analysis.metrics.items():
+        assert moving.reps[0].analysis.metrics[key] == pytest.approx(value, abs=1e-6), key
+    # 打ち消さなければ、骨盤の動き（ドロップ）が狂う
+    raw = analyze_throws(track_of(panned, 60), 1.8)
+    assert [r.analysis.events for r in raw.reps] != [r.analysis.events for r in still.reps]

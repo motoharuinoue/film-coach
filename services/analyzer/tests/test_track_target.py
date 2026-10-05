@@ -13,6 +13,7 @@ from film_coach.application.track_target import (
     track_target,
 )
 from film_coach.domain.library import VideoInfo
+from film_coach.domain.motion import Affine
 from film_coach.domain.tracking import Box
 
 N = 60
@@ -87,6 +88,31 @@ class FakeShots:
     def is_cut(self, frame: Frame) -> bool:
         self.seen += 1
         return int(frame) in self.cuts  # type: ignore[call-overload]
+
+
+class FakeMotion:
+    """カメラが 1 フレームに 3 px ずつ右へ振れる（画は左へ流れる）。最初のフレームは見積もれない"""
+
+    def __init__(self) -> None:
+        self.people: list[int] = []
+
+    def step(self, frame: Frame, people: list[Box]) -> Affine | None:
+        self.people.append(len(people))
+        return None if int(frame) == 0 else Affine(tx=3)  # type: ignore[call-overload]
+
+
+def test_カメラの動きを見積もり_場面の最初のフレームの座標への変換を持つ() -> None:
+    motion = FakeMotion()
+    tt = track_target(FakeVideo(), FakeDetector(), FakePose(), TargetHint(185, 400, 10 / 30), motion=motion)
+    assert len(motion.people) == N and motion.people[0] == 2  # 背景から人を除くため、検出した人の枠も渡す
+    assert tt.camera is not None and len(tt.camera) == N
+    assert tt.camera[0] == Affine() and tt.camera[10].apply(0, 0) == (30, 0)
+    # 場面の切り替わりでは始め直す
+    tt = track_target(
+        FakeVideo(), FakeDetector(), FakePose(), TargetHint(185, 400, 10 / 30), shots=FakeShots(40), motion=FakeMotion()
+    )
+    assert tt.camera is not None and tt.camera[40] == Affine() and tt.camera[45].apply(0, 0) == (15, 0)
+    assert track_target(FakeVideo(), FakeDetector(), FakePose(), TargetHint(185, 400, 10 / 30)).camera is None
 
 
 def test_場面の切り替わりで追跡を切り_またいでつながない() -> None:

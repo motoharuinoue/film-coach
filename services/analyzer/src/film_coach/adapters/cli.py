@@ -13,6 +13,7 @@ from ..application.analyze_pose import RepAnalysis, analyze_pose
 from ..application.ports import AnalysisWriter, ModelStore, PoseSequenceReader
 from ..application.throws import ThrowAnalysis, analyze_throws
 from ..application.track_target import (
+    CameraMotionEstimator,
     FrameSink,
     PersonDetector,
     PoseEstimator,
@@ -49,6 +50,8 @@ class CliDeps:
     write_throws: Callable[[ThrowAnalysis, Path], None]
     shots: Callable[[], ShotBoundaryDetector] | None = None
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
+    motion: Callable[[], CameraMotionEstimator] | None = None
+    """カメラの動きを見積もる（追跡ごとに新しく作る）"""
 
 
 def _point(text: str) -> tuple[float, float]:
@@ -191,7 +194,9 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
     sink = None if args.no_preview else deps.preview(dest, info, args.label)
     try:
         shots = deps.shots() if deps.shots else None
-        tt = track_target(video, deps.detector(), deps.pose(), TargetHint(x, y, args.at), sink, _progress(out), shots)
+        motion = deps.motion() if deps.motion else None
+        hint = TargetHint(x, y, args.at)
+        tt = track_target(video, deps.detector(), deps.pose(), hint, sink, _progress(out), shots, motion)
     except TargetNotFoundError as e:
         out.write(f"\n{e}\n")
         return 1

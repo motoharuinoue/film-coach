@@ -8,6 +8,7 @@ from typing import Any
 
 from ..application.track_target import TargetFrame, TargetHint, TargetTrack, TrackSegment
 from ..domain.library import VideoInfo
+from ..domain.motion import Affine
 from ..domain.tracking import Box
 from .schema import validate
 
@@ -16,6 +17,10 @@ TRACK_SCHEMA = "target-track.v1.schema.json"
 
 def _r(v: float, nd: int = 2) -> float:
     return round(v, nd)
+
+
+def _affine(m: Affine) -> list[float]:
+    return [round(m.a, 6), round(m.b, 6), round(m.tx, 2), round(m.c, 6), round(m.d, 6), round(m.ty, 2)]
 
 
 def track_to_json(tt: TargetTrack) -> dict[str, Any]:
@@ -32,6 +37,7 @@ def track_to_json(tt: TargetTrack) -> dict[str, Any]:
         "segments": [{"trackId": s.track_id, "start": s.start, "end": s.end} for s in tt.segments],
         "peopleTracked": tt.people_tracked,
         "cuts": list(tt.cuts),
+        "camera": None if tt.camera is None else [_affine(m) for m in tt.camera],
         "frames": [
             {
                 "i": f.index,
@@ -55,8 +61,8 @@ def write_track(tt: TargetTrack, dest: Path) -> None:
 
 
 def track_from_json(data: dict[str, Any]) -> TargetTrack:
-    # 場面の切り替わりを数える前に書き出した結果には cuts がないので、空とみなす
-    data = {**data, "cuts": data.get("cuts", [])}
+    # 以前に書き出した結果には cuts（場面の切り替わり）と camera（カメラの動き）がないので、なしとみなす
+    data = {**data, "cuts": data.get("cuts", []), "camera": data.get("camera")}
     validate(TRACK_SCHEMA, data)
     v, h = data["video"], data["hint"]
     frames = [
@@ -76,6 +82,7 @@ def track_from_json(data: dict[str, Any]) -> TargetTrack:
         frames,
         int(data["peopleTracked"]),
         [int(c) for c in data["cuts"]],
+        None if data["camera"] is None else [Affine(*(float(v) for v in m)) for m in data["camera"]],
     )
 
 

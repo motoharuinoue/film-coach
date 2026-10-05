@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from .adapters.cli import CliDeps, run
 from .application.throws import ThrowAnalysis
 from .application.track_target import (
+    CameraMotionEstimator,
     FanoutSink,
     FrameSink,
     PersonDetector,
@@ -53,6 +54,12 @@ def _shots() -> ShotBoundaryDetector:
     from .infrastructure.video_cv import OpenCvShotDetector
 
     return OpenCvShotDetector()
+
+
+def _motion() -> CameraMotionEstimator:
+    from .infrastructure.video_cv import OpenCvCameraMotion
+
+    return OpenCvCameraMotion()
 
 
 def _preview(dest_dir: Path, info: VideoInfo, label: str) -> FrameSink:
@@ -107,6 +114,7 @@ def http_deps() -> HttpDeps:
         sink_for=_preview,
         allowed_origins=[o.strip() for o in origins.split(",") if o.strip()],
         shots=_shots,
+        motion=_motion,
     )
 
 
@@ -133,6 +141,7 @@ def cli_deps() -> CliDeps:
         read_track=_read_track,
         write_throws=_write_throws,
         shots=_shots,
+        motion=_motion,
     )
 
 

@@ -15,6 +15,7 @@ import math
 import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Literal
 
 from .pose import KP, NUM_KEYPOINTS, Keypoint, KeypointName, PoseFrame, PoseSequence
@@ -124,6 +125,31 @@ def throw_direction(poses: Sequence[ImagePose], fps: float, hand: Hand) -> Liter
 def mirror_pose(pose: ImagePose) -> list[ImagePoint]:
     """左右の関節を入れ替える（左投げを右投げの規則で扱うため）"""
     return [pose[j] for j in MIRROR]
+
+
+REPAIR_CONF = 0.45
+"""これより信頼度の低い関節は、前後のフレームから補う。速く振った腕は像が流れ、手首を胴体の上に取り違えやすい
+（そのときの信頼度は 0.2〜0.4 ほど）"""
+MAX_FILL_S = 0.2
+"""補う間の長さの上限（秒）。これより長く信頼度が低ければ、そのままにする"""
+
+
+def repair_low_confidence(
+    poses: Sequence[ImagePose], fps: float, min_conf: float = REPAIR_CONF
+) -> list[list[ImagePoint]]:
+    """関節ごとに、信頼度の低いフレームの位置を、前後の信頼できるフレームの線形補間で置き換える。信頼度はそのまま残す"""
+    out = [list(p) for p in poses]
+    n = len(out)
+    max_gap = max(1, round(MAX_FILL_S * fps))
+    for j in range(NUM_KEYPOINTS):
+        good = [i for i in range(n) if out[i][j][2] >= min_conf]
+        for a, b in pairwise(good):
+            if 1 < b - a <= max_gap + 1:
+                (xa, ya, _), (xb, yb, _) = out[a][j], out[b][j]
+                for i in range(a + 1, b):
+                    r = (i - a) / (b - a)
+                    out[i][j] = (xa + (xb - xa) * r, ya + (yb - ya) * r, out[i][j][2])
+    return out
 
 
 class NotEnoughPoseError(ValueError):

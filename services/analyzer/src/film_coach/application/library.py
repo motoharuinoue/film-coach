@@ -12,6 +12,7 @@ from ..domain.library import VideoInfo, VideoRecord, YouTubeSource, retain_media
 from ..domain.youtube import check_segment, parse_youtube_id
 from .throws import ThrowAnalysis, analyze_throws
 from .track_target import (
+    CameraMotionEstimator,
     FrameSink,
     PersonDetector,
     PoseEstimator,
@@ -160,6 +161,7 @@ def run_tracking(
     label: str,
     progress: Progress,
     shots: ShotBoundaryDetector | None = None,
+    motion: CameraMotionEstimator | None = None,
 ) -> TargetTrack:
     record = get_record(store, video_id)
     path = store.media(video_id)
@@ -171,7 +173,7 @@ def run_tracking(
         video = open_video(path)
         # 確認用の動画（プレビュー・フォーカス）は元の動画の複製になるので、元の動画を残す映像でだけ作る
         sink = sink_for(store.output_dir(video_id), video.info(), label) if sink_for and retained else None
-        track = track_target(video, detector, pose, hint, sink, progress, shots)
+        track = track_target(video, detector, pose, hint, sink, progress, shots, motion)
     except Exception as e:
         store.save(replace(record, track_status="failed", label=label, errors=[str(e)]))
         raise

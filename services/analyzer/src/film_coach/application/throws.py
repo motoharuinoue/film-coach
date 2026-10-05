@@ -1,7 +1,8 @@
 """ユースケース：本人を追った骨格（画像の座標）から投球を見つけ、1 本ずつフェーズと QB 指標を出す。
 
-画像の座標をワールド 2D に直し（domain/world.py）、投げる手首の速さのピークで投球を切り出し（domain/throws.py）、
-1 本ずつ analyze_pose にかける。骨格が途切れた所と、場面の切り替わりはまたがない。
+カメラの動きを打ち消し（追跡のときに見積もった camera）、画像の座標をワールド 2D に直し（domain/world.py）、
+投げる手首の速さのピークで投球を切り出し（domain/throws.py）、1 本ずつ analyze_pose にかける。
+骨格が途切れた所と、場面の切り替わりはまたがない。
 """
 
 from __future__ import annotations
@@ -12,7 +13,15 @@ from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo
 from ..domain.pose import KP, smooth_sequence
 from ..domain.throws import find_throws
-from ..domain.world import Hand, ImagePose, NotEnoughPoseError, WorldTransform, estimate_transform, to_world
+from ..domain.world import (
+    Hand,
+    ImagePoint,
+    NotEnoughPoseError,
+    WorldTransform,
+    estimate_transform,
+    repair_low_confidence,
+    to_world,
+)
 from .analyze_pose import RepAnalysis, analyze_pose
 from .track_target import TargetFrame, TargetTrack
 
@@ -30,7 +39,8 @@ class ThrowRep:
     end: int
     """区間の最後のフレーム（含む）"""
     transform: WorldTransform
-    """この投球の座標の変換（x の原点は区間の最初の骨盤）。画面で映像に重ねるときに使う"""
+    """この投球の座標の変換（x の原点は区間の最初の骨盤）。画像の側は、カメラの動きを打ち消した座標
+    （場面の最初のフレームの座標）。画面で映像に重ねるときは、追跡結果の camera で各フレームに戻す"""
     analysis: RepAnalysis
 
 
@@ -45,12 +55,25 @@ class ThrowAnalysis:
     """解析の結果を読むときの注意（本人が小さく映っている、投球が見つからない など）"""
 
 
-def _runs(track: TargetTrack) -> list[list[TargetFrame]]:
+def stabilized(track: TargetTrack) -> list[TargetFrame]:
+    """カメラの動きを打ち消した骨格（場面の最初のフレームの座標）。カメラの動きを見積もっていなければそのまま"""
+    if track.camera is None:
+        return list(track.frames)
+    out: list[TargetFrame] = []
+    for f in track.frames:
+        if f.keypoints is None:
+            out.append(f)
+            continue
+        m = track.camera[f.index]
+        out.append(replace(f, keypoints=[(*m.apply(x, y), c) for x, y, c in f.keypoints]))
+    return out
+
+
+def _runs(frames: list[TargetFrame], cuts: set[int]) -> list[list[TargetFrame]]:
     """骨格のあるフレームが続く区間。場面の切り替わりで区切る"""
-    cuts = set(track.cuts)
     runs: list[list[TargetFrame]] = []
     current: list[TargetFrame] = []
-    for f in track.frames:
+    for f in frames:
         if f.keypoints is None or f.index in cuts:
             if current:
                 runs.append(current)
@@ -62,23 +85,25 @@ def _runs(track: TargetTrack) -> list[list[TargetFrame]]:
     return runs
 
 
-def _poses(frames: list[TargetFrame]) -> list[ImagePose]:
-    return [f.keypoints for f in frames if f.keypoints is not None]
+def _poses(frames: list[TargetFrame], fps: float) -> list[list[ImagePoint]]:
+    """骨格の列。信頼度の低い関節（腕を速く振ったときの取り違えなど）は、前後から補う"""
+    return repair_low_confidence([f.keypoints for f in frames if f.keypoints is not None], fps)
 
 
 def analyze_throws(track: TargetTrack, height_m: float, camera: CameraAngle = "side") -> ThrowAnalysis:
     """投球を見つけて、1 本ずつ解析する。投球が見つからなければ reps は空"""
     fps = track.video.fps
-    every = [f for run in _runs(track) for f in run]
+    runs = _runs(stabilized(track), set(track.cuts))
+    every = [f for run in runs for f in run]
     if not every:
         raise NotEnoughPoseError("本人の骨格がありません。追跡をやり直してください")
-    tf, hand = estimate_transform(_poses(every), fps, height_m)
+    tf, hand = estimate_transform(_poses(every, fps), fps, height_m)
 
     reps: list[ThrowRep] = []
-    for run in _runs(track):
+    for run in runs:
         if len(run) < MIN_RUN_S * fps:
             continue
-        poses = _poses(run)
+        poses = _poses(run, fps)
         whole = smooth_sequence(to_world(poses, [f.t for f in run], fps, height_m, tf, hand))
         for w in find_throws(whole):
             part = run[w.start : w.end + 1]
