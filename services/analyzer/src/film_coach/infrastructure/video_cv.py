@@ -54,6 +54,55 @@ class OpenCvVideoReader:
             cap.release()
 
 
+MIN_CONTRAST = 4.0
+"""形を比べるのに要る濃淡（白黒 0〜255 の標準偏差）"""
+
+
+class OpenCvShotDetector:
+    """場面の切り替わり（カット）を、前のフレームからの急な変化で見つける。
+
+    次の 2 つのどちらかが大きければカットとみなす。
+    - 色の分布：縮小したフレームの HSV ヒストグラム（色相 × 彩度）の Bhattacharyya 距離
+    - 形：ごく小さく縮めた白黒の画像（明るさをそろえる）の 1 − 相関。同じ競技場の別の画角のように、
+      色がほとんど同じ場面どうしの切り替わりを拾う。カメラを速く振っても、この大きさでは形はあまり崩れない
+    真っ暗な画面のように濃淡がほとんどない画では形を比べられないので、色だけで判断する。
+    フラッシュなどの一瞬の変化で切りすぎないよう、前のカットから min_frames フレーム未満では切らない。
+    クロスフェードなどのゆっくりした切り替わりは見つけられない。
+    """
+
+    def __init__(self, color: float = 0.5, shape: float = 0.4, min_frames: int = 8) -> None:
+        self.color = color
+        self.shape = shape
+        self.min_frames = min_frames
+        self._prev: tuple[Any, Any] | None = None
+        self._since = 0
+
+    def change(self, frame: Frame) -> tuple[float, float]:
+        """前のフレームからの (色の変化, 形の変化)。最初のフレームでは (0, 0)"""
+        img = np.asarray(frame)
+        small = cv2.resize(img, (96, 96), interpolation=cv2.INTER_AREA)
+        hist = cv2.calcHist([cv2.cvtColor(small, cv2.COLOR_BGR2HSV)], [0, 1], None, [30, 32], [0, 180, 0, 256])
+        cv2.normalize(hist, hist)
+        tiny = cv2.resize(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), (24, 24), interpolation=cv2.INTER_AREA)
+        gray = tiny.astype(np.float32)
+        std = float(gray.std())
+        g = (gray - gray.mean()) / std if std >= MIN_CONTRAST else None
+        prev, self._prev = self._prev, (hist, g)
+        if prev is None:
+            return 0.0, 0.0
+        color = float(cv2.compareHist(prev[0], hist, cv2.HISTCMP_BHATTACHARYYA))
+        shape = 0.0 if prev[1] is None or g is None else 1.0 - float(np.mean(prev[1] * g))
+        return color, shape
+
+    def is_cut(self, frame: Frame) -> bool:
+        color, shape = self.change(frame)
+        self._since += 1
+        if (color >= self.color or shape >= self.shape) and self._since >= self.min_frames:
+            self._since = 0
+            return True
+        return False
+
+
 class _Mp4Writer:
     """一時ファイルに mp4v で書き、閉じるときに ffmpeg で H.264 にする（ブラウザでも再生できるように）"""
 

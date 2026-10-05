@@ -24,6 +24,7 @@
 - 取り込み：`POST /api/videos/youtube` で `{url, start, end}` を受け、区間は 60 秒まで。URL は動画 ID だけを取り出して組み立て直してから yt-dlp に渡す
 - 消す：追跡が終わったら元の動画（区間）を消し、`mediaRetained: false` を記録する（`domain/library.py` の `retain_media_after_analysis`）。以降、元の動画とフレームの API は 410 を返す
 - 残す：枠・骨格（`track.json`）と出典（動画 ID・区間・題名・チャンネル・ライセンス）
+- 作らない：確認用の動画（プレビュー・フォーカス）は元の動画の複製になるので、YouTube の区間では作らない。元の動画を残すアップロードでだけ作る
 - 表示：画面では公式の埋め込みプレイヤーに骨格を重ねる（M1-3b）
 
 ## 結果

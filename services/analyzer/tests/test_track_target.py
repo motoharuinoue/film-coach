@@ -77,6 +77,38 @@ def test_指した人を追い_隠れた間も補間して_その人だけ骨格
     assert sink.closed and len(sink.written) == N
 
 
+class FakeShots:
+    """決めたフレームで場面が切り替わる"""
+
+    def __init__(self, *cuts: int) -> None:
+        self.cuts = set(cuts)
+        self.seen = 0
+
+    def is_cut(self, frame: Frame) -> bool:
+        self.seen += 1
+        return int(frame) in self.cuts  # type: ignore[call-overload]
+
+
+def test_場面の切り替わりで追跡を切り_またいでつながない() -> None:
+    # 40 フレーム目で場面が変わる。切り替わったあとも同じ位置に人がいるが、別の場面なので本人とは限らない
+    shots, pose = FakeShots(0, 40), FakePose()
+    tt = track_target(FakeVideo(), FakeDetector(), pose, TargetHint(185, 400, 10 / 30), shots=shots)
+    assert shots.seen == N  # 1 回目の読み込みで 1 回ずつ
+    assert tt.cuts == [40]  # 先頭のフレームは切り替わりに数えない
+    assert tt.people_tracked == 5  # 止まっている人 2（前後の場面）＋対象選手 3（隠れる前・後・次の場面）
+    assert [s.end for s in tt.segments] == [19, 39]
+    assert all(f.box is None for f in tt.frames[40:])
+    assert tt.coverage == pytest.approx(40 / N)
+    assert len(pose.calls) == 40
+
+
+def test_場面の切り替わりの後で指せば_その場面の中だけを追う() -> None:
+    hint = TargetHint(100 + 5 * 45 + 35, 400, 45 / 30)
+    tt = track_target(FakeVideo(), FakeDetector(), FakePose(), hint, shots=FakeShots(40))
+    assert [(s.start, s.end) for s in tt.segments] == [(40, 59)]
+    assert all(f.box is None for f in tt.frames[:40])
+
+
 def test_指した場所に人がいなければ分かるように失敗する() -> None:
     with pytest.raises(TargetNotFoundError, match="見つかりません"):
         track_target(FakeVideo(), FakeDetector(), FakePose(), TargetHint(x=960, y=900, t=1))

@@ -79,6 +79,11 @@ function Viewer() {
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-3 rounded-sm bg-white/10" /> 見失った
             </span>
+            {track.cuts.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2.5 w-px bg-ice" /> 場面の切り替わり
+              </span>
+            )}
           </span>
         </div>
       </div>
@@ -103,6 +108,14 @@ function Viewer() {
               <dt className="text-[11px] text-muted">映像全体で追跡した人数</dt>
               <dd className="font-mono">{track.peopleTracked}</dd>
             </div>
+            {track.cuts.length > 0 && (
+              <div className="col-span-2">
+                <dt className="text-[11px] text-muted">場面の切り替わり</dt>
+                <dd className="text-xs">
+                  <span className="font-mono">{track.cuts.length}</span> か所。切り替わりの向こうへは追跡をつながないので、別の場面に映る本人は追いません。
+                </dd>
+              </div>
+            )}
             <div className="col-span-2">
               <dt className="text-[11px] text-muted">映像</dt>
               <dd className="text-xs">

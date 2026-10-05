@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { containFit, coverage, focusWindow, frameAt, toSource, toView, type TargetTrack } from "./footage";
+import { containFit, coverage, crossesCut, focusWindow, frameAt, toSource, toView, type TargetTrack } from "./footage";
 
 const track = (n: number): TargetTrack => ({
   video: { name: "x", fps: 30, width: 1920, height: 1080, frameCount: n },
   hint: { x: 0, y: 0, t: 0 },
   segments: [{ trackId: 1, start: 0, end: n - 1 }],
   peopleTracked: 1,
+  cuts: [],
   frames: Array.from({ length: n }, (_, i) => ({ i, t: i / 30, box: i % 10 === 9 ? null : { x1: 0, y1: 0, x2: 10, y2: 10, score: 1 }, kp: null, interpolated: i === 5 })),
 });
 
@@ -56,5 +57,15 @@ describe("focusWindow", () => {
 
   it("小さすぎる枠でも拡大は 5 倍まで", () => {
     expect(focusWindow({ x1: 0, y1: 0, x2: 5, y2: 10, score: 1 }, 1920, 1080).scale).toBeCloseTo(5);
+  });
+});
+
+describe("crossesCut", () => {
+  it("2 つのフレームの間に場面の切り替わりがあるかを、向きを問わずに判定する（Python の crosses_cut と同じ）", () => {
+    expect(crossesCut([40], 39, 40)).toBe(true);
+    expect(crossesCut([40], 50, 10)).toBe(true);
+    expect(crossesCut([40], 40, 45)).toBe(false);
+    expect(crossesCut([40], 30, 39)).toBe(false);
+    expect(crossesCut([], 0, 99)).toBe(false);
   });
 });

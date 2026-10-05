@@ -29,6 +29,7 @@ def track_to_json(tt: TargetTrack) -> dict[str, Any]:
         "hint": {"x": tt.hint.x, "y": tt.hint.y, "t": tt.hint.t},
         "segments": [{"trackId": s.track_id, "start": s.start, "end": s.end} for s in tt.segments],
         "peopleTracked": tt.people_tracked,
+        "cuts": list(tt.cuts),
         "frames": [
             {
                 "i": f.index,

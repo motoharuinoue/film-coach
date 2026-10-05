@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 import pytest
-from test_track_target import FakeDetector, FakePose, FakeVideo
+from test_track_target import FakeDetector, FakePose, FakeSink, FakeVideo
 
 from film_coach.application.jobs import JobRunner
 from film_coach.application.library import (
@@ -137,13 +137,18 @@ def test_YouTubeの入力が不正なら取得しない(store: FileVideoStore) -
     assert fetcher.fetched == []
 
 
-def track(store: FileVideoStore, video_id: str) -> None:
+def track(store: FileVideoStore, video_id: str, sinks: list[FakeSink] | None = None) -> None:
+    def sink_for(_dest: Path, _info: VideoInfo, _label: str) -> FakeSink:
+        assert sinks is not None
+        sinks.append(FakeSink())
+        return sinks[-1]
+
     run_tracking(
         store,
         lambda _p: FakeVideo(),
         FakeDetector(),
         FakePose(),
-        None,
+        sink_for if sinks is not None else None,
         video_id,
         TargetHint(185, 400, 10 / 30),
         "#5",
@@ -162,6 +167,17 @@ def test_追跡のあと_アップロードは元の動画を残し_YouTubeは�
     assert store.track_path(yt.id) is not None  # 派生データは残す
     with pytest.raises(NotFoundError, match="消しています"):
         frame_jpeg(store, FakeGrabber(), yt.id, 1.0)
+
+
+def test_確認用の動画は_元の動画を残すアップロードでだけ作る(store: FileVideoStore) -> None:
+    up = import_upload(store, FakeGrabber(), "a.mp4", io.BytesIO(b"v"))
+    yt = import_youtube(store, FakeGrabber(), FakeFetcher(), "https://youtu.be/Qb7Throw_01", 0, 5)
+    up_sinks: list[FakeSink] = []
+    yt_sinks: list[FakeSink] = []
+    track(store, up.id, up_sinks)
+    track(store, yt.id, yt_sinks)
+    assert len(up_sinks) == 1 and up_sinks[0].closed
+    assert yt_sinks == []  # YouTube の映像の複製になるので作らない（ADR-0005）
 
 
 def test_追跡に失敗したら記録に理由を残す(store: FileVideoStore) -> None:

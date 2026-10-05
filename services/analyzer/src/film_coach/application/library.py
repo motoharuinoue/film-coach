@@ -14,6 +14,7 @@ from .track_target import (
     PersonDetector,
     PoseEstimator,
     Progress,
+    ShotBoundaryDetector,
     TargetHint,
     TargetTrack,
     VideoReader,
@@ -148,21 +149,23 @@ def run_tracking(
     hint: TargetHint,
     label: str,
     progress: Progress,
+    shots: ShotBoundaryDetector | None = None,
 ) -> TargetTrack:
     record = get_record(store, video_id)
     path = store.media(video_id)
     if path is None:
         raise NotFoundError("元の動画が残っていないので、追跡をやり直せません。もう一度取り込んでください")
     store.save(replace(record, track_status="running", label=label, errors=[]))
+    retained = retain_media_after_analysis(record)
     try:
         video = open_video(path)
-        sink = sink_for(store.output_dir(video_id), video.info(), label) if sink_for else None
-        track = track_target(video, detector, pose, hint, sink, progress)
+        # 確認用の動画（プレビュー・フォーカス）は元の動画の複製になるので、元の動画を残す映像でだけ作る
+        sink = sink_for(store.output_dir(video_id), video.info(), label) if sink_for and retained else None
+        track = track_target(video, detector, pose, hint, sink, progress, shots)
     except Exception as e:
         store.save(replace(record, track_status="failed", label=label, errors=[str(e)]))
         raise
     store.save_track(video_id, track)
-    retained = retain_media_after_analysis(record)
     if not retained:
         store.delete_media(video_id)
     store.save(replace(record, track_status="done", label=label, media_retained=retained, errors=[]))

@@ -1,6 +1,16 @@
 import pytest
 
-from film_coach.domain.tracking import Box, IouTracker, Track, fill_gaps, iou, link_tracks, merge_boxes, pick_track
+from film_coach.domain.tracking import (
+    Box,
+    IouTracker,
+    Track,
+    crosses_cut,
+    fill_gaps,
+    iou,
+    link_tracks,
+    merge_boxes,
+    pick_track,
+)
 
 
 def walk(x0: float, vx: float, frames: range, y: float = 300, h: float = 180) -> dict[int, Box]:
@@ -70,3 +80,31 @@ def test_長い抜けは補間しない() -> None:
     boxes, filled = fill_gaps({0: Box(0, 0, 10, 10), 50: Box(0, 0, 10, 10)}, max_gap=20)
     assert filled == set()
     assert sorted(boxes) == [0, 50]
+
+
+# ---- 場面の切り替わり（カット） ----
+
+
+def test_カットはその前後のフレームの間にあるかで判定する() -> None:
+    cuts = frozenset({40})
+    assert crosses_cut(39, 40, cuts) and crosses_cut(10, 50, cuts)
+    assert not crosses_cut(40, 45, cuts) and not crosses_cut(30, 39, cuts)
+
+
+def test_カットのあとは_同じ位置にいても前の場面の追跡を続けない() -> None:
+    a = walk(100, 3, range(60))
+    tracker = IouTracker()
+    for f in range(60):
+        tracker.update(f, [a[f]], cut=f == 40)
+    assert [(t.first, t.last) for t in tracker.tracks] == [(0, 39), (40, 59)]
+
+
+def test_カットの向こうは探さず_つながず_補間しない() -> None:
+    cuts = frozenset({40})
+    before, after = Track(1, walk(100, 4, range(0, 36))), Track(2, walk(100, 4, range(42, 80)))
+    assert pick_track([before], 41, 250, 380) is before  # カットを知らなければ、前の場面の 35 フレーム目で見つかる
+    assert pick_track([before], 41, 250, 380, cuts=cuts) is None
+    assert [t.id for t in link_tracks([before, after], before, cuts=cuts)] == [1]
+    assert [t.id for t in link_tracks([before, after], after, cuts=cuts)] == [2]
+    boxes, filled = fill_gaps(merge_boxes([before, after]), cuts=cuts)
+    assert filled == set() and 38 not in boxes

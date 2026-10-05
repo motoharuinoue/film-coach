@@ -56,6 +56,7 @@ def test_CLIのtrackで追跡結果とプレビューを書き出す(tmp_path: P
         pose=FakePose,
         preview=preview,
         write_track=lambda tt, dest: written.update(tt=tt, dest=dest),
+        shots=None,
     )
     out = io.StringIO()
     code = run(
@@ -69,7 +70,7 @@ def test_CLIのtrackで追跡結果とプレビューを書き出す(tmp_path: P
 
 
 def test_CLIのtrackは人がいない場所を指すと1で終わる(tmp_path: Path) -> None:
-    deps = replace(cli_deps(), open_video=lambda _p: FakeVideo(), detector=FakeDetector, pose=FakePose)
+    deps = replace(cli_deps(), open_video=lambda _p: FakeVideo(), detector=FakeDetector, pose=FakePose, shots=None)
     out = io.StringIO()
     assert (
         run(["track", "fake.mov", "--at", "1", "--point", "960,900", "--no-preview", "--out", str(tmp_path)], deps, out)
