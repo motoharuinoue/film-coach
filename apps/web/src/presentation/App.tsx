@@ -2,20 +2,23 @@
 // M0 後半で 8 画面のルーティングに置き換える。
 
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
+import { alignedFrame, alignOffset } from "../domain/align";
+import { formatMetric, METRIC_BY_KEY } from "../domain/metrics";
+import { PHASE_LABEL, phaseAt } from "../domain/phases";
 import { FieldScene, Hud, Skeleton, Trail } from "./components/scene";
 import { Badge, Button, Card, SectionTitle, StatusPill } from "./components/ui";
-import { bestRep, currentRep, currentSession, defaultWeights, metricRows, references } from "./data/demo";
 import { usePlayback } from "./hooks/usePlayback";
-import { alignedFrame, alignOffset } from "./lib/align";
-import { formatMetric, METRIC_BY_KEY, PHASE_LABEL, phaseAt } from "./lib/analysis";
+import { useDefaultBenchmarks, useServices } from "./services";
 
 export function App() {
-  const rep = currentRep;
+  const { coach } = useServices();
+  const bench = useDefaultBenchmarks();
+  const { session, rep } = coach.focus();
+  const best = bench.best;
   const pb = usePlayback(rep.seq.frames.length, rep.seq.fps, { autoplay: true, initialRate: 0.5 });
   const frame = rep.seq.frames[pb.frame]!;
-  const ghost = bestRep.seq.frames[alignedFrame(rep, bestRep, pb.frame)]!;
   const phase = phaseAt(rep.phases, pb.frame);
-  const rows = metricRows(rep, currentSession.camera);
+  const rows = coach.evaluate(rep, session.camera, bench);
 
   return (
     <main className="bg-grid mx-auto min-h-screen max-w-6xl px-6 py-10">
@@ -29,7 +32,7 @@ export function App() {
           className="block w-full"
           hud={<Hud tl={[`REP ${String(rep.index + 1).padStart(2, "0")}`, "SIDE · 60 FPS"]} tr={[PHASE_LABEL[phase]]} bl={[`${frame.t.toFixed(2)}s`]} />}
         >
-          <Skeleton frame={ghost} variant="ghost" offset={alignOffset(rep, bestRep)} />
+          {best && <Skeleton frame={best.seq.frames[alignedFrame(rep, best, pb.frame)]!} variant="ghost" offset={alignOffset(rep, best)} />}
           <Trail frames={rep.seq.frames} joint="rWrist" from={rep.events.strideStart} to={pb.frame} />
           <Skeleton frame={frame} />
         </FieldScene>
@@ -68,8 +71,8 @@ export function App() {
           <SectionTitle>お手本の重み（P × C × Q × K × M、ステップ幅）</SectionTitle>
           <table className="w-full text-sm">
             <tbody>
-              {references.map((ref) => {
-                const p = defaultWeights.parts[ref.id]?.strideRatio;
+              {coach.references().map((ref) => {
+                const p = bench.weights.parts[ref.id]?.strideRatio;
                 return (
                   <tr key={ref.id} className="border-t border-line">
                     <td className="py-2">{ref.channel}</td>
@@ -78,7 +81,7 @@ export function App() {
                         {p ? p[k].toFixed(2) : "—"}
                       </td>
                     ))}
-                    <td className="py-2 text-right font-mono text-turf">{(defaultWeights.overall[ref.id] ?? 0).toFixed(2)}</td>
+                    <td className="py-2 text-right font-mono text-turf">{(bench.weights.overall[ref.id] ?? 0).toFixed(2)}</td>
                   </tr>
                 );
               })}

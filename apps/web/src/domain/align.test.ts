@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { alignedFrame, alignOffset } from "./align";
-import { detectEvents } from "./analysis";
+import { detectEvents } from "./phases";
 import { kp } from "./pose";
-import { synthesizeThrow } from "./synth";
+import { synthesizeThrow } from "../infrastructure/demo/synth";
 
 const rep = (p: Parameters<typeof synthesizeThrow>[0]) => {
   const seq = synthesizeThrow(p);

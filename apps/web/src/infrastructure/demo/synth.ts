@@ -1,7 +1,8 @@
 // デモ用の合成データ：右投げ QB を横から撮った投球動作を、キーフレームの補間で作る。
 // M1 で Python の骨格推定に置き換えるまでの代役。出力は実データと同じ PoseSequence の形。
 
-import type { Keypoint, PoseFrame, PoseSequence } from "./pose";
+import type { RotationCurve } from "../../domain/entities";
+import type { Keypoint, PoseFrame, PoseSequence } from "../../domain/pose";
 
 type J = [number, number];
 type Body = {
@@ -366,7 +367,7 @@ export function synthesizeThrow(params: Partial<ThrowParams> = {}, fps = 60): Po
  */
 export type SequenceTiming = { pelvis: number; trunk: number; arm: number };
 
-export function rotationVelocity(seq: PoseSequence, releaseT: number, timing: SequenceTiming) {
+export function rotationVelocity(seq: PoseSequence, releaseT: number, timing: SequenceTiming): RotationCurve[] {
   const parts = [
     { key: "pelvis" as const, peak: 620, width: 0.075 },
     { key: "trunk" as const, peak: 910, width: 0.06 },

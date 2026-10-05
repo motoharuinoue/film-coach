@@ -1,7 +1,7 @@
 import { IconAlertCircle, IconAlertTriangle, IconCircleCheck, IconCircleDashed } from "@tabler/icons-react";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { useEffect, type ReactNode } from "react";
-import { STATUS_LABEL, type Status } from "../lib/analysis";
+import { STATUS_LABEL, type Status } from "../../domain/judgement";
 
 export function cx(...xs: (string | false | null | undefined)[]) {
   return xs.filter(Boolean).join(" ");

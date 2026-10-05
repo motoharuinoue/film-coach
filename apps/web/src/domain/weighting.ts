@@ -1,7 +1,9 @@
 // お手本の重み付け（docs/adr/0006-reference-weighting.md）
 // w(お手本, 指標) = P × C × Q(指標) × K(指標) × M
 
-import { METRICS, isValidFor, type CameraAngle, type MetricKey, type MetricValues, type Zone } from "./analysis";
+import type { CameraAngle } from "./camera";
+import type { Zone } from "./judgement";
+import { METRICS, isValidFor, type MetricKey, type MetricValues } from "./metrics";
 
 export type ReferenceStats = {
   views: number;

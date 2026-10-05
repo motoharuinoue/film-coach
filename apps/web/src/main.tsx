@@ -7,10 +7,14 @@ import "./styles.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App } from "./App";
+import { createServices } from "./composition";
+import { App } from "./presentation/App";
+import { ServicesProvider } from "./presentation/services";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ServicesProvider services={createServices()}>
+      <App />
+    </ServicesProvider>
   </StrictMode>,
 );

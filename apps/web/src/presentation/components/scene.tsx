@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from "react";
-import { BONES, headCenter, jointAngle, kp, type KeypointName, type PoseFrame, type Vec2 } from "../lib/pose";
+import { BONES, headCenter, jointAngle, kp, type KeypointName, type PoseFrame, type Vec2 } from "../../domain/pose";
 
 // ワールド座標（m）→ SVG 座標（1600×900）
 export type Camera = { x0: number; x1: number; y0: number; y1: number };

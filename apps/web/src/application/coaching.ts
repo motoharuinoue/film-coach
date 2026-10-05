@@ -1,0 +1,35 @@
+// 改善点を組み立てるユースケース：ドメインの方針で選び、文章はポートに任せ、ドリルを紐付ける。
+
+import { pickFindings } from "../domain/coaching";
+import type { AnalyzedRep } from "../domain/entities";
+import type { MetricEvaluation } from "../domain/judgement";
+import { METRIC_BY_KEY, type MetricKey } from "../domain/metrics";
+import type { FindingWriter, ReferenceRepository } from "./ports";
+
+export type Finding = {
+  key: MetricKey;
+  severity: "flag" | "caution";
+  title: string;
+  body: string;
+  /** 目標（お手本ゾーンの四分位の範囲） */
+  target: string;
+  drill?: { refId: string; label: string; at: string };
+  /** 根拠のフレーム */
+  frame: number;
+};
+
+export function buildFindings(rep: AnalyzedRep, evals: MetricEvaluation[], writer: FindingWriter, references: ReferenceRepository, max = 3): Finding[] {
+  return pickFindings(evals, max).map((e) => {
+    const d = METRIC_BY_KEY[e.key];
+    const drill = references.drillFor(e.key);
+    const ref = drill && references.get(drill.refId);
+    return {
+      key: e.key,
+      severity: e.status as Finding["severity"],
+      ...writer.write(e),
+      target: `${e.zone!.p25.toFixed(d.digits)}〜${e.zone!.p75.toFixed(d.digits)}${d.unit}`,
+      drill: drill && ref ? { ...drill, at: ref.segment.start } : undefined,
+      frame: d.at === "range" ? rep.events.setStart : rep.events[d.at],
+    };
+  });
+}
