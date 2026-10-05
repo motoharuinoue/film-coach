@@ -1,0 +1,186 @@
+"""OpenCV による動画の読み込みと、確認用のプレビュー動画の書き出し。"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import tempfile
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+
+import cv2
+import numpy as np
+
+from ..application.track_target import Frame, TargetFrame, VideoInfo
+
+# 骨格の線（COCO-17 の関節番号の組）
+BONES = [(5, 6), (11, 12), (5, 11), (6, 12), (5, 7), (7, 9), (6, 8), (8, 10), (11, 13), (13, 15), (12, 14), (14, 16)]
+TURF = (157, 229, 46)  # BGR（#2EE59D）
+PYLON = (26, 122, 255)  # BGR（#FF7A1A）
+
+
+class OpenCvVideoReader:
+    def __init__(self, path: Path) -> None:
+        if not path.exists():
+            raise FileNotFoundError(f"動画がありません：{path}")
+        self.path = path
+
+    def info(self) -> VideoInfo:
+        cap = cv2.VideoCapture(str(self.path))
+        try:
+            return VideoInfo(
+                name=self.path.name,
+                fps=float(cap.get(cv2.CAP_PROP_FPS)),
+                width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                frame_count=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+            )
+        finally:
+            cap.release()
+
+    def frames(self) -> Iterator[tuple[int, Frame]]:
+        cap = cv2.VideoCapture(str(self.path))
+        try:
+            i = 0
+            while True:
+                ok, img = cap.read()
+                if not ok:
+                    return
+                yield i, img
+                i += 1
+        finally:
+            cap.release()
+
+
+class _Mp4Writer:
+    """一時ファイルに mp4v で書き、閉じるときに ffmpeg で H.264 にする（ブラウザでも再生できるように）"""
+
+    def __init__(self, dest: Path, fps: float, size: tuple[int, int]) -> None:
+        self.dest = dest
+        self._tmp = Path(tempfile.mkdtemp()) / dest.name
+        fourcc: Any = cv2.VideoWriter.fourcc(*"mp4v")
+        self._out = cv2.VideoWriter(str(self._tmp), fourcc, fps, size)
+
+    def write(self, img: Any) -> None:
+        self._out.write(img)
+
+    def close(self) -> None:
+        self._out.release()
+        self.dest.parent.mkdir(parents=True, exist_ok=True)
+        if shutil.which("ffmpeg"):
+            cmd = [
+                "ffmpeg",
+                "-v",
+                "error",
+                "-y",
+                "-i",
+                str(self._tmp),
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-crf",
+                "23",
+            ]
+            # 固定の引数だけで呼ぶ
+            subprocess.run([*cmd, "-movflags", "+faststart", str(self.dest)], check=True)
+        else:
+            shutil.move(self._tmp, self.dest)
+        shutil.rmtree(self._tmp.parent, ignore_errors=True)
+
+
+def draw_target(img: Any, result: TargetFrame, label: str, min_conf: float = 0.3, scale: float = 1.0) -> None:
+    """対象選手の枠・名前・骨格を描く"""
+    if result.box is not None:
+        b = result.box
+        cv2.rectangle(img, (int(b.x1), int(b.y1)), (int(b.x2), int(b.y2)), PYLON, max(1, int(3 * scale)))
+        # 補間した枠は「*」を付けて区別する（Hershey フォントは英数字だけ）
+        text = label + (" *" if result.interpolated else "")
+        org = (int(b.x1), max(20, int(b.y1) - 10))
+        cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, 0.9 * scale, PYLON, max(1, int(2 * scale)), cv2.LINE_AA)
+    if result.keypoints is not None:
+        pts = result.keypoints
+        for a, c in BONES:
+            if pts[a][2] >= min_conf and pts[c][2] >= min_conf:
+                pa = (int(pts[a][0]), int(pts[a][1]))
+                pc = (int(pts[c][0]), int(pts[c][1]))
+                cv2.line(img, pa, pc, TURF, max(1, int(3 * scale)), cv2.LINE_AA)
+        for x, y, conf in pts[5:]:
+            if conf >= min_conf:
+                cv2.circle(img, (int(x), int(y)), max(2, int(4 * scale)), TURF, -1, cv2.LINE_AA)
+
+
+def draw_stamp(img: Any, result: TargetFrame, scale: float = 1.0) -> None:
+    stamp = f"{result.t:6.2f}s  frame {result.index:4d}"
+    cv2.putText(
+        img,
+        stamp,
+        (int(24 * scale), int(48 * scale)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.1 * scale,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+
+
+class PreviewVideoWriter:
+    """映像全体に、対象選手の枠と骨格を重ねた動画"""
+
+    def __init__(self, dest: Path, info: VideoInfo, label: str = "TARGET", min_conf: float = 0.3) -> None:
+        self.label = label
+        self.min_conf = min_conf
+        self._mp4 = _Mp4Writer(dest, info.fps, (info.width, info.height))
+
+    def write(self, frame: Frame, result: TargetFrame) -> None:
+        img = np.asarray(frame).copy()
+        draw_target(img, result, self.label, self.min_conf)
+        draw_stamp(img, result)
+        self._mp4.write(img)
+
+    def close(self) -> None:
+        self._mp4.close()
+
+
+class FocusVideoWriter:
+    """対象選手を追いかけて切り出した動画（フォロー撮影のように見せる）。
+
+    切り出す範囲は枠の高さの 2.6 倍の正方形。中心と大きさは指数移動平均でならして、揺れを抑える。
+    """
+
+    def __init__(
+        self, dest: Path, info: VideoInfo, label: str = "TARGET", size: int = 720, smooth: float = 0.15
+    ) -> None:
+        self.label = label
+        self.size = size
+        self.smooth = smooth
+        self.width, self.height = info.width, info.height
+        self._state: tuple[float, float, float] | None = None
+        self._mp4 = _Mp4Writer(dest, info.fps, (size, size))
+
+    def _window(self, result: TargetFrame) -> tuple[int, int, int]:
+        if result.box is not None:
+            b = result.box
+            target = (b.cx, b.cy, min(self.height, max(240.0, b.h * 2.6)))
+            if self._state is None:
+                self._state = target
+            else:
+                (sx, sy, ss), (tx, ty, ts), a = self._state, target, self.smooth
+                self._state = (sx + a * (tx - sx), sy + a * (ty - sy), ss + a * (ts - ss))
+        cx, cy, side = self._state or (self.width / 2, self.height / 2, float(self.height))
+        half = side / 2
+        x0 = int(min(max(0.0, cx - half), self.width - side))
+        y0 = int(min(max(0.0, cy - half), self.height - side))
+        return x0, y0, int(side)
+
+    def write(self, frame: Frame, result: TargetFrame) -> None:
+        img = np.asarray(frame).copy()
+        draw_target(img, result, self.label)
+        x0, y0, side = self._window(result)
+        crop = cv2.resize(img[y0 : y0 + side, x0 : x0 + side], (self.size, self.size), interpolation=cv2.INTER_CUBIC)
+        draw_stamp(crop, result, scale=0.7)
+        self._mp4.write(crop)
+
+    def close(self) -> None:
+        self._mp4.close()

@@ -6,6 +6,10 @@ readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "jsonschema>=4.26",
+    "numpy>=2.5.3",
+    "onnxruntime>=1.30.0",
+    "opencv-python>=5.0.0.93",
+    "rtmlib>=0.0.16",
 ]
 
 [project.scripts]
@@ -29,7 +33,10 @@ packages = ["src/film_coach"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+pythonpath = ["tests"]
+# 実際の動画とモデルを使う確認は、明示したときだけ動かす（uv run pytest -m integration）
+addopts = "-q -m 'not integration'"
+markers = ["integration: 手元の動画とモデルを使う確認（CI では動かさない）"]
 
 [tool.ruff]
 line-length = 120
@@ -44,6 +51,11 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 python_version = "3.13"
 strict = true
 files = ["src"]
+
+# rtmlib は型情報を持たない
+[[tool.mypy.overrides]]
+module = ["rtmlib", "rtmlib.*"]
+ignore_missing_imports = true
 
 # ---- クリーンアーキテクチャの層（docs/adr/0007-clean-architecture.md）----
 # 上の層は下の層に依存してよいが、逆は禁止。adapters と infrastructure は互いに依存しない。

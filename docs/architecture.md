@@ -96,9 +96,9 @@ film-coach/
 |---|---|
 | 実行環境 | Python 3.13（uv で固定。onnxruntime・OpenCV・rtmlib が対応済みで、手元に入っているため） |
 | API | FastAPI + SSE |
-| 人物検出・骨格推定 | rtmlib（RTMDet / RTMPose / RTMW、ONNX Runtime + CoreML） |
-| 追跡 | ByteTrack |
-| 対象選手のロック | SAM 2 |
+| 人物検出・骨格推定 | rtmlib（YOLOX-m / RTMPose-m、ONNX Runtime の CPU。CoreML は YOLOX で失敗するため使わない） |
+| 追跡と対象選手のロック | 自前の IoU 追跡（`domain/tracking.py`）。途切れた追跡を位置と大きさでつなぎ直し、短い抜けは補間する |
+| 対象選手のマスク（M4） | SAM 2 |
 | 画像処理 | OpenCV |
 | 動画の変換 | ffmpeg |
 | YouTube の取得 | yt-dlp（区間のみ） |

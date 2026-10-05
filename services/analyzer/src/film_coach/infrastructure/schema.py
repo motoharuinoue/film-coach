@@ -3,23 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 from functools import cache
-from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
 
-
-def schema_dir() -> Path:
-    """FILM_COACH_SCHEMA_DIR があればそれを、なければリポジトリの packages/schema を使う"""
-    if env := os.environ.get("FILM_COACH_SCHEMA_DIR"):
-        return Path(env)
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "packages" / "schema"
-        if candidate.is_dir():
-            return candidate
-    raise FileNotFoundError("packages/schema が見つかりません。FILM_COACH_SCHEMA_DIR を設定してください")
+from .paths import schema_dir
 
 
 @cache
