@@ -49,6 +49,8 @@ export function parseTrack(j: Json): TargetTrack {
     hint: j.hint as TargetTrack["hint"],
     segments: j.segments as TargetTrack["segments"],
     peopleTracked: Number(j.peopleTracked),
+    // 場面の切り替わりを数える前に書き出した結果には無いので、空とみなす
+    cuts: ((j.cuts as number[] | undefined) ?? []).map(Number),
     frames,
   };
 }

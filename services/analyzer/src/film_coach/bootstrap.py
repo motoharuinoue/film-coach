@@ -17,6 +17,7 @@ from .application.track_target import (
     FrameSink,
     PersonDetector,
     PoseEstimator,
+    ShotBoundaryDetector,
     TargetTrack,
     VideoReader,
 )
@@ -45,6 +46,12 @@ def _pose() -> PoseEstimator:
     from .infrastructure.rtm import RtmPoseEstimator
 
     return RtmPoseEstimator()
+
+
+def _shots() -> ShotBoundaryDetector:
+    from .infrastructure.video_cv import OpenCvShotDetector
+
+    return OpenCvShotDetector()
 
 
 def _preview(dest_dir: Path, info: VideoInfo, label: str) -> FrameSink:
@@ -86,6 +93,7 @@ def http_deps() -> HttpDeps:
         pose=cache(_pose),
         sink_for=_preview,
         allowed_origins=[o.strip() for o in origins.split(",") if o.strip()],
+        shots=_shots,
     )
 
 
@@ -109,6 +117,7 @@ def cli_deps() -> CliDeps:
         write_track=_write_track,
         output_dir=lambda video: data_dir() / "outputs" / video.stem,
         serve=_serve,
+        shots=_shots,
     )
 
 

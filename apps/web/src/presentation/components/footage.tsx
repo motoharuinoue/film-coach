@@ -2,7 +2,7 @@
 
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { focusWindow, frameAt, type TargetTrack, type TrackFrame } from "../../domain/footage";
+import { crossesCut, focusWindow, frameAt, type TargetTrack, type TrackFrame } from "../../domain/footage";
 import { BONES } from "../../domain/pose";
 import { Button, Segmented, cx } from "./ui";
 
@@ -91,24 +91,28 @@ export function TrackTimeline({ track, t, onSeek }: { track: TargetTrack; t: num
           <rect key={f.i} x={f.i} y={0} width={1.02} height={1} fill={!f.box ? "rgba(255,255,255,0.06)" : f.interpolated ? CAUTION : TURF} fillOpacity={f.box ? 0.55 : 1} />
         ))}
       </svg>
+      {track.cuts.map((c) => (
+        <div key={c} className="absolute inset-y-0 w-px bg-ice" style={{ left: `${(c / n) * 100}%` }} title={`場面の切り替わり ${(c / track.video.fps).toFixed(2)} 秒`} />
+      ))}
       <div className="absolute inset-y-0 w-0.5 bg-pylon glow-pylon" style={{ left: `${(t / duration) * 100}%` }} />
     </div>
   );
 }
 
-/** フォーカス表示：対象選手を中心に拡大する。中心と倍率はなめらかに追いかける */
+/** フォーカス表示：対象選手を中心に拡大する。中心と倍率はなめらかに追いかける（場面が切り替わったら追いかけ直す） */
 function useFocusTransform(frame: TrackFrame | undefined, track: TargetTrack, enabled: boolean) {
-  const state = useRef<{ cx: number; cy: number; scale: number } | null>(null);
+  const state = useRef<{ cx: number; cy: number; scale: number; i: number } | null>(null);
   const { width: W, height: H } = track.video;
   if (!enabled) {
     state.current = null;
     return { style: { transform: "none" }, scale: 1 };
   }
+  if (frame && state.current && crossesCut(track.cuts, state.current.i, frame.i)) state.current = null;
   if (frame?.box) {
-    const target = focusWindow(frame.box, W, H);
+    const target = { ...focusWindow(frame.box, W, H), i: frame.i };
     const s = state.current;
     const a = 0.18;
-    state.current = s ? { cx: s.cx + a * (target.cx - s.cx), cy: s.cy + a * (target.cy - s.cy), scale: s.scale + a * (target.scale - s.scale) } : target;
+    state.current = s ? { cx: s.cx + a * (target.cx - s.cx), cy: s.cy + a * (target.cy - s.cy), scale: s.scale + a * (target.scale - s.scale), i: frame.i } : target;
   }
   const f = state.current ?? { cx: W / 2, cy: H / 2, scale: 1 };
   // 枠の幅を 100% としたときの移動量（%）

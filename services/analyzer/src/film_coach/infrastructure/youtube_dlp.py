@@ -14,7 +14,9 @@ from pathlib import Path
 from ..domain.library import YouTubeSource
 from ..domain.youtube import watch_url
 
-FORMAT = "bv*[height<=1080][ext=mp4]+ba[ext=m4a]/b[height<=1080][ext=mp4]/b[height<=1080]"
+FORMAT = "bv*+ba/b"
+# 並べ替え：短い辺が 1080 以下（縦長の Shorts でも高さで絞らない）、fps が高い、H.264 / mp4 を優先
+SORT = "res:1080,fps,vcodec:h264,ext:mp4:m4a"
 
 
 class FetchError(RuntimeError):
@@ -47,7 +49,7 @@ class YtDlpFetcher:
 
     def fetch_segment(self, video_id: str, start: int, end: int, dest: Path) -> Path:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        args = ["-f", FORMAT, "--merge-output-format", "mp4", "--download-sections", f"*{start}-{end}"]
+        args = ["-f", FORMAT, "-S", SORT, "--merge-output-format", "mp4", "--download-sections", f"*{start}-{end}"]
         _run([*args, "--force-keyframes-at-cuts", "-o", str(dest), watch_url(video_id)], timeout=300)
         if not dest.exists():
             raise FetchError("取得した動画が見つかりません")

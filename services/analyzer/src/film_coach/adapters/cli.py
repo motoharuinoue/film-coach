@@ -15,6 +15,7 @@ from ..application.track_target import (
     FrameSink,
     PersonDetector,
     PoseEstimator,
+    ShotBoundaryDetector,
     TargetHint,
     TargetNotFoundError,
     TargetTrack,
@@ -42,6 +43,8 @@ class CliDeps:
     """動画ごとの既定の書き出し先"""
     serve: Callable[[str, int], None]
     """HTTP の解析サービスを起動する"""
+    shots: Callable[[], ShotBoundaryDetector] | None = None
+    """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
 
 
 def _point(text: str) -> tuple[float, float]:
@@ -110,6 +113,8 @@ def print_track(tt: TargetTrack, out: TextIO) -> None:
     found = [f for f in tt.frames if f.box is not None]
     filled = sum(f.interpolated for f in tt.frames)
     out.write(f"\n追跡した人数 {tt.people_tracked}\n")
+    if tt.cuts:
+        out.write(f"場面の切り替わり {len(tt.cuts)} か所：{'、'.join(f'{c / fps:.2f}s' for c in tt.cuts)}\n")
     out.write(f"対象選手の枠があるフレーム {len(found)}/{len(tt.frames)}（{tt.coverage:.0%}）、うち補間 {filled}\n")
     out.write(f"つないだ追跡 {len(tt.segments)} 本\n")
     for s in tt.segments:
@@ -148,7 +153,8 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
     out.write(f"{args.at:.2f} 秒の ({x:.0f}, {y:.0f}) にいる人を追います\n")
     sink = None if args.no_preview else deps.preview(dest, info, args.label)
     try:
-        tt = track_target(video, deps.detector(), deps.pose(), TargetHint(x, y, args.at), sink, _progress(out))
+        shots = deps.shots() if deps.shots else None
+        tt = track_target(video, deps.detector(), deps.pose(), TargetHint(x, y, args.at), sink, _progress(out), shots)
     except TargetNotFoundError as e:
         out.write(f"\n{e}\n")
         return 1

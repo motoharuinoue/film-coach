@@ -2,7 +2,9 @@
 
 大勢が映る映像で、フレームごとに検出した人物の枠を IoU（重なりの割合）でつなぎ、
 利用者が指した 1 人の追跡結果を取り出す。人の陰に隠れて途切れた追跡は、位置と大きさで
-つなぎ直す。標準ライブラリだけで書き、外部ライブラリには依存しない。
+つなぎ直す。編集された映像では、場面の切り替わり（カット）をまたいで別の人に乗り移らないよう、
+カットで追跡を切り、カットをまたいだつなぎ直し・補間をしない。
+標準ライブラリだけで書き、外部ライブラリには依存しない。
 """
 
 from __future__ import annotations
@@ -43,6 +45,15 @@ class Box:
 
     def shifted(self, dx: float, dy: float) -> Box:
         return Box(self.x1 + dx, self.y1 + dy, self.x2 + dx, self.y2 + dy, self.score)
+
+
+Cuts = frozenset[int]
+"""カット（新しい場面の最初のフレーム番号）の集合"""
+
+
+def crosses_cut(a: int, b: int, cuts: Cuts) -> bool:
+    """フレーム a と b（a < b）の間に場面の切り替わりがあるか"""
+    return any(a < c <= b for c in cuts)
 
 
 def iou(a: Box, b: Box) -> float:
@@ -95,9 +106,13 @@ class IouTracker:
     """新しい追跡を始める検出の信頼度の下限"""
     tracks: list[Track] = field(default_factory=list)
     _next_id: int = 1
+    _scene_start: int = 0
 
-    def update(self, frame: int, detections: list[Box]) -> None:
-        alive = [t for t in self.tracks if frame - t.last <= self.max_age]
+    def update(self, frame: int, detections: list[Box], cut: bool = False) -> None:
+        """cut=True のフレーム（新しい場面の始まり）では、それまでの場面の追跡を全部終わらせる"""
+        if cut:
+            self._scene_start = frame
+        alive = [t for t in self.tracks if t.last >= self._scene_start and frame - t.last <= self.max_age]
         pairs = sorted(
             ((iou(t.predict(frame), d), ti, di) for ti, t in enumerate(alive) for di, d in enumerate(detections)),
             reverse=True,
@@ -118,10 +133,14 @@ class IouTracker:
                 self._next_id += 1
 
 
-def pick_track(tracks: list[Track], frame: int, x: float, y: float, search: int = 15) -> Track | None:
-    """frame 付近で点 (x, y) を含む枠の追跡。複数あれば枠の中心に近いものを選ぶ"""
+def pick_track(
+    tracks: list[Track], frame: int, x: float, y: float, search: int = 15, cuts: Cuts = frozenset()
+) -> Track | None:
+    """frame 付近（同じ場面の中）で点 (x, y) を含む枠の追跡。複数あれば枠の中心に近いものを選ぶ"""
     for d in sorted(range(-search, search + 1), key=abs):
         f = frame + d
+        if crosses_cut(min(f, frame), max(f, frame), cuts):
+            continue
         hits = [t for t in tracks if f in t.boxes and t.boxes[f].contains(x, y)]
         if hits:
             return min(hits, key=lambda t: math.hypot(t.boxes[f].cx - x, t.boxes[f].cy - y))
@@ -132,11 +151,14 @@ def _similar_size(a: Box, b: Box, ratio: float = 1.6) -> bool:
     return 1 / ratio <= b.h / a.h <= ratio
 
 
-def link_tracks(tracks: list[Track], seed: Track, max_gap: int = 20, max_dist: float = 0.8) -> list[Track]:
+def link_tracks(
+    tracks: list[Track], seed: Track, max_gap: int = 20, max_dist: float = 0.8, cuts: Cuts = frozenset()
+) -> list[Track]:
     """途切れた追跡を前後につなぐ。
 
     つなぐ条件：seed の端から max_gap フレーム以内に始まる（終わる）追跡で、予測した位置との距離が
-    枠の高さの max_dist 倍以内、大きさが近いもの。候補が複数あれば、いちばん近いものを選ぶ。
+    枠の高さの max_dist 倍以内、大きさが近いもの。場面の切り替わりはまたがない。
+    候補が複数あれば、いちばん近いものを選ぶ。
     """
     chain = [seed]
     used = {seed.id}
@@ -145,6 +167,8 @@ def link_tracks(tracks: list[Track], seed: Track, max_gap: int = 20, max_dist: f
         cands = []
         for t in tracks:
             if t.id in used or not (tail.last < t.first <= tail.last + max_gap):
+                continue
+            if crosses_cut(tail.last, t.first, cuts):
                 continue
             p, b = tail.predict(t.first), t.boxes[t.first]
             dist = math.hypot(p.cx - b.cx, p.cy - b.cy) / p.h
@@ -161,6 +185,8 @@ def link_tracks(tracks: list[Track], seed: Track, max_gap: int = 20, max_dist: f
         cands = []
         for t in tracks:
             if t.id in used or not (head.first - max_gap <= t.last < head.first):
+                continue
+            if crosses_cut(t.last, head.first, cuts):
                 continue
             d = head.first - t.last
             p = head.boxes[head.first].shifted(-vx * d, -vy * d)
@@ -185,14 +211,15 @@ def merge_boxes(chain: list[Track]) -> dict[int, Box]:
     return dict(sorted(out.items()))
 
 
-def fill_gaps(boxes: dict[int, Box], max_gap: int = 20) -> tuple[dict[int, Box], set[int]]:
-    """max_gap フレーム以内の抜けを、前後の枠の線形補間で埋める。戻り値の 2 つ目は補間したフレーム"""
+def fill_gaps(boxes: dict[int, Box], max_gap: int = 20, cuts: Cuts = frozenset()) -> tuple[dict[int, Box], set[int]]:
+    """max_gap フレーム以内の抜けを、前後の枠の線形補間で埋める（場面の切り替わりはまたがない）。
+    戻り値の 2 つ目は補間したフレーム"""
     frames = sorted(boxes)
     out = dict(boxes)
     filled: set[int] = set()
     for a, b in pairwise(frames):
         gap = b - a
-        if 1 < gap <= max_gap + 1:
+        if 1 < gap <= max_gap + 1 and not crosses_cut(a, b, cuts):
             ba, bb = boxes[a], boxes[b]
             for f in range(a + 1, b):
                 r = (f - a) / gap

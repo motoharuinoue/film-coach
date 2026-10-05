@@ -36,6 +36,7 @@ from ..application.track_target import (
     FrameSink,
     PersonDetector,
     PoseEstimator,
+    ShotBoundaryDetector,
     TargetHint,
     TargetNotFoundError,
     VideoReader,
@@ -59,6 +60,8 @@ class HttpDeps:
     pose: Callable[[], PoseEstimator]
     sink_for: Callable[[Path, VideoInfo, str], FrameSink] | None
     allowed_origins: list[str]
+    shots: Callable[[], ShotBoundaryDetector] | None = None
+    """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
 
 
 class YouTubeImport(BaseModel):
@@ -193,6 +196,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
                     TargetHint(body.x, body.y, body.t),
                     body.label,
                     report,
+                    deps.shots() if deps.shots else None,
                 )
             except TargetNotFoundError as e:
                 raise ValueError(str(e)) from e

@@ -52,6 +52,8 @@ export type TargetTrack = {
   hint: { x: number; y: number; t: number };
   segments: { trackId: number; start: number; end: number }[];
   peopleTracked: number;
+  /** 場面の切り替わり（新しい場面の最初のフレーム番号）。追跡はこれをまたがない */
+  cuts: number[];
   frames: TrackFrame[];
 };
 
@@ -61,6 +63,12 @@ export type TrackHint = { t: number; x: number; y: number; label: string };
 export function frameAt(track: TargetTrack, t: number): TrackFrame | undefined {
   const i = Math.max(0, Math.min(track.frames.length - 1, Math.round(t * track.video.fps)));
   return track.frames[i];
+}
+
+/** フレーム a と b の間に場面の切り替わりがあるか（向きは問わない） */
+export function crossesCut(cuts: readonly number[], a: number, b: number): boolean {
+  const [lo, hi] = a <= b ? [a, b] : [b, a];
+  return cuts.some((c) => lo < c && c <= hi);
 }
 
 export function coverage(track: TargetTrack) {

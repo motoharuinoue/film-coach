@@ -1,6 +1,7 @@
 """ユースケース：大勢が映る映像から、利用者が指した 1 人を追い、その人の骨格を出す。
 
-1 回目の読み込みで全員を検出・追跡し、指した点を含む追跡を選んで、途切れた所をつなぐ。
+1 回目の読み込みで全員を検出・追跡し（場面の切り替わりで追跡を切る）、指した点を含む追跡を選んで、
+同じ場面の中で途切れた所をつなぐ。
 2 回目の読み込みで、その人の枠だけ骨格を推定する（全員の骨格は出さない）。
 フレーム（画像）の中身はポートの実装だけが扱い、この層では中身を見ない。
 """
@@ -37,6 +38,14 @@ class PersonDetector(Protocol):
 class PoseEstimator(Protocol):
     def estimate(self, frame: Frame, box: Box) -> list[ImageKeypoint]:
         """枠の中の 1 人の COCO-17 の関節"""
+        ...
+
+
+class ShotBoundaryDetector(Protocol):
+    """場面の切り替わり（カット）を見つける。フレームを先頭から順に 1 回ずつ渡す"""
+
+    def is_cut(self, frame: Frame) -> bool:
+        """このフレームが新しい場面の始まりか"""
         ...
 
 
@@ -98,6 +107,8 @@ class TargetTrack:
     frames: list[TargetFrame]
     people_tracked: int
     """映像全体で追跡した人数"""
+    cuts: list[int]
+    """場面の切り替わり（新しい場面の最初のフレーム番号）"""
 
     @property
     def coverage(self) -> float:
@@ -124,24 +135,31 @@ def track_target(
     hint: TargetHint,
     sink: FrameSink | None = None,
     progress: Progress = _noop,
+    shots: ShotBoundaryDetector | None = None,
 ) -> TargetTrack:
     info = video.info()
 
     # 1 回目：全員を検出して追跡する
     tracker = IouTracker()
+    cut_frames: list[int] = []
     for i, frame in video.frames():
-        tracker.update(i, detector.detect(frame))
+        # 先頭のフレームも渡す（次のフレームと比べるため）。先頭は切り替わりに数えない
+        cut = (shots.is_cut(frame) if shots else False) and i > 0
+        if cut:
+            cut_frames.append(i)
+        tracker.update(i, detector.detect(frame), cut=cut)
         progress("detect", i + 1, info.frame_count)
+    cuts = frozenset(cut_frames)
 
     hint_frame = min(info.frame_count - 1, max(0, js_round(hint.t * info.fps)))
-    seed = pick_track(tracker.tracks, hint_frame, hint.x, hint.y)
+    seed = pick_track(tracker.tracks, hint_frame, hint.x, hint.y, cuts=cuts)
     if seed is None:
         raise TargetNotFoundError(
             f"{hint.t:.2f} 秒の ({hint.x:.0f}, {hint.y:.0f}) に人が見つかりません。位置か時刻を変えてください"
         )
-    chain: list[Track] = link_tracks(tracker.tracks, seed)
-    # 人の陰に隠れた短い間は、前後の枠から補間する
-    boxes, filled = fill_gaps(merge_boxes(chain))
+    chain: list[Track] = link_tracks(tracker.tracks, seed, cuts=cuts)
+    # 人の陰に隠れた短い間は、前後の枠から補間する（場面の切り替わりはまたがない）
+    boxes, filled = fill_gaps(merge_boxes(chain), cuts=cuts)
 
     # 2 回目：対象選手の骨格だけを推定する
     frames: list[TargetFrame] = []
@@ -159,4 +177,4 @@ def track_target(
         sink.close()
 
     segments = [TrackSegment(t.id, t.first, t.last) for t in chain]
-    return TargetTrack(info, hint, segments, frames, len(tracker.tracks))
+    return TargetTrack(info, hint, segments, frames, len(tracker.tracks), cut_frames)

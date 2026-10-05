@@ -4,7 +4,7 @@
   "title": "TargetTrack",
   "description": "大勢が映る映像で、指定した 1 人を追った結果。座標は画像のピクセル（左上が原点、y は下向き）。",
   "type": "object",
-  "required": ["schemaVersion", "video", "hint", "segments", "peopleTracked", "frames"],
+  "required": ["schemaVersion", "video", "hint", "segments", "peopleTracked", "cuts", "frames"],
   "additionalProperties": false,
   "$defs": {
     "box": {
@@ -55,6 +55,11 @@
       }
     },
     "peopleTracked": { "type": "integer", "minimum": 0, "description": "映像全体で追跡した人数" },
+    "cuts": {
+      "type": "array",
+      "description": "場面の切り替わり（新しい場面の最初のフレーム番号）。追跡とつなぎ直しはこれをまたがない",
+      "items": { "type": "integer", "minimum": 1 }
+    },
     "frames": {
       "type": "array",
       "items": {

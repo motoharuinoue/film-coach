@@ -57,6 +57,14 @@ describe("画面の読み込み処理", () => {
     expect(t.frames[0]!.box).toMatchObject({ x1: 100, y1: 300, x2: 170, y2: 480 });
     expect(t.frames[0]!.kp).toHaveLength(17);
     expect(t.frames.filter((f) => f.interpolated).map((f) => f.i)).toEqual(Array.from({ length: 12 }, (_, i) => 20 + i));
+    // 50 フレーム目で場面が変わり、その先は追わない
+    expect(t.cuts).toEqual([50]);
+    expect(t.frames.slice(50).every((f) => f.box === null)).toBe(true);
+  });
+
+  it("場面の切り替わりを数える前の追跡結果も読める", () => {
+    const { cuts: _, ...old } = samples.track as Record<string, unknown>;
+    expect(parseTrack(old).cuts).toEqual([]);
   });
 });
 
@@ -98,7 +106,7 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
     const done = trackFootage(lib, "000000000001", hint, progress);
     await vi.waitFor(() => expect(FakeEventSource.last).toBeDefined());
     FakeEventSource.last!.replay(samples.jobEvents);
-    await expect(done).resolves.toMatchObject({ coverage: 1, segments: 2, interpolated: 12 });
+    await expect(done).resolves.toMatchObject({ coverage: 0.8333, segments: 2, interpolated: 12 });
     expect(progress).toHaveBeenCalled();
     expect(FakeEventSource.last!.url).toBe("http://127.0.0.1:8787/api/jobs/job-1/events");
     expect(FakeEventSource.last!.closed).toBe(true);

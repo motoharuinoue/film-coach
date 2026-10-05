@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from test_http import FakeModels, events
-from test_track_target import FakeDetector, FakePose, FakeVideo
+from test_track_target import FakeDetector, FakePose, FakeShots, FakeVideo
 from test_youtube_library import FakeFetcher, FakeGrabber
 
 from film_coach.adapters.http import HttpDeps, create_app
@@ -41,6 +41,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         pose=FakePose,
         sink_for=None,
         allowed_origins=[],
+        shots=lambda: FakeShots(50),  # 50 フレーム目で場面が変わる
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()
