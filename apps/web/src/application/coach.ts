@@ -6,7 +6,7 @@ import type { Zones } from "../domain/judgement";
 import type { ManualAdjust } from "../domain/weighting";
 import { buildFindings } from "./coaching";
 import { consistency, evaluateRep, radarScores, releasePoints, repScore, selectBestRep, sessionScore, strengths } from "./evaluation";
-import type { AnalysisGateway, FindingWriter, ManualAdjustmentStore, ReferenceRepository, SessionRepository, VideoMetadataReader } from "./ports";
+import type { AnalysisGateway, FindingWriter, FootageLibrary, ManualAdjustmentStore, ReferenceRepository, SessionRepository, VideoMetadataReader } from "./ports";
 import { defaultManual, weighReferences, type ReferenceWeights } from "./references";
 
 /** 判定に使う 2 つの基準：お手本ゾーン（重み付き分布）と自己ベスト */
@@ -75,4 +75,6 @@ export type Services = {
   manualStore: ManualAdjustmentStore;
   analysis: AnalysisGateway;
   videoMeta: VideoMetadataReader;
+  /** 解析サービスにつなぐ設定があるときだけある（公開デモではない） */
+  footage?: FootageLibrary;
 };

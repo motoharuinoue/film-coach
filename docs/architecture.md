@@ -71,6 +71,7 @@ film-coach/
 | `ReferenceRepository` | `DemoReferenceRepository` | 解析サービスの HTTP クライアント（M2） |
 | `ManualAdjustmentStore` | `LocalStorageManualStore` | 解析サービスの SQLite（M2） |
 | `FindingWriter` | `TemplateFindingWriter` | Ollama のローカル LLM（M3） |
+| `FootageLibrary` | `HttpFootageLibrary`（解析サービスの HTTP API。開発時だけ `VITE_ANALYZER_URL` で差し込む） | — |
 
 ## 3. 技術スタック
 

@@ -1,14 +1,16 @@
-import { IconBrandGithub, IconBrandYoutube, IconHome, IconRoute } from "@tabler/icons-react";
+import { IconBrandGithub, IconBrandYoutube, IconHome, IconMovie, IconRoute } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { NavLink, Outlet, ScrollRestoration, useLocation } from "react-router";
 import { STEPS, type StepKey } from "../guide/content";
 import { TourProvider, useTour } from "../guide/Tour";
 import { useServices } from "../services";
+import { useAnalyzer } from "../state/analyzer";
 import { cx } from "./ui";
 
 /** パスから、使う流れのどの段階にいるかを決める */
 function stepOf(path: string): StepKey | undefined {
-  if (path === "/sessions/new" || /\/reps$/.test(path)) return "import";
+  if (path === "/sessions/new" || /\/reps$/.test(path) || path === "/footage" || /^\/footage\/[^/]+\/pick$/.test(path)) return "import";
+  if (/^\/footage\/[^/]+$/.test(path)) return "watch";
   if (/\/(studio|compare)$/.test(path)) return "watch";
   if (/\/report$/.test(path)) return "fix";
   if (path === "/progress") return "keep";
@@ -51,6 +53,7 @@ function Shell() {
   const location = useLocation();
   const { coach } = useServices();
   const tour = useTour();
+  const analyzer = useAnalyzer();
   const player = coach.player();
   const sid = coach.focus().session.id;
   const current = stepOf(location.pathname);
@@ -67,6 +70,17 @@ function Shell() {
             <IconHome size={17} stroke={1.75} className="relative" aria-hidden />
             <span className="relative whitespace-nowrap">ホーム</span>
           </SideLink>
+          <SideLink to="/footage">
+            <IconMovie size={17} stroke={1.75} className="relative" aria-hidden />
+            <span className="relative whitespace-nowrap">自分の映像</span>
+            {analyzer.status !== "none" && (
+              <span
+                className={cx("relative ml-auto h-2 w-2 rounded-full", analyzer.status === "online" ? "bg-turf" : analyzer.status === "checking" ? "bg-caution" : "bg-flag")}
+                title={analyzer.status === "online" ? "解析サービスにつながっています" : "解析サービスにつながっていません"}
+                aria-label={analyzer.status === "online" ? "解析サービスにつながっています" : "解析サービスにつながっていません"}
+              />
+            )}
+          </SideLink>
 
           {/* 使う流れ（4 段階） */}
           <div className="flex gap-1 lg:mt-5 lg:block" data-tour="nav-steps">
@@ -75,9 +89,11 @@ function Shell() {
               <span className="absolute top-5 bottom-5 left-[25px] hidden w-px bg-line lg:block" aria-hidden />
               {STEPS.map((s) => {
                 const on = current === s.key;
+                // 「自分の映像」の画面では、そのリンクだけを選んだ状態にする（段階は番号の色で示す）
+                const highlight = on && !location.pathname.startsWith("/footage");
                 return (
                   <li key={s.key}>
-                    <SideLink to={to[s.key]} active={on}>
+                    <SideLink to={to[s.key]} active={highlight}>
                       <span className={cx("relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border font-mono text-[11px]", on ? "border-turf bg-turf text-ink" : "border-line-strong bg-ink text-muted")}>{s.no}</span>
                       <span className="relative min-w-0">
                         <span className="block whitespace-nowrap">{s.title}</span>
