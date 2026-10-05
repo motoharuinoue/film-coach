@@ -6,9 +6,10 @@ import { LocalStorageManualStore } from "./infrastructure/browser/localStorageMa
 import { BrowserVideoMetadataReader } from "./infrastructure/browser/videoMetadataReader";
 import { DemoReferenceRepository, DemoSessionRepository } from "./infrastructure/demo/repositories";
 import { SimulatedAnalysisGateway } from "./infrastructure/demo/simulatedAnalysisGateway";
+import { HttpFootageLibrary } from "./infrastructure/http/httpFootageLibrary";
 import { TemplateFindingWriter } from "./infrastructure/writer/templateFindingWriter";
 
-export function createServices(): Services {
+export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL): Services {
   const sessions = new DemoSessionRepository();
   const coach = new CoachService({
     sessions,
@@ -20,5 +21,6 @@ export function createServices(): Services {
     manualStore: new LocalStorageManualStore(),
     analysis: new SimulatedAnalysisGateway(sessions),
     videoMeta: new BrowserVideoMetadataReader(),
+    footage: analyzerUrl ? new HttpFootageLibrary(analyzerUrl) : undefined,
   };
 }

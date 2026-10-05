@@ -39,6 +39,8 @@ build/
 .env
 .env.*
 !.env.example
+# 開発サーバーが手元の解析サービスにつなぐ URL だけを書いたファイル（秘密は書かない）
+!apps/web/.env.development
 
 # ---- ログ ----
 *.log

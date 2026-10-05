@@ -1,22 +1,30 @@
 import { IconBrandYoutube, IconCheck, IconCircleDashed, IconFileUpload, IconLoader2, IconMovie, IconX } from "@tabler/icons-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import type { AnalysisInput, AnalysisProgress, AnalysisResult, VideoMeta } from "../../application/ports";
 import { CAMERA_ANGLES, CAMERA_LABEL, type CameraAngle } from "../../domain/camera";
 import type { SessionKind } from "../../domain/entities";
+import type { Footage } from "../../domain/footage";
 import { isValidFor, METRICS } from "../../domain/metrics";
 import { checkSegment, formatTime, MAX_SEGMENT_SEC, parseYouTubeId } from "../../domain/youtube";
 import { FieldScene, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, StatusIcon, cx } from "../components/ui";
 import { PageGuide } from "../guide/PageGuide";
 import { useServices } from "../services";
+import { useAnalyzer } from "../state/analyzer";
 import { formatDate } from "../state/session";
 
 type Source = "file" | "youtube";
 
 export function NewSession() {
   const { analysis, videoMeta, coach } = useServices();
+  const analyzer = useAnalyzer();
+  const live = analyzer.status === "online" && analyzer.lib;
+  const navigate = useNavigate();
+  const [rawFile, setRawFile] = useState<File>();
+  const [importing, setImporting] = useState<{ label: string; ratio?: number }>();
+  const [importError, setImportError] = useState<string>();
   const [source, setSource] = useState<Source>("file");
   const [kind, setKind] = useState<SessionKind>("drill");
   const [camera, setCamera] = useState<CameraAngle>("side");
@@ -45,6 +53,7 @@ export function NewSession() {
       setFileError("動画ファイル（mp4 / mov）を選んでください");
       return;
     }
+    setRawFile(f);
     void videoMeta.read(f).then(setFile);
   };
 
@@ -54,7 +63,31 @@ export function NewSession() {
     setUrlError(id ? undefined : "YouTube の動画 URL を入力してください（例：https://www.youtube.com/watch?v=…）");
   };
 
+  /** 解析サービスにつながっていれば、実際に取り込んで本人を選ぶ画面へ進む */
+  const importLive = async () => {
+    const lib = analyzer.lib!;
+    setImportError(undefined);
+    try {
+      let footage: Footage;
+      if (source === "file") {
+        setImporting({ label: "アップロードしています", ratio: 0 });
+        footage = await lib.upload(rawFile!, (ratio) => setImporting({ label: "アップロードしています", ratio }));
+      } else {
+        setImporting({ label: "YouTube から区間を取得しています" });
+        footage = await lib.importYouTube(url, segment.ok ? segment.start : 0, segment.ok ? segment.end : 0);
+      }
+      navigate(`/footage/${footage.id}/pick`);
+    } catch (e) {
+      setImportError((e as Error).message);
+      setImporting(undefined);
+    }
+  };
+
   const startAnalysis = () => {
+    if (live) {
+      void importLive();
+      return;
+    }
     const input: AnalysisInput = {
       source: source === "file" ? { kind: "file", name: file!.name } : { kind: "youtube", videoId: videoId!, startSec: segment.ok ? segment.start : 0, endSec: segment.ok ? segment.end : 0 },
       sessionKind: kind,
@@ -257,11 +290,19 @@ export function NewSession() {
                 {camera !== "side" && <p className="mt-3 text-xs text-muted">QB の投球フォームは、投げる腕の側の真横から撮ると最も多くの指標を測れます。</p>}
               </Card>
 
-              <Button variant="primary" className="w-full py-2.5" disabled={!ready} onClick={startAnalysis}>
-                {source === "youtube" && <IconBrandYoutube size={16} aria-hidden />}
-                解析を始める
+              <Button variant="primary" className="w-full py-2.5" disabled={!ready || !!importing || (live && source === "file" && !rawFile)} onClick={startAnalysis}>
+                {importing ? <IconLoader2 size={16} className="animate-spin" aria-hidden /> : source === "youtube" && <IconBrandYoutube size={16} aria-hidden />}
+                {importing ? `${importing.label}${importing.ratio !== undefined ? `（${Math.round(importing.ratio * 100)}%）` : "…"}` : live ? "取り込んで本人を選ぶ" : "解析を始める"}
               </Button>
-              <DemoNote>デモでは解析をシミュレーションし、結果は {formatDate(coach.focus().session.date)} のサンプルを表示します。選んだファイルの情報はブラウザの中だけで読み、どこにも送りません。</DemoNote>
+              {importError && <p className="text-xs text-flag">{importError}</p>}
+              {live ? (
+                <div className="flex items-start gap-2 rounded-lg border border-turf/25 bg-turf/[0.06] px-3 py-2 text-xs leading-relaxed text-turf/90">
+                  <IconCheck size={14} className="mt-0.5 shrink-0" aria-hidden />
+                  <div>手元の解析サービスにつながっています。動画は解析サービス（この PC の中）にだけ送り、外には出しません。取り込んだら、映像の中の本人を選びます。</div>
+                </div>
+              ) : (
+                <DemoNote>デモでは解析をシミュレーションし、結果は {formatDate(coach.focus().session.date)} のサンプルを表示します。選んだファイルの情報はブラウザの中だけで読み、どこにも送りません。手元で解析サービスを動かすと、実際に解析できます（「自分の映像」を参照）。</DemoNote>
+              )}
             </div>
           </motion.div>
         ) : (

@@ -60,6 +60,22 @@ uv run pytest        # TypeScript と同じ結果になることの確認を含�
 uv run lint-imports  # 層のルールの検査
 ```
 
+### 自分の映像を解析する（手元だけ）
+
+解析サービスを起動してから画面を開くと、サイドバーの「自分の映像」が使えます（公開デモでは使えません。映像は手元から外に出しません）。
+
+```bash
+cd services/analyzer
+uv run film-coach models download   # 初回だけ（約 145 MB）
+uv run film-coach serve             # http://127.0.0.1:8787
+# 別のターミナルで
+npm run dev                          # http://localhost:5173
+```
+
+1. 「① 取り込む」でファイルか YouTube の区間を取り込む
+2. フレームの上で本人を押して選ぶ
+3. 追跡が終わったら、実際の映像に骨格を重ねて見る（フォーカス表示で本人を追って拡大）
+
 M0 では、骨格は合成データ（`apps/web/src/infrastructure/demo/synth.ts`）です。フェーズ分割・指標・重み付けは、実データと同じ計算を通しています。選手・チャンネル・動画はすべて架空です。
 
 ## 設計書

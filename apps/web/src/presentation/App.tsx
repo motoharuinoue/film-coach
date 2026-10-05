@@ -3,6 +3,7 @@ import { createHashRouter, Navigate, RouterProvider, useParams } from "react-rou
 import { AppShell } from "./components/AppShell";
 import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
+import { AnalyzerProvider } from "./state/analyzer";
 import { BenchmarksProvider } from "./state/benchmarks";
 
 // ホーム以外の画面は、開いたときに読み込む（最初の表示を軽くするため）
@@ -29,6 +30,9 @@ const router = createHashRouter([
       { path: "/sessions/:id/report", ...page(() => import("./pages/Report"), "Report") },
       { path: "/references", ...page(() => import("./pages/References"), "References") },
       { path: "/progress", ...page(() => import("./pages/Progress"), "Progress") },
+      { path: "/footage", ...page(() => import("./pages/footage/FootageList"), "FootageList") },
+      { path: "/footage/:id/pick", ...page(() => import("./pages/footage/FootagePick"), "FootagePick") },
+      { path: "/footage/:id", ...page(() => import("./pages/footage/FootageViewer"), "FootageViewer") },
       { path: "*", element: <NotFound /> },
     ],
   },
@@ -38,9 +42,11 @@ export function App() {
   return (
     // OS の「視差効果を減らす」設定のときは、動きを抑える
     <MotionConfig reducedMotion="user">
-      <BenchmarksProvider>
-        <RouterProvider router={router} />
-      </BenchmarksProvider>
+      <AnalyzerProvider>
+        <BenchmarksProvider>
+          <RouterProvider router={router} />
+        </BenchmarksProvider>
+      </AnalyzerProvider>
     </MotionConfig>
   );
 }

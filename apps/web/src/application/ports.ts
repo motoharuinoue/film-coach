@@ -3,6 +3,7 @@
 
 import type { CameraAngle } from "../domain/camera";
 import type { AnalyzedRep, Player, Reference, Session, SessionKind } from "../domain/entities";
+import type { Footage, TargetTrack, TrackHint } from "../domain/footage";
 import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
 import type { PoseFrame } from "../domain/pose";
@@ -65,4 +66,34 @@ export type AnalysisResult = { sessionId: string; repCount: number };
 export interface AnalysisGateway {
   stages(): string[];
   run(input: AnalysisInput, onProgress: (p: AnalysisProgress) => void, signal?: AbortSignal): Promise<AnalysisResult>;
+}
+
+// ---- 自分の映像（解析サービス） ----
+
+export type TrackingProgress = { stage: "detect" | "pose" | string; done: number; total: number };
+export type TrackingSummary = { videoId: string; coverage: number; segments: number; interpolated: number };
+
+export type TrackingHandlers = {
+  onProgress?: (p: TrackingProgress) => void;
+  onDone: (s: TrackingSummary) => void;
+  onFailed: (message: string) => void;
+};
+
+/**
+ * 解析サービス（services/analyzer の HTTP API）に取り込んだ映像。
+ * 公開デモでは解析サービスがないので、この実装を差し込まない（Services.footage が undefined）。
+ */
+export interface FootageLibrary {
+  health(): Promise<{ ok: boolean; modelsReady: boolean }>;
+  list(): Promise<Footage[]>;
+  get(id: string): Promise<Footage>;
+  upload(file: Blob & { name: string }, onProgress?: (ratio: number) => void): Promise<Footage>;
+  importYouTube(url: string, start: number, end: number): Promise<Footage>;
+  /** API の相対パス（links の値）を、画面から使える URL にする */
+  url(path: string): string;
+  frameUrl(footage: Footage, t: number): string | null;
+  track(footage: Footage): Promise<TargetTrack>;
+  startTracking(id: string, hint: TrackHint): Promise<{ jobId: string; events: string }>;
+  /** 進み具合を受け取る。戻り値で受け取りをやめる */
+  follow(events: string, handlers: TrackingHandlers): () => void;
 }
