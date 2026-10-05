@@ -55,6 +55,24 @@ uv run film-coach track ../../data/videos/clip.mov --at 5 --point 1440,430 --lab
 
 1920×1080・30fps・20 秒の動画で、Apple M4 の CPU で約 85 秒かかります。
 
+### 投球の検出と QB 指標
+
+```bash
+# 追跡結果から投球を見つけ、1 本ずつフェーズと QB 指標を出す（身長は cm）
+uv run film-coach throws ../../data/outputs/clip/track.json --height 180
+```
+
+横から固定カメラで撮った映像を前提に、次の順で計算します（`throws.json`、`packages/schema/throw-analysis.v1.schema.json`）。
+
+1. 画像の座標をワールド 2D（メートル）に直す（`domain/world.py`）
+   - 縮尺：太もも・すね・体幹の長さ（姿勢で変わりにくい）の合計を、人体寸法の標準の比率（身長の 0.779）で割って、画像の上での身長を見積もる
+   - 地面：低いほうの足首の位置の中央値
+   - 投げる向きと利き腕：手首が最も速く動く向きと、速いほうの手首。左投げは左右の関節を入れ替え、右投げの規則で計算する
+2. 投球を見つける（`domain/throws.py`）：投げる手首の速さのピーク（身長の 3 倍/秒以上）のうち、手首が肩より上にあるもの。区間は、ドロップの前の構えの終わりから始める
+3. 1 本ずつ、平滑化 → フェーズ分割 → 指標（画面と同じ規則、`analyze-pose` と同じ）
+
+合成データを画像に写したテストで、TypeScript の実装と同じフェーズ（±2 フレーム）と指標（角度は一致、長さは縮尺の見積もりのずれの数 % 以内）になることを確かめています。本人が小さく映っている（画面の高さの 40% 未満）ときは、結果に注意を添えます。
+
 ## HTTP の解析サービス
 
 画面（`apps/web`）から使う API です。手元の画面からだけ使う前提で、`127.0.0.1` だけで待ち受けます。
@@ -76,6 +94,8 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/jobs/{jobId}/events` | 進み具合（SSE：`state` → `progress` → `done` / `failed`） |
 | GET | `/api/videos/{id}/track` | 追跡結果（`target-track.v1.schema.json`） |
 | GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
+| POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera}`）。追跡した骨格だけを使うので、YouTube の区間でも動く |
+| GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
 
 - 解析は 1 本ずつ裏で動かします（ONNX Runtime が CPU を使い切るため）
 - YouTube から取り込んだ区間は、追跡が終わったら元の動画を消し、枠・骨格と出典だけを残します。元の動画の複製になる確認用の動画も作りません（ADR-0005）

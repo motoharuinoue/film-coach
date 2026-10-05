@@ -11,6 +11,7 @@ from typing import TextIO
 
 from ..application.analyze_pose import RepAnalysis, analyze_pose
 from ..application.ports import AnalysisWriter, ModelStore, PoseSequenceReader
+from ..application.throws import ThrowAnalysis, analyze_throws
 from ..application.track_target import (
     FrameSink,
     PersonDetector,
@@ -26,6 +27,7 @@ from ..domain.camera import CAMERA_ANGLES, CameraAngle
 from ..domain.library import VideoInfo
 from ..domain.metrics import METRICS
 from ..domain.phases import PHASE_LABEL
+from ..domain.world import NotEnoughPoseError
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +45,8 @@ class CliDeps:
     """動画ごとの既定の書き出し先"""
     serve: Callable[[str, int], None]
     """HTTP の解析サービスを起動する"""
+    read_track: Callable[[Path], TargetTrack]
+    write_throws: Callable[[ThrowAnalysis, Path], None]
     shots: Callable[[], ShotBoundaryDetector] | None = None
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
 
@@ -77,6 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--out", type=Path, help="書き出し先のフォルダ（既定は data/outputs/<動画名>）")
     t.add_argument("--no-preview", action="store_true", help="確認用の動画（preview.mp4・focus.mp4）を作らない")
 
+    w = sub.add_parser("throws", help="追跡結果（track.json）から投球を見つけ、1 本ずつフェーズと QB 指標を出す")
+    w.add_argument("track", type=Path, help="track の書き出した track.json（target-track.v1.schema.json）")
+    w.add_argument("--height", type=float, required=True, help="選手の身長（cm）。縮尺と身長比の指標に使う")
+    w.add_argument("--camera", choices=CAMERA_ANGLES, default="side", help="撮影の角度（測れる指標が変わる）")
+    w.add_argument("--out", type=Path, help="書き出し先（既定は track.json と同じフォルダの throws.json）")
+
     s = sub.add_parser("serve", help="画面から使う HTTP の解析サービスを起動する（127.0.0.1 だけで待ち受ける）")
     s.add_argument("--port", type=int, default=8787)
     return p
@@ -92,6 +102,21 @@ def print_analysis(a: RepAnalysis, out: TextIO) -> None:
         v = a.metrics.get(m.key)
         text = "判定不可（この角度では測れない）" if v is None else f"{v:.{m.digits}f} {m.unit}".rstrip()
         out.write(f"  {m.label:<16} {text}\n")
+
+
+def print_throws(ta: ThrowAnalysis, out: TextIO) -> None:
+    fps = ta.video.fps
+    hand = "右" if ta.hand == "right" else "左"
+    out.write(f"{hand}投げ、投球 {len(ta.reps)} 本\n")
+    for w in ta.warnings:
+        out.write(f"  注意：{w}\n")
+    for r in ta.reps:
+        release = r.start + r.analysis.events.release
+        out.write(f"\n#{r.index}  {r.start / fps:.2f}s 〜 {r.end / fps:.2f}s、リリース {release / fps:.2f}s\n")
+        for m in METRICS:
+            v = r.analysis.metrics.get(m.key)
+            if v is not None:
+                out.write(f"  {m.label:<16} {f'{v:.{m.digits}f} {m.unit}'.rstrip()}\n")
 
 
 def _progress(out: TextIO) -> Callable[[str, int, int], None]:
@@ -135,6 +160,18 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
     if args.command == "serve":
         out.write(f"解析サービスを起動します：http://127.0.0.1:{args.port}/api/health\n")
         deps.serve("127.0.0.1", args.port)
+        return 0
+
+    if args.command == "throws":
+        try:
+            ta = analyze_throws(deps.read_track(args.track), args.height / 100, args.camera)
+        except NotEnoughPoseError as e:
+            out.write(f"{e}\n")
+            return 1
+        print_throws(ta, out)
+        throws_out: Path = args.out or args.track.with_name("throws.json")
+        deps.write_throws(ta, throws_out)
+        out.write(f"\n書き出しました：{throws_out}\n")
         return 0
 
     if args.command == "models":

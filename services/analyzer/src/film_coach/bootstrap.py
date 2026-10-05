@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .adapters.cli import CliDeps, run
+from .application.throws import ThrowAnalysis
 from .application.track_target import (
     FanoutSink,
     FrameSink,
@@ -71,6 +72,18 @@ def _write_track(tt: TargetTrack, dest: Path) -> None:
     write_track(tt, dest)
 
 
+def _read_track(src: Path) -> TargetTrack:
+    from .infrastructure.json_track import read_track
+
+    return read_track(src)
+
+
+def _write_throws(ta: ThrowAnalysis, dest: Path) -> None:
+    from .infrastructure.json_throws import write_throws
+
+    write_throws(ta, dest)
+
+
 def http_deps() -> HttpDeps:
     """HTTP の解析サービスの依存。モデルは最初に使うときに 1 回だけ読み込む"""
     import os
@@ -117,6 +130,8 @@ def cli_deps() -> CliDeps:
         write_track=_write_track,
         output_dir=lambda video: data_dir() / "outputs" / video.stem,
         serve=_serve,
+        read_track=_read_track,
+        write_throws=_write_throws,
         shots=_shots,
     )
 

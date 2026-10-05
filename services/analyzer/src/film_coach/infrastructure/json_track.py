@@ -1,4 +1,4 @@
-"""対象選手の追跡結果の JSON 書き出し（packages/schema/target-track.v1.schema.json）。"""
+"""対象選手の追跡結果の JSON 入出力（packages/schema/target-track.v1.schema.json）。"""
 
 from __future__ import annotations
 
@@ -6,7 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ..application.track_target import TargetTrack
+from ..application.track_target import TargetFrame, TargetHint, TargetTrack, TrackSegment
+from ..domain.library import VideoInfo
+from ..domain.tracking import Box
 from .schema import validate
 
 TRACK_SCHEMA = "target-track.v1.schema.json"
@@ -50,3 +52,32 @@ def track_to_json(tt: TargetTrack) -> dict[str, Any]:
 def write_track(tt: TargetTrack, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(track_to_json(tt), ensure_ascii=False), encoding="utf-8")
+
+
+def track_from_json(data: dict[str, Any]) -> TargetTrack:
+    # 場面の切り替わりを数える前に書き出した結果には cuts がないので、空とみなす
+    data = {**data, "cuts": data.get("cuts", [])}
+    validate(TRACK_SCHEMA, data)
+    v, h = data["video"], data["hint"]
+    frames = [
+        TargetFrame(
+            int(f["i"]),
+            float(f["t"]),
+            None if f["box"] is None else Box(*(float(n) for n in f["box"])),
+            None if f["kp"] is None else [(float(x), float(y), float(c)) for x, y, c in f["kp"]],
+            bool(f["interpolated"]),
+        )
+        for f in data["frames"]
+    ]
+    return TargetTrack(
+        VideoInfo(v["name"], float(v["fps"]), int(v["width"]), int(v["height"]), int(v["frameCount"])),
+        TargetHint(float(h["x"]), float(h["y"]), float(h["t"])),
+        [TrackSegment(int(s["trackId"]), int(s["start"]), int(s["end"])) for s in data["segments"]],
+        frames,
+        int(data["peopleTracked"]),
+        [int(c) for c in data["cuts"]],
+    )
+
+
+def read_track(source: Path) -> TargetTrack:
+    return track_from_json(json.loads(source.read_text(encoding="utf-8")))
