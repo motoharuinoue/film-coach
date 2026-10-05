@@ -3,43 +3,73 @@
 ## 1. 全体像
 
 ```
-┌──────────────── ブラウザ ────────────────┐
-│ apps/web (React + TS)                     │
-│  画面 / 骨格オーバーレイ / グラフ           │
-│  YouTube IFrame Player（お手本の表示）      │
-└───────┬───────────────────────────────────┘
+┌──────────────── ブラウザ ─────────────────────┐
+│ apps/web (React + TS)                          │
+│  presentation   画面 / 骨格オーバーレイ / グラフ │
+│  application    ユースケース・ポート            │
+│  domain         指標・判定・重み付け            │
+│  infrastructure 解析サービスの HTTP クライアント │
+│  YouTube IFrame Player（お手本の表示）           │
+└───────┬────────────────────────────────────────┘
         │ REST + SSE（解析の進み具合）
-┌───────▼──────── ローカル Mac ─────────────┐
-│ services/analyzer (Python + FastAPI)      │
-│  sources/     ファイル / YouTube の取り込み  │
-│  pipeline/    検出 → 追跡 → 骨格 → フェーズ → 指標 │
-│  judge/       ルールで判定                  │
-│  references/  お手本の収集・重み・分布       │
-│  report/      Ollama で文章化               │
-│  SQLite + data/（動画・骨格データ）          │
-└───────┬───────────────────────────────────┘
+┌───────▼──────── ローカル Mac ──────────────────┐
+│ services/analyzer (Python + FastAPI)           │
+│  adapters       HTTP / ファイル・YouTube の取り込み / Ollama │
+│  application    解析ジョブ / お手本の取り込み / レポート │
+│  domain         フェーズ / 指標 / 判定 / 重み付け │
+│  infrastructure rtmlib / SAM 2 / OpenCV / ffmpeg / SQLite │
+│  data/          動画・骨格データ（ローカルのみ）  │
+└───────┬────────────────────────────────────────┘
         │ 検索・情報取得・区間の取得のみ
     YouTube Data API / YouTube
 ```
 
 公開デモ（GitHub Pages）では Python 側を動かさず、`samples/` の解析済み JSON を読み込んで同じ画面を表示する。
 
-## 2. リポジトリ構成
+## 2. リポジトリ構成と層
+
+フロントエンドも解析サービスも、クリーンアーキテクチャの層に分ける。依存は内側（domain）に向けるだけにし、そのルールをテストで守る（[ADR-0007](adr/0007-clean-architecture.md)）。
 
 ```
 film-coach/
-  apps/web/            フロントエンド
-  services/analyzer/   解析サービス
-    sources/           SourceAdapter: LocalFile / YouTube
-    pipeline/          解析の各段階
-    judge/             判定ルールと metrics.yaml
-    references/        お手本ライブラリ
-    report/            レポート生成
+  apps/web/src/
+    domain/            骨格・フェーズ・指標・判定・重み付け・コーチングの方針・エンティティ
+    application/       ユースケース、ポート（外部への窓口）、CoachService
+    infrastructure/    ポートの実装
+      demo/            合成データ・デモ用リポジトリ（M1 で HTTP 実装に差し替え）
+      writer/          改善点の文章化（テンプレート。M3 で Ollama を追加）
+      browser/         localStorage など
+    presentation/      React の画面・部品・フック
+    composition.ts     コンポジションルート（infrastructure を差し込む唯一の場所）
+    architecture.test.ts  依存の向きの検査
+  services/analyzer/   解析サービス（M1）
+    domain/            フェーズ・指標・判定・重み付け（web の domain と同じ規則）
+    application/       解析ジョブ、お手本の取り込み、レポート
+    adapters/          HTTP（FastAPI）、SourceAdapter（LocalFile / YouTube）、Ollama
+    infrastructure/    rtmlib・SAM 2・OpenCV・ffmpeg・SQLite
   packages/schema/     解析結果・お手本・重みの JSON Schema
   samples/             自分で撮ったサンプル動画 + 解析済み JSON
   docs/                設計書
   .github/workflows/   CI
 ```
+
+| 層 | 依存してよい層 |
+|---|---|
+| domain | domain |
+| application | domain |
+| infrastructure（adapters を含む） | domain, application |
+| presentation | domain, application |
+
+`domain` と `application` は React などの外部パッケージに依存しない。
+
+### ポート
+
+| ポート | いまの実装 | 今後の実装 |
+|---|---|---|
+| `SessionRepository` | `DemoSessionRepository`（合成データ） | 解析サービスの HTTP クライアント（M1） |
+| `ReferenceRepository` | `DemoReferenceRepository` | 解析サービスの HTTP クライアント（M2） |
+| `ManualAdjustmentStore` | `LocalStorageManualStore` | 解析サービスの SQLite（M2） |
+| `FindingWriter` | `TemplateFindingWriter` | Ollama のローカル LLM（M3） |
 
 ## 3. 技術スタック
 
@@ -107,7 +137,7 @@ film-coach/
 
 | ツール | 状態 |
 |---|---|
-| Node 23 / npm（workspaces） | 導入済み |
+| Node 23 / npm（workspaces） | 導入済み。依存の解決は npm 11 で行う（npm 10 は不具合で失敗する） |
 | ffmpeg | 導入済み |
 | Python 3.14 | 導入済み。ML 系ライブラリとの互換性のため、uv で 3.12 を固定して使う |
 | uv / ollama / yt-dlp | 未導入（M1 で導入） |

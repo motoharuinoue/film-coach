@@ -17,3 +17,4 @@
 | [0004](adr/0004-schema-driven.md) | 解析結果の形を JSON Schema で一元管理する |
 | [0005](adr/0005-youtube-terms-and-copyright.md) | YouTube の規約と著作権への対応（確認待ち） |
 | [0006](adr/0006-reference-weighting.md) | お手本の重み付けを 5 つの要素の積にする |
+| [0007](adr/0007-clean-architecture.md) | クリーンアーキテクチャで層を分け、依存の向きをテストで守る |

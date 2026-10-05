@@ -1,0 +1,49 @@
+# ---- 依存パッケージ ----
+node_modules/
+
+# ---- ビルド・テストで生成されるもの（フロントエンド） ----
+dist/
+dist-ssr/
+coverage/
+*.tsbuildinfo
+.vite/
+vite.config.*.timestamp-*
+playwright-report/
+test-results/
+storybook-static/
+
+# ---- ビルド・テストで生成されるもの（Python / services/analyzer、M1 以降） ----
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+
+# ---- 解析で生成されるデータ（動画・骨格・SQLite）。ルート直下の data/ だけを対象にする ----
+/data/
+*.sqlite3
+*.db
+
+# ---- ダウンロードしたモデルの重み（M1 以降） ----
+*.onnx
+*.pt
+*.pth
+
+# ---- 環境変数・秘密情報 ----
+.env
+.env.*
+!.env.example
+
+# ---- ログ ----
+*.log
+npm-debug.log*
+
+# ---- OS・エディタ・ツールのローカル設定 ----
+.DS_Store
+.idea/
+.claude/settings.local.json
