@@ -12,6 +12,7 @@
 - `packages/schema` に JSON Schema を置き、版番号を持たせる。
 - Python 側（Pydantic）と TypeScript 側の型は、ここから生成する。
 - M0 では先に TypeScript の型と仮データを作り、M1 で JSON Schema に移す。
+- M1-1 で骨格の時系列のスキーマ（`pose-sequence.v1.schema.json`）と、両言語の結果を突き合わせる共通データ（`fixtures/parity.v1.json`）を追加した。解析結果（API の応答）のスキーマは M1-3 で追加する。
 
 ## 結果
 

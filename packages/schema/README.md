@@ -1,0 +1,17 @@
+# packages/schema
+
+フロントエンド（TypeScript）と解析サービス（Python）で共有するデータの形（[ADR-0004](../../docs/adr/0004-schema-driven.md)）。
+
+| ファイル | 内容 |
+|---|---|
+| `pose-sequence.v1.schema.json` | 1 レップ分の骨格の時系列（COCO-17、ワールド 2D） |
+| `fixtures/parity.v1.json` | 両言語の実装が同じ結果を出すことを確かめる共通データ（合成骨格と、フェーズ・指標の期待値） |
+
+## 共通データの更新
+
+期待値は TypeScript の実装から作ります。ドメインの規則を変えたら、両言語を直したうえで作り直してください。
+
+```bash
+UPDATE_FIXTURES=1 npm test -- parity   # TypeScript 側で作り直す
+cd services/analyzer && uv run pytest  # Python 側で一致を確かめる
+```

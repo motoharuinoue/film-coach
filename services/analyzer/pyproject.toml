@@ -1,0 +1,68 @@
+[project]
+name = "film-coach-analyzer"
+version = "0.1.0"
+description = "Film Coach の解析サービス：骨格の時系列からフェーズと QB 指標を出す"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "jsonschema>=4.26",
+]
+
+[project.scripts]
+film-coach = "film_coach.bootstrap:main"
+
+[dependency-groups]
+dev = [
+    "import-linter>=2.15",
+    "mypy>=2.4",
+    "pytest>=9.1",
+    "ruff>=0.16",
+    "types-jsonschema>=4.26.0.20260518",
+]
+
+[build-system]
+requires = ["hatchling>=1.32"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/film_coach"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+# 日本語の全角記号（、。：など）をコメントや文字列で使うため
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+files = ["src"]
+
+# ---- クリーンアーキテクチャの層（docs/adr/0007-clean-architecture.md）----
+# 上の層は下の層に依存してよいが、逆は禁止。adapters と infrastructure は互いに依存しない。
+# 組み立て（bootstrap.py）だけが、すべての層を import してよい。
+[tool.importlinter]
+root_package = "film_coach"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "層の依存の向き"
+type = "layers"
+layers = [
+    "film_coach.adapters | film_coach.infrastructure",
+    "film_coach.application",
+    "film_coach.domain",
+]
+
+[[tool.importlinter.contracts]]
+name = "domain と application は外部ライブラリに依存しない"
+type = "forbidden"
+source_modules = ["film_coach.domain", "film_coach.application"]
+forbidden_modules = ["jsonschema", "numpy", "cv2", "onnxruntime", "rtmlib", "fastapi"]
