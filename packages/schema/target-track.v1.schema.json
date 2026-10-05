@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "target-track.v1.schema.json",
+  "title": "TargetTrack",
+  "description": "大勢が映る映像で、指定した 1 人を追った結果。座標は画像のピクセル（左上が原点、y は下向き）。",
+  "type": "object",
+  "required": ["schemaVersion", "video", "hint", "segments", "peopleTracked", "frames"],
+  "additionalProperties": false,
+  "$defs": {
+    "box": {
+      "type": "array",
+      "description": "[x1, y1, x2, y2, 検出の信頼度]",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number" }, { "type": "number", "minimum": 0, "maximum": 1 }],
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "keypoint": {
+      "type": "array",
+      "description": "[x, y, 信頼度]",
+      "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number", "minimum": 0, "maximum": 1 }],
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "video": {
+      "type": "object",
+      "required": ["name", "fps", "width", "height", "frameCount"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "frameCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "hint": {
+      "type": "object",
+      "description": "対象選手の指定：t 秒の時点で、画像の (x, y) に映っている人",
+      "required": ["x", "y", "t"],
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "t": { "type": "number", "minimum": 0 } }
+    },
+    "segments": {
+      "type": "array",
+      "description": "つないだ追跡。1 つより多ければ、途中で見失ってつなぎ直している",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["trackId", "start", "end"],
+        "additionalProperties": false,
+        "properties": { "trackId": { "type": "integer" }, "start": { "type": "integer", "minimum": 0 }, "end": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "peopleTracked": { "type": "integer", "minimum": 0, "description": "映像全体で追跡した人数" },
+    "frames": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["i", "t", "box", "kp", "interpolated"],
+        "additionalProperties": false,
+        "properties": {
+          "i": { "type": "integer", "minimum": 0 },
+          "t": { "type": "number", "minimum": 0 },
+          "box": { "oneOf": [{ "$ref": "#/$defs/box" }, { "type": "null" }] },
+          "kp": { "oneOf": [{ "type": "array", "items": { "$ref": "#/$defs/keypoint" }, "minItems": 17, "maxItems": 17 }, { "type": "null" }] },
+          "interpolated": { "type": "boolean", "description": "見失った間を、前後の枠から補間したフレームか" }
+        }
+      }
+    }
+  }
+}

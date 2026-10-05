@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -19,3 +20,13 @@ class AnalysisWriter(Protocol):
     """解析結果を書き出す"""
 
     def write(self, analysis: RepAnalysis, dest: Path) -> None: ...
+
+
+class ModelStore(Protocol):
+    """骨格推定などのモデルファイルの置き場所"""
+
+    def status(self) -> list[tuple[str, float, bool, str]]:
+        """(役割, 大きさ MB, 置いてあるか, 場所)"""
+        ...
+
+    def download(self, log: Callable[[str], None]) -> None: ...

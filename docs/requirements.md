@@ -62,9 +62,9 @@
 
 | 段階 | 手法 |
 |---|---|
-| 人物検出 | RTMDet（rtmlib 同梱、Apache-2.0） |
-| 追跡 | ByteTrack（MIT） |
-| ★対象選手のロック | SAM 2（Apache-2.0）。試合映像で 1 回タップすると、そのプレー中ずっと追う |
+| 人物検出 | YOLOX-m（rtmlib 同梱の HumanArt 版、Apache-2.0） |
+| 追跡 | IoU による追跡 ＋ 途切れたときのつなぎ直し ＋ 短い抜けの補間（自前の実装。足りなければ ByteTrack を検討） |
+| ★対象選手のロック | 指した点（時刻と画像上の位置）を含む追跡を選んで追い続ける（M1-2）。M4 で SAM 2（Apache-2.0）のマスクを加える |
 | 2D 骨格推定 | RTMPose / RTMW（rtmlib、ONNX Runtime + CoreML） |
 | 平滑化・正規化 | One Euro / Savitzky-Golay。身長・肩幅で正規化した骨格座標も持つ |
 | ★フェーズ分割 | ルールベースで 5 フェーズに分ける（下記） |
