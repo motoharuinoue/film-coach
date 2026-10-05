@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "youtube-search.v1.schema.json",
+  "title": "YouTubeSearch",
+  "description": "YouTube Data API v3 で探したお手本の候補（GET /api/youtube/search の応答）。埋め込みで再生できる動画だけ。高評価数・コメント数・登録者数は、非公開なら null。",
+  "type": "object",
+  "required": ["query", "creativeCommonsOnly", "candidates", "quota"],
+  "additionalProperties": false,
+  "$defs": {
+    "count": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+    "quota": {
+      "type": "object",
+      "description": "その日（米国太平洋時間）の無料枠",
+      "required": ["day", "used", "limit", "remaining", "resetsAt"],
+      "additionalProperties": false,
+      "properties": {
+        "day": { "type": "string", "format": "date" },
+        "used": { "type": "integer", "minimum": 0 },
+        "limit": { "type": "integer", "minimum": 1 },
+        "remaining": { "type": "integer", "minimum": 0 },
+        "resetsAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "properties": {
+    "query": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "creativeCommonsOnly": { "type": "boolean" },
+    "quota": { "$ref": "#/$defs/quota" },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["videoId", "title", "channel", "channelId", "publishedAt", "durationSec", "views", "likes", "comments", "subscribers", "license", "definition", "thumbnail", "url"],
+        "additionalProperties": false,
+        "properties": {
+          "videoId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+          "title": { "type": "string" },
+          "channel": { "type": "string" },
+          "channelId": { "type": "string" },
+          "publishedAt": { "type": "string" },
+          "durationSec": { "type": "integer", "minimum": 0 },
+          "views": { "type": "integer", "minimum": 0 },
+          "likes": { "$ref": "#/$defs/count" },
+          "comments": { "$ref": "#/$defs/count" },
+          "subscribers": { "$ref": "#/$defs/count" },
+          "license": { "enum": ["youtube", "creativeCommon"] },
+          "definition": { "enum": ["hd", "sd"] },
+          "thumbnail": { "type": "string" },
+          "url": { "type": "string" }
+        }
+      }
+    }
+  }
+}

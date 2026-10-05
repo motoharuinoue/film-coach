@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -44,6 +45,16 @@ from ..application.track_target import (
     TargetNotFoundError,
     VideoReader,
 )
+from ..application.youtube_search import (
+    Clock,
+    QuotaExceeded,
+    QuotaLedger,
+    YouTubeApiError,
+    YouTubeNotConfigured,
+    YouTubeSearch,
+    quota_status,
+    search_candidates,
+)
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord
 from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
@@ -69,6 +80,11 @@ class HttpDeps:
     allowed_origins: list[str]
     shots: Callable[[], ShotBoundaryDetector] | None = None
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
+    youtube: YouTubeSearch | None = None
+    """お手本の候補を探す（YouTube Data API）"""
+    quota: QuotaLedger | None = None
+    """YouTube Data API の無料枠の記録"""
+    clock: Clock | None = None
     motion: Callable[[], CameraMotionEstimator] | None = None
     """カメラの動きを見積もる（追跡ごとに新しく作る）"""
 
@@ -259,6 +275,41 @@ def create_app(deps: HttpDeps) -> FastAPI:
 
         job = deps.jobs.submit("track", video_id, work)
         return {"jobId": job.id, "events": f"/api/jobs/{job.id}/events"}
+
+    def now() -> datetime:
+        return deps.clock() if deps.clock else datetime.now(UTC)
+
+    @app.get("/api/youtube/status")
+    def youtube_status() -> dict[str, Any]:
+        """API キーがあるか（キーそのものは返さない）と、今日の無料枠"""
+        configured = bool(deps.youtube and deps.youtube.configured())
+        quota = dto.quota_to_json(quota_status(deps.quota, now())) if deps.quota else None
+        return {"configured": configured, "quota": quota}
+
+    @app.get("/api/youtube/search")
+    def youtube_search(
+        q: str = Query(min_length=1, max_length=100),
+        cc: bool = Query(False, description="Creative Commons の動画だけ"),
+        max: int = Query(12, ge=1, le=25),
+    ) -> dict[str, Any]:
+        if deps.youtube is None or deps.quota is None:
+            raise HTTPException(503, "YouTube の検索は使えません")
+        try:
+            found, quota = search_candidates(deps.youtube, deps.quota, q, cc, max, now)
+        except YouTubeNotConfigured as e:
+            raise HTTPException(503, str(e)) from e
+        except QuotaExceeded as e:
+            raise HTTPException(429, str(e)) from e
+        except YouTubeApiError as e:
+            raise HTTPException(502, str(e)) from e
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        return {
+            "query": q,
+            "creativeCommonsOnly": cc,
+            "candidates": [dto.candidate_to_json(c) for c in found],
+            "quota": dto.quota_to_json(quota),
+        }
 
     @app.get("/api/practices")
     def practices() -> list[dict[str, Any]]:

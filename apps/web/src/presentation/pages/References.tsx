@@ -1,6 +1,7 @@
 import { IconBrandYoutube, IconEyeOff, IconPin, IconRefresh, IconSearch, IconStar } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useMemo, useState } from "react";
+import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import { KIND_LABEL, type Reference, type ReferenceKind } from "../../domain/entities";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
@@ -10,6 +11,7 @@ import { FieldScene, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, Toggle, cx } from "../components/ui";
 import { usePlayback } from "../hooks/usePlayback";
 import { PageGuide } from "../guide/PageGuide";
+import { useAnalyzer } from "../state/analyzer";
 import { useBenchmarks, useCoach } from "../state/benchmarks";
 
 const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -17,6 +19,7 @@ const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compa
 export function References() {
   const { coach, bench } = useCoach();
   const { manual, update, reset, changed } = useBenchmarks();
+  const analyzer = useAnalyzer();
   const refs = coach.references();
   const [query, setQuery] = useState("");
   const [ccOnly, setCcOnly] = useState(false);
@@ -39,11 +42,20 @@ export function References() {
         title="お手本ライブラリ"
         sub="YouTube のお手本を取り込み、人気度・発信者・解析品質・合意度・手動調整で重み付けします"
         right={
-          changed && (
-            <Button variant="ghost" onClick={reset}>
-              <IconRefresh size={15} aria-hidden /> 手動調整を元に戻す
-            </Button>
-          )
+          <span className="flex gap-2">
+            {changed && (
+              <Button variant="ghost" onClick={reset}>
+                <IconRefresh size={15} aria-hidden /> 手動調整を元に戻す
+              </Button>
+            )}
+            {analyzer.status === "online" && (
+              <Link to="/references/search">
+                <Button variant="primary">
+                  <IconBrandYoutube size={15} aria-hidden /> YouTube で探す
+                </Button>
+              </Link>
+            )}
+          </span>
         }
       />
 

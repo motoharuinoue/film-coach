@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkSegment, formatTime, parseTime, parseYouTubeId } from "./youtube";
+import { checkSegment, defaultSegment, formatTime, parseTime, parseYouTubeId } from "./youtube";
 
 describe("parseYouTubeId", () => {
   it.each([
@@ -48,5 +48,13 @@ describe("checkSegment", () => {
     const r = checkSegment("0:00", "1:01");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain("60 秒");
+  });
+});
+
+describe("defaultSegment", () => {
+  it("取り込む区間の初期値は最初の 30 秒。短い動画ならその長さ", () => {
+    expect(defaultSegment(95)).toEqual({ start: 0, end: 30 });
+    expect(defaultSegment(12)).toEqual({ start: 0, end: 12 });
+    expect(defaultSegment(0)).toEqual({ start: 0, end: 30 }); // 長さが分からなければ 30 秒
   });
 });
