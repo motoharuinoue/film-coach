@@ -9,23 +9,25 @@ import {
   IconRepeat,
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { alignedFrame, alignOffset, type Alignable } from "../../domain/align";
 import { CAMERA_LABEL } from "../../domain/camera";
+import type { AnalyzedRep, Session } from "../../domain/entities";
 import { formatMetric, invalidReason, METRIC_BY_KEY } from "../../domain/metrics";
 import { PHASE_LABEL, phaseAt } from "../../domain/phases";
 import { jointAngle, kp, speedSeries } from "../../domain/pose";
 import { PhaseBar, TimeChart, ZoneBar } from "../components/charts";
 import { AngleArc, FieldScene, Hud, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, Card, Kbd, SectionTitle, Segmented, StatusIcon, Toggle, cx } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { usePlayback } from "../hooks/usePlayback";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel, useSessionRep } from "../state/session";
+import { CompareView } from "./studio/CompareView";
 
 type GhostTarget = "none" | "best" | string;
 
-export function Studio() {
-  const { session, rep, setRep } = useSessionRep();
+function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) {
   const { coach, bench } = useCoach();
   const { zones } = bench;
   const pb = usePlayback(rep.seq.frames.length, rep.seq.fps, { initialRate: 0.25 });
@@ -80,30 +82,11 @@ export function Studio() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">分析スタジオ</h1>
-          <Badge>
-            {formatDate(session.date)} {session.title} · {CAMERA_LABEL[session.camera]}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => setRep(Math.max(0, rep.index - 1))} disabled={rep.index === 0} aria-label="前のレップ">
-            <IconChevronLeft size={16} />
-          </Button>
-          <span className="font-mono text-sm">
-            {repLabel(rep.index)} / {session.reps.length}
-          </span>
-          <Button variant="ghost" onClick={() => setRep(Math.min(session.reps.length - 1, rep.index + 1))} disabled={rep.index === session.reps.length - 1} aria-label="次のレップ">
-            <IconChevronRight size={16} />
-          </Button>
-        </div>
-      </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
           {/* 映像 */}
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden" data-tour="studio-video">
             <div className="relative">
               <FieldScene
                 className="block w-full"
@@ -157,7 +140,7 @@ export function Studio() {
           </Card>
 
           {/* タイムラインと操作 */}
-          <Card className="space-y-4 p-4">
+          <Card className="space-y-4 p-4" data-tour="studio-timeline">
             <PhaseBar phases={rep.phases} frame={pb.frame} total={rep.seq.frames.length} markers={markers} onSeek={pb.seek} />
             <div className="flex flex-wrap items-center gap-3 pt-3">
               <div className="flex items-center gap-1">
@@ -243,7 +226,7 @@ export function Studio() {
         </div>
 
         {/* 指標カード */}
-        <aside className="space-y-3">
+        <aside className="space-y-3" data-tour="studio-metrics">
           <SectionTitle right={<span className="text-[11px] text-faint">押すと根拠のフレームへ</span>}>指標</SectionTitle>
           {rows.map((r) => {
             const def = METRIC_BY_KEY[r.key];
@@ -318,6 +301,58 @@ export function Studio() {
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+type View = "analysis" | "compare";
+
+export function Studio() {
+  const { session, rep, setRep } = useSessionRep();
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get("view") === "compare" ? "compare" : "analysis";
+  const setView = (v: View) =>
+    setParams(
+      (p) => {
+        if (v === "compare") p.set("view", "compare");
+        else p.delete("view");
+        return p;
+      },
+      { replace: true },
+    );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold tracking-tight">分析スタジオ</h1>
+          <Segmented
+            label="スタジオの表示"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: "analysis", label: "分析" },
+              { value: "compare", label: "比較" },
+            ]}
+          />
+          <Badge>
+            {formatDate(session.date)} {session.title} · {CAMERA_LABEL[session.camera]}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" onClick={() => setRep(Math.max(0, rep.index - 1))} disabled={rep.index === 0} aria-label="前のレップ">
+            <IconChevronLeft size={16} />
+          </Button>
+          <span className="font-mono text-sm">
+            {repLabel(rep.index)} / {session.reps.length}
+          </span>
+          <Button variant="ghost" onClick={() => setRep(Math.min(session.reps.length - 1, rep.index + 1))} disabled={rep.index === session.reps.length - 1} aria-label="次のレップ">
+            <IconChevronRight size={16} />
+          </Button>
+        </div>
+      </div>
+      <PageGuide id="studio" sessionId={session.id} />
+      {view === "compare" ? <CompareView key={rep.id} session={session} rep={rep} /> : <AnalysisView key={rep.id} session={session} rep={rep} />}
     </div>
   );
 }

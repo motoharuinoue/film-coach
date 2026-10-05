@@ -6,6 +6,7 @@ import { CAMERA_LABEL } from "../../domain/camera";
 import { METRIC_BY_KEY } from "../../domain/metrics";
 import { PoseThumb } from "../components/scene";
 import { Badge, Card, DemoNote, PageHeader, SectionTitle, StatusPill, cx } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel, useSessionRep } from "../state/session";
 
@@ -20,7 +21,7 @@ export function Reps() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="レップ選択"
+        title="① 取り込む：レップを選ぶ"
         sub={`${formatDate(session.date)} ${session.title} · ${CAMERA_LABEL[session.camera]} · ${session.reps.length} レップを自動で切り出しました`}
         right={
           <div className="flex gap-2">
@@ -32,6 +33,8 @@ export function Reps() {
           </div>
         }
       />
+
+      <PageGuide id="reps" sessionId={session.id} />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
         {session.reps.map((r, i) => {

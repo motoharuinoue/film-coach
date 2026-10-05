@@ -1,20 +1,20 @@
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
-import { alignedFrame, alignOffset } from "../../domain/align";
-import type { AnalyzedRep } from "../../domain/entities";
-import { formatMetric, METRIC_BY_KEY } from "../../domain/metrics";
-import { PHASE_LABEL, phaseAt } from "../../domain/phases";
-import { PhaseBar } from "../components/charts";
-import { FieldScene, Hud, Skeleton } from "../components/scene";
-import { Badge, Button, Card, PageHeader, SectionTitle, Segmented, StatusIcon, cx } from "../components/ui";
-import { usePlayback } from "../hooks/usePlayback";
-import { useCoach } from "../state/benchmarks";
-import { formatDate, repLabel, useSessionRep } from "../state/session";
+import { alignedFrame, alignOffset } from "../../../domain/align";
+import type { AnalyzedRep, Session } from "../../../domain/entities";
+import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
+import { PHASE_LABEL, phaseAt } from "../../../domain/phases";
+import { PhaseBar } from "../../components/charts";
+import { FieldScene, Hud, Skeleton } from "../../components/scene";
+import { Badge, Button, Card, SectionTitle, Segmented, StatusIcon, cx } from "../../components/ui";
+import { usePlayback } from "../../hooks/usePlayback";
+import { useCoach } from "../../state/benchmarks";
+import { formatDate, repLabel } from "../../state/session";
 
 type Mode = "overlay" | "side";
 
-export function Compare() {
-  const { session, rep } = useSessionRep();
+/** 分析スタジオの「比較」表示：自己ベストかお手本と、重ねて・並べて比べる */
+export function CompareView({ session, rep }: { session: Session; rep: AnalyzedRep }) {
   const { coach, bench } = useCoach();
   const [mode, setMode] = useState<Mode>("overlay");
   const sideRefs = coach.references().filter((r) => r.stats.camera === "side");
@@ -35,31 +35,28 @@ export function Compare() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="比較"
-        sub="リリースの瞬間で時間を合わせ、接地時の後ろ足で位置を合わせて比べます"
-        right={
-          <div className="flex flex-wrap items-center gap-3">
-            <Segmented
-              label="表示"
-              value={mode}
-              onChange={setMode}
-              options={[
-                { value: "overlay", label: "重ねる" },
-                { value: "side", label: "並べる" },
-              ]}
-            />
-            <select value={targetId} onChange={(e) => setTargetId(e.target.value)} aria-label="比べる相手" className="rounded-lg border border-line bg-panel px-3 py-1.5 text-sm">
-              <option value="best">自己ベスト</option>
-              {sideRefs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  お手本：{r.channel}
-                </option>
-              ))}
-            </select>
-          </div>
-        }
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted">リリースの瞬間で時間を合わせ、接地時の後ろ足で位置を合わせて比べます</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            label="比較の表示"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "overlay", label: "重ねる" },
+              { value: "side", label: "並べる" },
+            ]}
+          />
+          <select value={targetId} onChange={(e) => setTargetId(e.target.value)} aria-label="比べる相手" className="rounded-lg border border-line bg-panel px-3 py-1.5 text-sm">
+            <option value="best">自己ベスト</option>
+            {sideRefs.map((r) => (
+              <option key={r.id} value={r.id}>
+                お手本：{r.channel}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {mode === "overlay" ? (
         <Card className="overflow-hidden">
