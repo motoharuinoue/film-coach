@@ -3,6 +3,7 @@
 
 import { CoachService, type Services } from "./application/coach";
 import { LocalStorageManualStore } from "./infrastructure/browser/localStorageManualStore";
+import { LocalStorageProfileStore } from "./infrastructure/browser/localStorageProfileStore";
 import { BrowserVideoMetadataReader } from "./infrastructure/browser/videoMetadataReader";
 import { DemoReferenceRepository, DemoSessionRepository } from "./infrastructure/demo/repositories";
 import { SimulatedAnalysisGateway } from "./infrastructure/demo/simulatedAnalysisGateway";
@@ -22,5 +23,6 @@ export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL):
     analysis: new SimulatedAnalysisGateway(sessions),
     videoMeta: new BrowserVideoMetadataReader(),
     footage: analyzerUrl ? new HttpFootageLibrary(analyzerUrl) : undefined,
+    profile: new LocalStorageProfileStore(),
   };
 }

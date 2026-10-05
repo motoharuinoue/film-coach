@@ -4186,5 +4186,35 @@
    }
   ],
   "warnings": []
+ },
+ "uploadWithThrows": {
+  "schemaVersion": 1,
+  "id": "000000000003",
+  "name": "IMG_0002.MOV",
+  "source": "upload",
+  "info": {
+   "name": "IMG_0002.MOV",
+   "fps": 30.0,
+   "width": 1920,
+   "height": 1080,
+   "frameCount": 60,
+   "duration": 2.0
+  },
+  "createdAt": "2026-10-05T12:00:00+00:00",
+  "youtube": null,
+  "mediaRetained": true,
+  "trackStatus": "none",
+  "label": "",
+  "errors": [],
+  "links": {
+   "self": "/api/videos/000000000003",
+   "frame": "/api/videos/000000000003/frame",
+   "media": "/api/videos/000000000003/media",
+   "track": null,
+   "preview": null,
+   "focus": null,
+   "throws": "/api/videos/000000000003/throws",
+   "events": null
+  }
  }
 }

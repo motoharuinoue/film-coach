@@ -82,6 +82,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "jobEvents": job_events[:4] + job_events[-3:],
         "throwsRequest": throws_request,
         "throws": throws,
+        "uploadWithThrows": c.get(f"/api/videos/{side['id']}").json(),
     }
 
 
