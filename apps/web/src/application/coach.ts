@@ -5,8 +5,8 @@ import type { AnalyzedRep, BestRep, Session } from "../domain/entities";
 import type { Zones } from "../domain/judgement";
 import type { ManualAdjust } from "../domain/weighting";
 import { buildFindings } from "./coaching";
-import { consistency, evaluateRep, radarScores, repScore, selectBestRep, sessionScore, strengths } from "./evaluation";
-import type { FindingWriter, ManualAdjustmentStore, ReferenceRepository, SessionRepository } from "./ports";
+import { consistency, evaluateRep, radarScores, releasePoints, repScore, selectBestRep, sessionScore, strengths } from "./evaluation";
+import type { AnalysisGateway, FindingWriter, ManualAdjustmentStore, ReferenceRepository, SessionRepository, VideoMetadataReader } from "./ports";
 import { defaultManual, weighReferences, type ReferenceWeights } from "./references";
 
 /** 判定に使う 2 つの基準：お手本ゾーン（重み付き分布）と自己ベスト */
@@ -61,10 +61,18 @@ export class CoachService {
   consistency(s: Session) {
     return consistency(s);
   }
+  releasePoints(s: Session) {
+    return releasePoints(s);
+  }
   radar(rep: AnalyzedRep, s: Session, b: Benchmarks) {
     return radarScores(this.evaluate(rep, s.camera, b), consistency(s).score);
   }
 }
 
 /** プレゼンテーション層が受け取るサービス一式 */
-export type Services = { coach: CoachService; manualStore: ManualAdjustmentStore };
+export type Services = {
+  coach: CoachService;
+  manualStore: ManualAdjustmentStore;
+  analysis: AnalysisGateway;
+  videoMeta: VideoMetadataReader;
+};
