@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web（型検査・テスト・ビルド）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          # Node 24 LTS（同梱の npm 11 で lockfile を解決する）
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # 依存の向き（クリーンアーキテクチャ）の検査も含む
+      - run: npm test
+      - run: npm run build
