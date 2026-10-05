@@ -47,6 +47,7 @@ film-coach/
     application/       解析ジョブ、お手本の取り込み、レポート
     adapters/          HTTP（FastAPI）、SourceAdapter（LocalFile / YouTube）、Ollama
     infrastructure/    rtmlib・SAM 2・OpenCV・ffmpeg・SQLite
+    bootstrap.py       コンポジションルート（依存の検査は import-linter）
   packages/schema/     解析結果・お手本・重みの JSON Schema
   samples/             自分で撮ったサンプル動画 + 解析済み JSON
   docs/                設計書
@@ -93,7 +94,7 @@ film-coach/
 
 | 用途 | 採用 |
 |---|---|
-| 実行環境 | Python 3.12（uv で固定） |
+| 実行環境 | Python 3.13（uv で固定。onnxruntime・OpenCV・rtmlib が対応済みで、手元に入っているため） |
 | API | FastAPI + SSE |
 | 人物検出・骨格推定 | rtmlib（RTMDet / RTMPose / RTMW、ONNX Runtime + CoreML） |
 | 追跡 | ByteTrack |
@@ -129,9 +130,16 @@ film-coach/
 | ReferenceWeight | 指標ごとの P / C / Q / K / M と最終的な重み |
 | ReferenceDistribution | 指標ごとの重み付き分位（10% / 25% / 50% / 75% / 90%） |
 
-## 5. スキーマ駆動
+## 5. スキーマ駆動と両言語の一致
 
-解析結果の形は `packages/schema` の JSON Schema で一元管理し、版番号を持たせる。Python 側（Pydantic）と TypeScript 側の型はここから生成する。公開デモが解析済み JSON だけで動くのも、この共通の形があるから（[ADR-0004](adr/0004-schema-driven.md)）。
+解析結果の形は `packages/schema` の JSON Schema で一元管理し、版番号を持たせる。公開デモが解析済み JSON だけで動くのも、この共通の形があるから（[ADR-0004](adr/0004-schema-driven.md)）。
+
+| ファイル | 内容 | 使う場所 |
+|---|---|---|
+| `pose-sequence.v1.schema.json` | 1 レップ分の骨格の時系列（COCO-17、ワールド 2D、`[x, y, 信頼度]`） | 解析サービスが読み込み時に検証する |
+| `fixtures/parity.v1.json` | 合成骨格 4 ケースと、フェーズ・指標の期待値 | TypeScript と Python の両方のテストで、同じ結果になることを確かめる |
+
+フェーズ分割と指標の規則は TypeScript（`apps/web/src/domain`）と Python（`services/analyzer/src/film_coach/domain`）の両方にある。期待値は TypeScript の実装から作り（`UPDATE_FIXTURES=1 npm test -- parity`）、Python のテストがフレーム番号の完全一致と、指標の 1e-9 以内の一致を確かめる。丸めは JavaScript の `Math.round` にそろえる（Python の `round` は偶数丸めなので使わない）。
 
 ## 6. 開発環境
 
@@ -139,6 +147,7 @@ film-coach/
 |---|---|
 | Node 23 / npm（workspaces） | 導入済み。依存の解決は npm 11 で行う（npm 10 は不具合で失敗する） |
 | ffmpeg | 導入済み |
-| Python 3.14 | 導入済み。ML 系ライブラリとの互換性のため、uv で 3.12 を固定して使う |
-| uv / ollama / yt-dlp | 未導入（M1 で導入） |
+| Python 3.13 / 3.14 | 導入済み。解析サービスは uv で 3.13 に固定する（`services/analyzer/.python-version`） |
+| uv / yt-dlp | 導入済み（M1） |
+| ollama | 未導入（M3 で導入） |
 | YouTube Data API キー | 利用者本人が Google Cloud のコンソールで発行する |

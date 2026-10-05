@@ -19,7 +19,8 @@
 |---|---|---|
 | `docs` | 設計書と ADR | 済み |
 | `apps/web` | フロントエンド（React + TypeScript + Vite）。`domain` / `application` / `infrastructure` / `presentation` の 4 層 | M0 |
-| `services/analyzer` | 解析サービス（Python + FastAPI） | M1 |
+| `services/analyzer` | 解析サービス（Python 3.13 + uv）。同じ 4 層で、フェーズ分割と QB 指標を TypeScript と同じ規則で実装 | M1 |
+| `packages/schema` | 両言語で共有する JSON Schema と、結果を突き合わせる共通データ | M1 |
 
 段階ごとの内容は [docs/roadmap.md](docs/roadmap.md) を参照してください。
 
@@ -49,6 +50,15 @@ npm run build
 ```
 
 `master` に入ると、GitHub Actions がテストとビルドを通したうえで GitHub Pages にデモを公開します（`.github/workflows/pages.yml`）。Pull Request では型検査・テスト・ビルドを実行します（`.github/workflows/ci.yml`）。
+
+解析サービス（Python）は `services/analyzer` で動かします（詳しくは [services/analyzer/README.md](services/analyzer/README.md)）。
+
+```bash
+cd services/analyzer
+uv sync
+uv run pytest        # TypeScript と同じ結果になることの確認を含む
+uv run lint-imports  # 層のルールの検査
+```
 
 M0 では、骨格は合成データ（`apps/web/src/infrastructure/demo/synth.ts`）です。フェーズ分割・指標・重み付けは、実データと同じ計算を通しています。選手・チャンネル・動画はすべて架空です。
 

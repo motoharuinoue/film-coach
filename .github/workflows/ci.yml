@@ -28,3 +28,26 @@ jobs:
       # 依存の向き（クリーンアーキテクチャ）の検査も含む
       - run: npm test
       - run: npm run build
+
+  analyzer:
+    name: analyzer（lint・型検査・層・テスト）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/analyzer
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv は v10 のような大まかなタグを出していないので、細かい版まで指定する
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          working-directory: services/analyzer
+          enable-cache: true
+      # .python-version（3.13）を uv が読む。uv.lock どおりに入れる
+      - run: uv sync --locked
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run mypy
+      # 依存の向き（クリーンアーキテクチャ）の検査
+      - run: uv run lint-imports
+      # TypeScript と同じ結果になること（packages/schema/fixtures/parity.v1.json）も確かめる
+      - run: uv run pytest

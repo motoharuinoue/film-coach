@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pose-sequence.v1.schema.json",
+  "title": "PoseSequence",
+  "description": "1 レップ分の骨格の時系列。関節の並びは COCO-17。座標はワールド 2D（メートル、x は投げる方向、y は上向き、地面が 0）。",
+  "type": "object",
+  "required": ["schemaVersion", "keypointLayout", "space", "fps", "heightM", "frames"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "keypointLayout": { "const": "coco17" },
+    "space": { "const": "world-2d" },
+    "fps": { "type": "number", "exclusiveMinimum": 0 },
+    "heightM": { "type": "number", "exclusiveMinimum": 0, "description": "選手の身長（m）。指標を身長比にするのに使う" },
+    "frames": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["t", "kp"],
+        "additionalProperties": false,
+        "properties": {
+          "t": { "type": "number", "minimum": 0, "description": "秒" },
+          "kp": {
+            "type": "array",
+            "description": "17 関節の [x, y, 信頼度]",
+            "minItems": 17,
+            "maxItems": 17,
+            "items": {
+              "type": "array",
+              "prefixItems": [{ "type": "number" }, { "type": "number" }, { "type": "number", "minimum": 0, "maximum": 1 }],
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        }
+      }
+    }
+  }
+}
