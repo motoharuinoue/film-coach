@@ -4,6 +4,8 @@
 
 **自分専用の AI フィルムルーム** — QB の投球動作を骨格レベルで分解し、自己ベストと YouTube から集めたお手本の両方と比べて、「何がどれだけずれているか」を根拠のフレームと練習ドリルを添えて示します。
 
+**デモ**：https://motoharuinoue.github.io/film-coach/ （仮データで動きます。サーバーは不要）
+
 ## 特徴
 
 - **2 つの基準**：自己ベスト・レップ間のばらつきと、重み付けしたお手本の分布の両方で判定する
@@ -44,6 +46,8 @@ npm run dev      # http://localhost:5173
 npm test         # ユニットテストと、依存の向き（層のルール）の検査
 npm run build
 ```
+
+`master` に入ると、GitHub Actions がテストとビルドを通したうえで GitHub Pages にデモを公開します（`.github/workflows/pages.yml`）。Pull Request では型検査・テスト・ビルドを実行します（`.github/workflows/ci.yml`）。
 
 M0 では、骨格は合成データ（`apps/web/src/infrastructure/demo/synth.ts`）です。フェーズ分割・指標・重み付けは、実データと同じ計算を通しています。選手・チャンネル・動画はすべて架空です。
 
