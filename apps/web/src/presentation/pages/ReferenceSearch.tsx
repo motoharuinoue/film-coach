@@ -4,7 +4,7 @@
 
 import { IconBrandYoutube, IconClock, IconEye, IconKey, IconLoader2, IconSearch, IconThumbUp, IconUsers } from "@tabler/icons-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { creator, popularity } from "../../domain/weighting";
 import { checkSegment, defaultSegment, formatTime, MAX_SEGMENT_SEC, SEARCH_COST, type QuotaStatus, type YouTubeCandidate, type YouTubeSearchResult } from "../../domain/youtube";
@@ -118,6 +118,12 @@ function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (foot
   const [error, setError] = useState<string>();
   const seg = checkSegment(start, end);
   const inside = seg.ok && (c.durationSec === 0 || seg.end <= c.durationSec);
+  // 下の方の候補を開いても見えるよう、開いたら取り込みの欄まで動かす
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // 新しいブラウザでは Promise を返すので、片付けの関数と取り違えないよう何も返さない
+    void panel.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [c.videoId]);
   const run = async () => {
     if (!lib || !seg.ok || !inside) return;
     setBusy(true);
@@ -131,7 +137,7 @@ function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (foot
     }
   };
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+    <motion.div ref={panel} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="scroll-mt-24">
       <Card className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="aspect-video overflow-hidden rounded-xl border border-line bg-black">
           <iframe
