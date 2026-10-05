@@ -1,0 +1,64 @@
+"""記録と JSON の対応（video-record.v1.schema.json の形）。
+
+保存（infrastructure）と API の応答（adapters）の両方が使うので、この層に置く。
+スキーマによる検証は、外部ライブラリを使う infrastructure の側で行う。
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from ..domain.library import VideoInfo, VideoRecord, YouTubeSource
+from ..domain.youtube import watch_url
+
+
+def record_to_json(r: VideoRecord) -> dict[str, Any]:
+    yt = r.youtube
+    return {
+        "schemaVersion": 1,
+        "id": r.id,
+        "name": r.name,
+        "source": r.source,
+        "info": {
+            "name": r.info.name,
+            "fps": r.info.fps,
+            "width": r.info.width,
+            "height": r.info.height,
+            "frameCount": r.info.frame_count,
+            "duration": round(r.info.duration, 3),
+        },
+        "createdAt": r.created_at,
+        "youtube": None
+        if yt is None
+        else {
+            "videoId": yt.video_id,
+            "start": yt.start,
+            "end": yt.end,
+            "title": yt.title,
+            "channel": yt.channel,
+            "license": yt.license,
+            "url": watch_url(yt.video_id, yt.start),
+        },
+        "mediaRetained": r.media_retained,
+        "trackStatus": r.track_status,
+        "label": r.label,
+        "errors": list(r.errors),
+    }
+
+
+def record_from_json(d: dict[str, Any]) -> VideoRecord:
+    i, yt = d["info"], d["youtube"]
+    return VideoRecord(
+        id=d["id"],
+        name=d["name"],
+        source=d["source"],
+        info=VideoInfo(i["name"], float(i["fps"]), int(i["width"]), int(i["height"]), int(i["frameCount"])),
+        created_at=d["createdAt"],
+        youtube=None
+        if yt is None
+        else YouTubeSource(yt["videoId"], int(yt["start"]), int(yt["end"]), yt["title"], yt["channel"], yt["license"]),
+        media_retained=bool(d["mediaRetained"]),
+        track_status=d["trackStatus"],
+        label=d["label"],
+        errors=list(d["errors"]),
+    )

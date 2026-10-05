@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-record.v1.schema.json",
+  "title": "VideoRecord",
+  "description": "解析サービスに取り込んだ動画の記録。API の応答と、data/library/<id>/record.json の形。",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "source", "info", "createdAt", "youtube", "mediaRetained", "trackStatus", "label", "errors"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "name": { "type": "string" },
+    "source": { "enum": ["upload", "youtube"] },
+    "info": {
+      "type": "object",
+      "required": ["name", "fps", "width", "height", "frameCount", "duration"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "frameCount": { "type": "integer", "minimum": 1 },
+        "duration": { "type": "number", "minimum": 0 }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "youtube": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "description": "YouTube から取り込んだときの出典（元の動画は解析のあとに消す。ADR-0005）",
+          "required": ["videoId", "start", "end", "title", "channel", "license", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "videoId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+            "start": { "type": "integer", "minimum": 0 },
+            "end": { "type": "integer", "minimum": 1 },
+            "title": { "type": "string" },
+            "channel": { "type": "string" },
+            "license": { "type": "string" },
+            "url": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "mediaRetained": { "type": "boolean", "description": "元の動画（区間）を手元に残しているか" },
+    "trackStatus": { "enum": ["none", "running", "done", "failed"] },
+    "label": { "type": "string", "description": "対象選手に付けた名前（例：#5）" },
+    "errors": { "type": "array", "items": { "type": "string" } }
+  }
+}

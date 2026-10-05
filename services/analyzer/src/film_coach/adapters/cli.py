@@ -18,11 +18,11 @@ from ..application.track_target import (
     TargetHint,
     TargetNotFoundError,
     TargetTrack,
-    VideoInfo,
     VideoReader,
     track_target,
 )
 from ..domain.camera import CAMERA_ANGLES, CameraAngle
+from ..domain.library import VideoInfo
 from ..domain.metrics import METRICS
 from ..domain.phases import PHASE_LABEL
 
@@ -40,6 +40,8 @@ class CliDeps:
     write_track: Callable[[TargetTrack, Path], None]
     output_dir: Callable[[Path], Path]
     """動画ごとの既定の書き出し先"""
+    serve: Callable[[str, int], None]
+    """HTTP の解析サービスを起動する"""
 
 
 def _point(text: str) -> tuple[float, float]:
@@ -71,6 +73,9 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--label", default="TARGET", help="プレビューで枠に付ける名前（例：#5）")
     t.add_argument("--out", type=Path, help="書き出し先のフォルダ（既定は data/outputs/<動画名>）")
     t.add_argument("--no-preview", action="store_true", help="確認用の動画（preview.mp4・focus.mp4）を作らない")
+
+    s = sub.add_parser("serve", help="画面から使う HTTP の解析サービスを起動する（127.0.0.1 だけで待ち受ける）")
+    s.add_argument("--port", type=int, default=8787)
     return p
 
 
@@ -120,6 +125,11 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
         if args.out:
             deps.writer.write(analysis, args.out)
             out.write(f"\n書き出しました：{args.out}\n")
+        return 0
+
+    if args.command == "serve":
+        out.write(f"解析サービスを起動します：http://127.0.0.1:{args.port}/api/health\n")
+        deps.serve("127.0.0.1", args.port)
         return 0
 
     if args.command == "models":

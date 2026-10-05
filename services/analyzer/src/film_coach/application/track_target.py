@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..domain.library import VideoInfo
 from ..domain.pose import NUM_KEYPOINTS, js_round
 from ..domain.tracking import Box, IouTracker, Track, fill_gaps, link_tracks, merge_boxes, pick_track
 
@@ -19,15 +20,6 @@ Frame = object
 
 ImageKeypoint = tuple[float, float, float]
 """画像上の関節の [x, y, 信頼度]"""
-
-
-@dataclass(frozen=True, slots=True)
-class VideoInfo:
-    name: str
-    fps: float
-    width: int
-    height: int
-    frame_count: int
 
 
 class VideoReader(Protocol):

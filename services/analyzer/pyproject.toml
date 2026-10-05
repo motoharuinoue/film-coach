@@ -5,11 +5,15 @@ description = "Film Coach の解析サービス：骨格の時系列からフェ
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "fastapi>=0.142.2",
     "jsonschema>=4.26",
     "numpy>=2.5.3",
     "onnxruntime>=1.30.0",
     "opencv-python>=5.0.0.93",
+    "python-multipart>=0.0.32",
     "rtmlib>=0.0.16",
+    "uvicorn>=0.54.0",
+    "yt-dlp>=2026.8.19",
 ]
 
 [project.scripts]
@@ -17,6 +21,7 @@ film-coach = "film_coach.bootstrap:main"
 
 [dependency-groups]
 dev = [
+    "httpx2>=2.13.1",
     "import-linter>=2.15",
     "mypy>=2.4",
     "pytest>=9.1",

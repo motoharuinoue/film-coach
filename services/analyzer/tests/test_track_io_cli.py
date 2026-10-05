@@ -9,8 +9,9 @@ import pytest
 from test_track_target import FakeDetector, FakePose, FakeSink, FakeVideo
 
 from film_coach.adapters.cli import run
-from film_coach.application.track_target import FrameSink, TargetHint, VideoInfo, track_target
+from film_coach.application.track_target import FrameSink, TargetHint, track_target
 from film_coach.bootstrap import cli_deps
+from film_coach.domain.library import VideoInfo
 from film_coach.infrastructure.json_track import track_to_json
 from film_coach.infrastructure.models import MODELS, LocalModelStore, ModelNotFoundError, require
 from film_coach.infrastructure.schema import SchemaError, validate

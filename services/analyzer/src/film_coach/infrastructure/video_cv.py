@@ -12,7 +12,8 @@ from typing import Any
 import cv2
 import numpy as np
 
-from ..application.track_target import Frame, TargetFrame, VideoInfo
+from ..application.track_target import Frame, TargetFrame
+from ..domain.library import VideoInfo
 
 # 骨格の線（COCO-17 の関節番号の組）
 BONES = [(5, 6), (11, 12), (5, 11), (6, 12), (5, 7), (7, 9), (6, 8), (8, 10), (11, 13), (13, 15), (12, 14), (14, 16)]
@@ -184,3 +185,30 @@ class FocusVideoWriter:
 
     def close(self) -> None:
         self._mp4.close()
+
+
+class OpenCvFrameGrabber:
+    """FrameGrabber の実装：動画の情報と、指定した時刻のフレーム（JPEG）"""
+
+    def probe(self, path: Path) -> VideoInfo:
+        info = OpenCvVideoReader(path).info()
+        if info.fps <= 0 or info.frame_count <= 0 or info.width <= 0:
+            raise ValueError("フレームを読めません")
+        return info
+
+    def jpeg_at(self, path: Path, t: float, max_width: int = 1280) -> bytes:
+        cap = cv2.VideoCapture(str(path))
+        try:
+            cap.set(cv2.CAP_PROP_POS_MSEC, max(0.0, t) * 1000)
+            ok, img = cap.read()
+        finally:
+            cap.release()
+        if not ok:
+            raise ValueError(f"{t:.2f} 秒のフレームを読めません")
+        h, w = img.shape[:2]
+        if w > max_width:
+            img = cv2.resize(img, (max_width, int(h * max_width / w)), interpolation=cv2.INTER_AREA)
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        if not ok:
+            raise ValueError("JPEG にできませんでした")
+        return bytes(buf.tobytes())
