@@ -9,6 +9,7 @@ import { FactorBars, Histogram } from "../components/charts";
 import { FieldScene, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, Toggle, cx } from "../components/ui";
 import { usePlayback } from "../hooks/usePlayback";
+import { PageGuide } from "../guide/PageGuide";
 import { useBenchmarks, useCoach } from "../state/benchmarks";
 
 const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -45,6 +46,8 @@ export function References() {
           )
         }
       />
+
+      <PageGuide id="references" />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         {/* 一覧 */}
@@ -148,7 +151,7 @@ function ReferenceDetail({ r, metric, setMetric, manual, update }: { r: Referenc
   const metricOptions = METRICS.filter((m) => m.key !== "headStability" && m.key !== "releaseTime").slice(0, 6);
 
   return (
-    <Card className="space-y-5 p-5">
+    <Card className="space-y-5 p-5" data-tour="references-detail">
       <div className="overflow-hidden rounded-xl border border-line">
         <FieldScene className="block w-full">
           <Skeleton frame={rep.seq.frames[pb.frame]!} variant="ref" />

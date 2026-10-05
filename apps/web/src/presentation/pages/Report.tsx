@@ -5,6 +5,7 @@ import { formatMetric, METRIC_BY_KEY, RADAR_LABEL, type RadarAxis } from "../../
 import { Radar, ScoreRing, Scatter } from "../components/charts";
 import { AngleArc, FieldScene, PoseThumb, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel, useSessionRep } from "../state/session";
 
@@ -38,6 +39,7 @@ export function Report() {
 
   return (
     <div className="mx-auto max-w-[1040px] space-y-6">
+      <PageGuide id="report" sessionId={session.id} />
       <div className="no-print flex flex-wrap items-center justify-end gap-2">
         <Button onClick={copy}>
           {copied ? <IconCheck size={15} aria-hidden /> : <IconLink size={15} aria-hidden />}
@@ -108,7 +110,7 @@ export function Report() {
           </section>
 
           {/* 改善点 */}
-          <section>
+          <section data-tour="report-findings">
             <SectionTitle>改善点トップ {findings.length}</SectionTitle>
             <div className="space-y-4">
               {findings.map((f, i) => (

@@ -9,6 +9,7 @@ import { isValidFor, METRICS } from "../../domain/metrics";
 import { checkSegment, formatTime, MAX_SEGMENT_SEC, parseYouTubeId } from "../../domain/youtube";
 import { FieldScene, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, StatusIcon, cx } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { useServices } from "../services";
 import { formatDate } from "../state/session";
 
@@ -84,7 +85,8 @@ export function NewSession() {
 
   return (
     <div>
-      <PageHeader title="新規セッション" sub="動画を取り込み、レップごとに骨格・フェーズ・指標を出します" />
+      <PageHeader title="① 取り込む" sub="動画を取り込み、レップごとに骨格・フェーズ・指標を出します" />
+      <PageGuide id="new" className="mb-5" />
 
       <AnimatePresence mode="wait">
         {progress === undefined ? (

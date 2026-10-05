@@ -6,6 +6,7 @@ import { deviation } from "../../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
 import { TrendChart } from "../components/charts";
 import { Badge, Card, PageHeader, SectionTitle, cx } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate } from "../state/session";
 
@@ -55,7 +56,8 @@ export function Progress() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="推移" sub="セッションごとの平均と、レップ間の幅（最小〜最大）。帯はお手本ゾーン" />
+      <PageHeader title="④ 続ける：推移" sub="セッションごとの平均と、レップ間の幅（最小〜最大）。帯はお手本ゾーン" />
+      <PageGuide id="progress" />
 
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap gap-1">

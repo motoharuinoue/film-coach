@@ -7,6 +7,7 @@ import { formatMetric, METRIC_BY_KEY, type MetricKey } from "../../domain/metric
 import { ScoreRing, Sparkline } from "../components/charts";
 import { PoseThumb } from "../components/scene";
 import { Badge, Button, Card, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel } from "../state/session";
 
@@ -49,9 +50,11 @@ export function Home() {
         </Link>
       </div>
 
+      <PageGuide id="home" sessionId={current.id} />
+
       <div className="grid gap-5 lg:grid-cols-[1.05fr_1.4fr]">
         {/* 総合スコア */}
-        <Card className="relative overflow-hidden p-6">
+        <Card className="relative overflow-hidden p-6" data-tour="home-score">
           <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-turf/10 blur-3xl" />
           <SectionTitle right={<Badge>{formatDate(current.date)} · {current.title}</Badge>}>最新セッションのスコア</SectionTitle>
           <div className="flex items-center gap-6">
@@ -99,7 +102,7 @@ export function Home() {
 
         {/* 次に直すこと */}
         {top && (
-          <Card className="grid overflow-hidden sm:grid-cols-[1fr_1.1fr]">
+          <Card className="grid overflow-hidden sm:grid-cols-[1fr_1.1fr]" data-tour="home-next">
             <Link to={`/sessions/${current.id}/studio?rep=${rep.index + 1}`} className="group relative block overflow-hidden bg-ink" aria-label="根拠のフレームを分析スタジオで見る">
               <PoseThumb frame={rep.seq.frames[top.frame]!} className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]" />
               <div className="absolute top-3 left-3">
