@@ -1,12 +1,16 @@
 import { IconBrandYoutube, IconDownload, IconFocusCentered, IconTarget } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { coverage, type Footage, type TargetTrack } from "../../../domain/footage";
-import { VideoFootagePlayer, YouTubeFootagePlayer, type Layers } from "../../components/footage";
-import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Toggle } from "../../components/ui";
+import { PHASE_LABEL } from "../../../domain/phases";
+import { releaseFrame, throwAt, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
+import { VideoFootagePlayer, YouTubeFootagePlayer, type Layers, type SeekRequest, type ThrowMark } from "../../components/footage";
+import { Badge, Button, Card, PageHeader, SectionTitle, Toggle } from "../../components/ui";
 import { PageGuide } from "../../guide/PageGuide";
+import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
 import { AnalyzerGate } from "./AnalyzerGate";
+import { ThrowPanel } from "./ThrowPanel";
 
 function Viewer() {
   const { id = "" } = useParams();
@@ -15,6 +19,13 @@ function Viewer() {
   const [track, setTrack] = useState<TargetTrack>();
   const [error, setError] = useState<string>();
   const [layers, setLayers] = useState<Layers>({ box: true, skeleton: true, focus: false });
+  const { profile } = useServices();
+  const [throws, setThrows] = useState<ThrowAnalysis>();
+  const [throwsBusy, setThrowsBusy] = useState(false);
+  const [throwsError, setThrowsError] = useState<string>();
+  const [selected, setSelected] = useState(1);
+  const [t, setT] = useState(0);
+  const [seekTo, setSeekTo] = useState<SeekRequest>();
 
   useEffect(() => {
     if (!lib) return;
@@ -23,9 +34,13 @@ function Viewer() {
       .then(async (f) => {
         setFootage(f);
         if (f.trackStatus === "done") setTrack(await lib.track(f));
+        if (f.links.throws) setThrows(await lib.throws(f));
       })
       .catch((e: Error) => setError(e.message));
   }, [lib, id]);
+
+  const fps = footage?.info.fps ?? 30;
+  const marks = useMemo<ThrowMark[]>(() => (throws?.reps ?? []).map((r) => ({ index: r.index, start: r.start, end: r.end, release: releaseFrame(r) })), [throws]);
 
   if (error) return <p className="text-sm text-flag">{error}</p>;
   if (!footage || !lib) return <p className="text-sm text-muted">読み込んでいます…</p>;
@@ -46,15 +61,43 @@ function Viewer() {
   const cov = coverage(track);
   const label = footage.label || undefined;
   const yt = footage.youtube;
+  const frame = Math.round(t * fps);
+  const now = throws && throwAt(throws, frame);
+  const seekFrame = (f: number) => setSeekTo({ t: f / fps, key: Date.now() });
+  const pick = (r: ThrowRep) => {
+    setSelected(r.index);
+    seekFrame(releaseFrame(r));
+  };
+  const analyze = async (cm: number) => {
+    setThrowsBusy(true);
+    setThrowsError(undefined);
+    try {
+      profile.saveHeightCm(cm);
+      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera: throws?.camera ?? "side" });
+      setThrows(a);
+      setSelected(a.reps[0]?.index ?? 1);
+      if (a.reps[0]) seekFrame(releaseFrame(a.reps[0]));
+    } catch (e) {
+      setThrowsError((e as Error).message);
+    } finally {
+      setThrowsBusy(false);
+    }
+  };
+  const badge = now && (
+    <span className="rounded-md bg-black/70 px-2 py-1 font-display text-sm text-text backdrop-blur">
+      #{now.rep.index} <span className="text-turf">{PHASE_LABEL[now.phase]}</span>
+    </span>
+  );
+  const extras = { onTime: setT, seekTo, throws: marks, badge };
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="min-w-0 space-y-3">
         <Card className="space-y-3 p-3">
           {footage.links.media ? (
-            <VideoFootagePlayer src={lib.url(footage.links.media)} track={track} label={label} layers={layers} />
+            <VideoFootagePlayer src={lib.url(footage.links.media)} track={track} label={label} layers={layers} {...extras} />
           ) : yt ? (
-            <YouTubeFootagePlayer videoId={yt.videoId} start={yt.start} end={yt.end} track={track} label={label} layers={layers} />
+            <YouTubeFootagePlayer videoId={yt.videoId} start={yt.start} end={yt.end} track={track} label={label} layers={layers} {...extras} />
           ) : (
             <p className="p-6 text-sm text-muted">再生できる映像がありません。</p>
           )}
@@ -79,6 +122,11 @@ function Viewer() {
             <span className="inline-flex items-center gap-1">
               <span className="h-2 w-3 rounded-sm bg-white/10" /> 見失った
             </span>
+            {marks.length > 0 && (
+              <span className="inline-flex items-center gap-1">
+                <span className="h-2.5 w-3 rounded-sm ring-1 ring-white/40 ring-inset" /> 投球（白線がリリース）
+              </span>
+            )}
             {track.cuts.length > 0 && (
               <span className="inline-flex items-center gap-1">
                 <span className="h-2.5 w-px bg-ice" /> 場面の切り替わり
@@ -86,6 +134,18 @@ function Viewer() {
             )}
           </span>
         </div>
+        <ThrowPanel
+          analysis={throws}
+          heightCm={profile.heightCm()}
+          busy={throwsBusy}
+          error={throwsError}
+          frame={frame}
+          fps={fps}
+          selected={selected}
+          onAnalyze={analyze}
+          onPick={pick}
+          onSeekFrame={seekFrame}
+        />
       </div>
 
       <aside className="space-y-4">
@@ -164,7 +224,6 @@ function Viewer() {
           </Card>
         )}
 
-        <DemoNote>投球の指標（ステップ幅・肘の高さなど）は、横から全身を撮った投球の映像で出せるようにします（M1 の残り）。</DemoNote>
       </aside>
     </div>
   );

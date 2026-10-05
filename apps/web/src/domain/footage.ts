@@ -17,6 +17,8 @@ export type FootageLinks = {
   preview: string | null;
   focus: string | null;
   events: string | null;
+  /** 投球の解析結果（まだ解析していなければ null） */
+  throws: string | null;
 };
 
 export type Footage = {

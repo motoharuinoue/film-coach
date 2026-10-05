@@ -7,6 +7,7 @@ import type { Footage, TargetTrack, TrackHint } from "../domain/footage";
 import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
 import type { PoseFrame } from "../domain/pose";
+import type { ThrowAnalysis, ThrowsRequest } from "../domain/throws";
 import type { ManualAdjust } from "../domain/weighting";
 
 export interface SessionRepository {
@@ -96,4 +97,14 @@ export interface FootageLibrary {
   startTracking(id: string, hint: TrackHint): Promise<{ jobId: string; events: string }>;
   /** 進み具合を受け取る。戻り値で受け取りをやめる */
   follow(events: string, handlers: TrackingHandlers): () => void;
+  /** 投球の解析結果（links.throws） */
+  throws(footage: Footage): Promise<ThrowAnalysis>;
+  /** 追跡した骨格から投球を見つけ、1 本ずつ指標を出す。骨格だけを使うので、すぐに終わる */
+  analyzeThrows(id: string, req: ThrowsRequest): Promise<ThrowAnalysis>;
+}
+
+/** 選手の身体の情報。指標の計算に使い、この端末の中にだけ保存する（リポジトリにもサーバーにも置かない） */
+export interface PlayerProfileStore {
+  heightCm(): number | undefined;
+  saveHeightCm(cm: number): void;
 }

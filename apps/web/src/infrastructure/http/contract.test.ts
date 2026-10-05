@@ -9,7 +9,7 @@ import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFootage } from "../../application/footage";
-import { HttpFootageLibrary, parseFootage, parseTrack } from "./httpFootageLibrary";
+import { HttpFootageLibrary, parseFootage, parseThrows, parseTrack } from "./httpFootageLibrary";
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/schema");
 const read = (name: string) => JSON.parse(readFileSync(resolve(SCHEMA, name), "utf8")) as Record<string, unknown>;
@@ -29,7 +29,7 @@ const withoutLinks = (v: Record<string, unknown>) => {
 };
 
 describe("API の見本が JSON Schema に合う", () => {
-  it.each(["uploadBeforeTrack", "upload", "youtube"])("%s の記録", (key) => {
+  it.each(["uploadBeforeTrack", "upload", "youtube", "uploadWithThrows"])("%s の記録", (key) => {
     expect(validRecord(withoutLinks(samples[key]!)), JSON.stringify(validRecord.errors)).toBe(true);
   });
 
@@ -76,6 +76,26 @@ describe("画面の読み込み処理", () => {
   it("場面の切り替わりを数える前の追跡結果も読める", () => {
     const { cuts: _, ...old } = samples.track as Record<string, unknown>;
     expect(parseTrack(old).cuts).toEqual([]);
+  });
+});
+
+describe("投球の解析の読み込み", () => {
+  it("投球ごとのイベント・フェーズ・指標と、骨格の列を名前付きの値にする", () => {
+    const a = parseThrows(samples.throws!);
+    expect(a).toMatchObject({ hand: "right", heightM: 1.8, camera: "side", warnings: [] });
+    expect(a.reps).toHaveLength(1);
+    const r = a.reps[0]!;
+    expect(r.start).toBeLessThan(r.start + r.events.release);
+    expect(r.phases.map((p) => p.key)).toEqual(["drop", "set", "stride", "release", "follow"]);
+    expect(r.metrics.strideRatio).toBeGreaterThan(0);
+    expect(r.sequence.frames[0]!.kp).toHaveLength(17);
+    expect(r.sequence.frames[0]!.kp[0]).toEqual({ x: expect.any(Number), y: expect.any(Number), c: expect.any(Number) });
+  });
+
+  it("投球を解析した記録には、結果へのリンクが付く", () => {
+    const f = parseFootage(samples.uploadWithThrows!);
+    expect(f.links.throws).toBe(`/api/videos/${f.id}/throws`);
+    expect(parseFootage(samples.upload!).links.throws).toBeNull();
   });
 });
 
@@ -143,5 +163,24 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
       }) as unknown as typeof fetch,
     });
     await expect(lib.health()).rejects.toThrow("film-coach serve");
+  });
+
+  it("身長を送って投球を解析し、結果を読む", async () => {
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      expect(String(url)).toBe("http://127.0.0.1:8787/api/videos/000000000003/throws");
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toEqual(samples.throwsRequest);
+      return jsonResponse(samples.throws);
+    }) as unknown as typeof globalThis.fetch;
+    const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
+    const a = await lib.analyzeThrows("000000000003", samples.throwsRequest as unknown as { heightCm: number; camera: "side" });
+    expect(a.reps[0]!.index).toBe(1);
+  });
+
+  it("まだ解析していない映像の結果は取りに行かない", async () => {
+    const fetch = vi.fn() as unknown as typeof globalThis.fetch;
+    const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
+    await expect(lib.throws(parseFootage(samples.upload!))).rejects.toThrow("まだ解析していません");
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

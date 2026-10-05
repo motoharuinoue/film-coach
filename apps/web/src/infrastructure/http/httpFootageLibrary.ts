@@ -1,8 +1,10 @@
 // FootageLibrary の HTTP 実装（services/analyzer の API）。
-// API の JSON（packages/schema の video-record.v1 / target-track.v1）を、ドメインの型に読み替える。
+// API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1）を、ドメインの型に読み替える。
 
 import type { FootageLibrary, TrackingHandlers, TrackingProgress, TrackingSummary } from "../../application/ports";
 import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFrame, TrackHint } from "../../domain/footage";
+import type { PoseSequence } from "../../domain/pose";
+import type { ThrowAnalysis, ThrowRep, ThrowsRequest } from "../../domain/throws";
 
 type Json = Record<string, unknown>;
 
@@ -15,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-const LINK_KEYS: (keyof FootageLinks)[] = ["self", "frame", "media", "track", "preview", "focus", "events"];
+const LINK_KEYS: (keyof FootageLinks)[] = ["self", "frame", "media", "track", "preview", "focus", "events", "throws"];
 
 export function parseFootage(j: Json): Footage {
   const links = (j.links ?? {}) as Json;
@@ -52,6 +54,35 @@ export function parseTrack(j: Json): TargetTrack {
     // 場面の切り替わりを数える前に書き出した結果には無いので、空とみなす
     cuts: ((j.cuts as number[] | undefined) ?? []).map(Number),
     frames,
+  };
+}
+
+const toSequence = (s: Json): PoseSequence => ({
+  fps: Number(s.fps),
+  heightM: Number(s.heightM),
+  frames: (s.frames as Json[]).map((f) => ({ t: Number(f.t), kp: (f.kp as number[][]).map(([x, y, c]) => ({ x: x!, y: y!, c: c! })) })),
+});
+
+/** 投球の解析結果（throw-analysis.v1）。骨格の列の組（tuple）を、名前付きの値にする */
+export function parseThrows(j: Json): ThrowAnalysis {
+  return {
+    video: j.video as ThrowAnalysis["video"],
+    heightM: Number(j.heightM),
+    camera: j.camera as ThrowAnalysis["camera"],
+    hand: j.hand === "left" ? "left" : "right",
+    warnings: (j.warnings as string[]) ?? [],
+    reps: (j.reps as Json[]).map(
+      (r): ThrowRep => ({
+        index: Number(r.index),
+        start: Number(r.start),
+        end: Number(r.end),
+        transform: r.transform as ThrowRep["transform"],
+        events: r.events as ThrowRep["events"],
+        phases: r.phases as ThrowRep["phases"],
+        metrics: r.metrics as ThrowRep["metrics"],
+        sequence: toSequence(r.sequence as Json),
+      }),
+    ),
   };
 }
 
@@ -145,6 +176,20 @@ export class HttpFootageLibrary implements FootageLibrary {
       body: JSON.stringify(hint),
     });
     return { jobId: String(j.jobId), events: String(j.events) };
+  }
+
+  async throws(footage: Footage) {
+    if (!footage.links.throws) throw new ApiError("投球はまだ解析していません", 404);
+    return parseThrows(await this.json(footage.links.throws));
+  }
+
+  async analyzeThrows(id: string, req: ThrowsRequest) {
+    const j = await this.json(`/api/videos/${encodeURIComponent(id)}/throws`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    return parseThrows(j);
   }
 
   follow(events: string, handlers: TrackingHandlers) {

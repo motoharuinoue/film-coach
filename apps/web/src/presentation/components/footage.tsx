@@ -68,8 +68,11 @@ export function TrackOverlay({ frame, width, height, label, showBox = true, show
   );
 }
 
-/** 追跡の状況：枠があるフレーム（緑）、補間したフレーム（黄）、見失ったフレーム（灰） */
-export function TrackTimeline({ track, t, onSeek }: { track: TargetTrack; t: number; onSeek: (t: number) => void }) {
+/** 帯に印を付ける投球の区間（映像のフレーム番号） */
+export type ThrowMark = { index: number; start: number; end: number; release: number };
+
+/** 追跡の状況：枠があるフレーム（緑）、補間したフレーム（黄）、見失ったフレーム（灰）。投球の区間とリリースに印を付ける */
+export function TrackTimeline({ track, t, onSeek, throws = [] }: { track: TargetTrack; t: number; onSeek: (t: number) => void; throws?: ThrowMark[] }) {
   const n = track.frames.length;
   const duration = n / track.video.fps;
   return (
@@ -93,6 +96,12 @@ export function TrackTimeline({ track, t, onSeek }: { track: TargetTrack; t: num
       </svg>
       {track.cuts.map((c) => (
         <div key={c} className="absolute inset-y-0 w-px bg-ice" style={{ left: `${(c / n) * 100}%` }} title={`場面の切り替わり ${(c / track.video.fps).toFixed(2)} 秒`} />
+      ))}
+      {throws.map((m) => (
+        <div key={m.index} className="pointer-events-none absolute inset-y-0" style={{ left: `${(m.start / n) * 100}%`, width: `${((m.end - m.start + 1) / n) * 100}%` }}>
+          <div className="absolute inset-0 rounded-sm bg-white/10 ring-1 ring-white/30 ring-inset" />
+          <div className="absolute inset-y-0 w-px bg-white" style={{ left: `${((m.release - m.start) / (m.end - m.start + 1)) * 100}%` }} title={`#${m.index} のリリース ${(m.release / track.video.fps).toFixed(2)} 秒`} />
+        </div>
       ))}
       <div className="absolute inset-y-0 w-0.5 bg-pylon glow-pylon" style={{ left: `${(t / duration) * 100}%` }} />
     </div>
@@ -121,10 +130,11 @@ function useFocusTransform(frame: TrackFrame | undefined, track: TargetTrack, en
   return { style: { transform: `translate(${tx}%, ${ty}%) scale(${f.scale})`, transformOrigin: "0 0" }, scale: f.scale };
 }
 
-function Stage({ track, frame, label, layers, children }: { track: TargetTrack; frame?: TrackFrame; label?: string; layers: { box: boolean; skeleton: boolean; focus: boolean }; children: ReactNode }) {
+function Stage({ track, frame, label, layers, badge, children }: { track: TargetTrack; frame?: TrackFrame; label?: string; layers: { box: boolean; skeleton: boolean; focus: boolean }; badge?: ReactNode; children: ReactNode }) {
   const { style, scale } = useFocusTransform(frame, track, layers.focus);
   return (
     <div className="relative w-full overflow-hidden rounded-xl bg-black" style={{ aspectRatio: `${track.video.width} / ${track.video.height}` }}>
+      {badge && <div className="pointer-events-none absolute top-3 left-3 z-10">{badge}</div>}
       <div className="absolute inset-0" style={style}>
         {children}
         <TrackOverlay frame={frame} width={track.video.width} height={track.video.height} label={label} showBox={layers.box} showSkeleton={layers.skeleton} zoom={Math.sqrt(scale)} />
@@ -161,7 +171,12 @@ function Transport({ playing, onToggle, t, duration, onSeek, rate, onRate }: { p
 }
 
 /** 手元に残した元の動画を再生し、フレームごとに骨格を重ねる */
-export function VideoFootagePlayer({ src, track, label, layers, onTime }: { src: string; track: TargetTrack; label?: string; layers: Layers; onTime?: (t: number) => void }) {
+/** 外から再生位置を指定する。key を変えるたびに、その時刻へ移って止める */
+export type SeekRequest = { t: number; key: number };
+
+type PlayerExtras = { onTime?: (t: number) => void; seekTo?: SeekRequest; throws?: ThrowMark[]; badge?: ReactNode };
+
+export function VideoFootagePlayer({ src, track, label, layers, onTime, seekTo, throws, badge }: { src: string; track: TargetTrack; label?: string; layers: Layers } & PlayerExtras) {
   const video = useRef<HTMLVideoElement>(null);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -195,11 +210,17 @@ export function VideoFootagePlayer({ src, track, label, layers, onTime }: { src:
     if (video.current) video.current.currentTime = s;
     setT(s);
   };
+  useEffect(() => {
+    if (!seekTo || !video.current) return;
+    video.current.pause();
+    video.current.currentTime = seekTo.t;
+    setT(seekTo.t);
+  }, [seekTo]);
   const frame = frameAt(track, t);
 
   return (
     <div className="space-y-3">
-      <Stage track={track} frame={frame} label={label} layers={layers}>
+      <Stage track={track} frame={frame} label={label} layers={layers} badge={badge}>
         <video
           ref={video}
           src={src}
@@ -212,7 +233,7 @@ export function VideoFootagePlayer({ src, track, label, layers, onTime }: { src:
         />
       </Stage>
       <Transport playing={playing} onToggle={() => (video.current?.paused ? video.current.play() : video.current?.pause())} t={t} duration={duration} onSeek={seek} rate={rate} onRate={setRate} />
-      <TrackTimeline track={track} t={t} onSeek={seek} />
+      <TrackTimeline track={track} t={t} onSeek={seek} throws={throws} />
     </div>
   );
 }
@@ -244,8 +265,10 @@ function loadYouTubeApi(): Promise<YTNamespace> {
 }
 
 /** YouTube の埋め込みプレイヤー。追跡結果の時刻は区間の始まりを 0 とする */
-export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers }: { videoId: string; start: number; end: number; track: TargetTrack; label?: string; layers: Layers }) {
+export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers, onTime, seekTo, throws, badge }: { videoId: string; start: number; end: number; track: TargetTrack; label?: string; layers: Layers } & PlayerExtras) {
   const host = useRef<HTMLDivElement>(null);
+  const onTimeRef = useRef(onTime);
+  onTimeRef.current = onTime;
   const player = useRef<YTPlayer | null>(null);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -270,7 +293,11 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
       });
       const tick = () => {
         const p = player.current;
-        if (p?.getCurrentTime) setT(Math.max(0, p.getCurrentTime() - start));
+        if (p?.getCurrentTime) {
+          const now = Math.max(0, p.getCurrentTime() - start);
+          setT(now);
+          onTimeRef.current?.(now);
+        }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
@@ -288,10 +315,16 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
     player.current?.seekTo(start + s, true);
     setT(s);
   };
+  useEffect(() => {
+    if (!seekTo) return;
+    player.current?.pauseVideo();
+    player.current?.seekTo(start + seekTo.t, true);
+    setT(seekTo.t);
+  }, [seekTo, start]);
 
   return (
     <div className="space-y-3">
-      <Stage track={track} frame={frameAt(track, t)} label={label} layers={layers}>
+      <Stage track={track} frame={frameAt(track, t)} label={label} layers={layers} badge={badge}>
         <div ref={host} className={cx("absolute inset-0 [&>iframe]:h-full [&>iframe]:w-full")} />
       </Stage>
       <Transport
@@ -306,7 +339,7 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
           player.current?.setPlaybackRate(r);
         }}
       />
-      <TrackTimeline track={track} t={t} onSeek={seek} />
+      <TrackTimeline track={track} t={t} onSeek={seek} throws={throws} />
     </div>
   );
 }
