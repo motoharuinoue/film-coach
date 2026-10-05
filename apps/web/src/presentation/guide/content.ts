@@ -10,7 +10,7 @@ export const STEPS: { key: StepKey; no: number; title: string; desc: string }[] 
   { key: "keep", no: 4, title: "続ける", desc: "日ごとの変化を追う" },
 ];
 
-export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer";
+export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer" | "practice";
 
 export type Guide = {
   step?: StepKey;
@@ -76,6 +76,15 @@ export const GUIDES: Record<GuideId, Guide> = {
       "「フォーカス表示」で、本人を追いかけるように拡大します",
       "下の帯は追跡の状況です（緑：追えた、黄：補間、灰：見失った）。押すとその時刻へ移ります",
       "身長を入れて「投球を見つける」と、1 球ずつフェーズと QB 指標が出ます。投球を選ぶとリリースの瞬間へ移ります",
+    ],
+  },
+  practice: {
+    step: "watch",
+    purpose: "練習にまとめた映像の投球を並べて、ばらつきを比べる画面です。",
+    actions: [
+      "表の列の番号を押すと、その投球を選べます。選んだ投球の骨格を、リリースの瞬間で緑に描きます",
+      "リリース点の散らばりが小さいほど、毎回同じ位置でボールを離せています",
+      "「映像で見る」で、その投球のリリースの瞬間を開きます",
     ],
   },
   references: {

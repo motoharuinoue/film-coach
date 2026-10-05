@@ -1,6 +1,6 @@
 import { IconBrandYoutube, IconDownload, IconFocusCentered, IconTarget } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { coverage, type Footage, type TargetTrack } from "../../../domain/footage";
 import { PHASE_LABEL } from "../../../domain/phases";
 import { releaseFrame, throwAt, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
@@ -26,6 +26,9 @@ function Viewer() {
   const [selected, setSelected] = useState(1);
   const [t, setT] = useState(0);
   const [seekTo, setSeekTo] = useState<SeekRequest>();
+  // 練習の画面などから「?t=秒」で開くと、その時刻で止める
+  const [params] = useSearchParams();
+  const startAt = Number(params.get("t"));
 
   useEffect(() => {
     if (!lib) return;
@@ -34,10 +37,16 @@ function Viewer() {
       .then(async (f) => {
         setFootage(f);
         if (f.trackStatus === "done") setTrack(await lib.track(f));
-        if (f.links.throws) setThrows(await lib.throws(f));
+        if (f.links.throws) {
+          const a = await lib.throws(f);
+          setThrows(a);
+          const rep = a.reps.find((r) => Math.abs(releaseFrame(r) / f.info.fps - startAt) < 0.05);
+          if (rep) setSelected(rep.index);
+        }
+        if (startAt > 0) setSeekTo({ t: startAt, key: Date.now() });
       })
       .catch((e: Error) => setError(e.message));
-  }, [lib, id]);
+  }, [lib, id, startAt]);
 
   const fps = footage?.info.fps ?? 30;
   const marks = useMemo<ThrowMark[]>(() => (throws?.reps ?? []).map((r) => ({ index: r.index, start: r.start, end: r.end, release: releaseFrame(r) })), [throws]);

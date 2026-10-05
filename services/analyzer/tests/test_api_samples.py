@@ -23,7 +23,7 @@ from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application import library
 from film_coach.application.jobs import JobRunner
 from film_coach.domain.pose import PoseSequence
-from film_coach.infrastructure.library_fs import FileVideoStore
+from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
 
 REPO = Path(__file__).resolve().parents[3]
 SAMPLES = REPO / "packages" / "schema" / "fixtures" / "api-samples.v1.json"
@@ -41,9 +41,11 @@ def dump(data: dict[str, Any]) -> str:
 def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSequence) -> dict[str, Any]:
     ids = itertools.count(1)
     monkeypatch.setattr(FileVideoStore, "new_id", lambda _self: f"{next(ids):012x}")
+    monkeypatch.setattr(FilePracticeStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(library, "_now", lambda: "2026-10-05T12:00:00+00:00")
     deps = HttpDeps(
         store=FileVideoStore(tmp_path / "library"),
+        practices=FilePracticeStore(tmp_path / "practices"),
         grabber=FakeGrabber(),
         fetcher=FakeFetcher(),
         jobs=JobRunner(),
@@ -68,6 +70,16 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
     deps.store.save_track(side["id"], synth_track(base_sequence))
     throws_request = {"heightCm": 180, "camera": "side"}
     throws = c.post(f"/api/videos/{side['id']}/throws", json=throws_request).json()
+    # 練習：2 本の映像をまとめる
+    practice_request = {
+        "name": "投球ドリル",
+        "date": "2026-10-05",
+        "kind": "drill",
+        "camera": "side",
+        "memo": "",
+        "videoIds": [side["id"], up["id"]],
+    }
+    practice = c.post("/api/practices", json=practice_request).json()
     return {
         "schemaVersion": 1,
         "generatedBy": "services/analyzer/tests/test_api_samples.py",
@@ -83,6 +95,9 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "throwsRequest": throws_request,
         "throws": throws,
         "uploadWithThrows": c.get(f"/api/videos/{side['id']}").json(),
+        "practiceRequest": practice_request,
+        "practice": practice,
+        "practices": c.get("/api/practices").json(),
     }
 
 

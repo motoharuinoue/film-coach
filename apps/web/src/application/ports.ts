@@ -7,6 +7,7 @@ import type { Footage, TargetTrack, TrackHint } from "../domain/footage";
 import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
 import type { PoseFrame } from "../domain/pose";
+import type { Practice, PracticeInput } from "../domain/practice";
 import type { ThrowAnalysis, ThrowsRequest } from "../domain/throws";
 import type { ManualAdjust } from "../domain/weighting";
 
@@ -101,6 +102,12 @@ export interface FootageLibrary {
   throws(footage: Footage): Promise<ThrowAnalysis>;
   /** 追跡した骨格から投球を見つけ、1 本ずつ指標を出す。骨格だけを使うので、すぐに終わる */
   analyzeThrows(id: string, req: ThrowsRequest): Promise<ThrowAnalysis>;
+  /** 練習（映像のまとめ）。新しい順 */
+  practices(): Promise<Practice[]>;
+  practice(id: string): Promise<Practice>;
+  createPractice(input: PracticeInput): Promise<Practice>;
+  /** まとめを消すだけで、映像と解析結果は残す */
+  deletePractice(id: string): Promise<void>;
 }
 
 /** 選手の身体の情報。指標の計算に使い、この端末の中にだけ保存する（リポジトリにもサーバーにも置かない） */

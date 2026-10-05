@@ -9,7 +9,7 @@ import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFootage } from "../../application/footage";
-import { HttpFootageLibrary, parseFootage, parseThrows, parseTrack } from "./httpFootageLibrary";
+import { HttpFootageLibrary, parseFootage, parsePractice, parseThrows, parseTrack } from "./httpFootageLibrary";
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/schema");
 const read = (name: string) => JSON.parse(readFileSync(resolve(SCHEMA, name), "utf8")) as Record<string, unknown>;
@@ -22,6 +22,7 @@ const validTrack = ajv.compile(read("target-track.v1.schema.json"));
 // 投球の解析は、骨格の列を pose-sequence.v1 で参照する
 ajv.addSchema(read("pose-sequence.v1.schema.json"));
 const validThrows = ajv.compile(read("throw-analysis.v1.schema.json"));
+const validPractice = ajv.compile(read("practice.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -35,6 +36,10 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("追跡結果", () => {
     expect(validTrack(samples.track), JSON.stringify(validTrack.errors)).toBe(true);
+  });
+
+  it("練習", () => {
+    expect(validPractice(withoutLinks(samples.practice!)), JSON.stringify(validPractice.errors)).toBe(true);
   });
 
   it("投球の解析", () => {
@@ -96,6 +101,16 @@ describe("投球の解析の読み込み", () => {
     const f = parseFootage(samples.uploadWithThrows!);
     expect(f.links.throws).toBe(`/api/videos/${f.id}/throws`);
     expect(parseFootage(samples.upload!).links.throws).toBeNull();
+  });
+});
+
+describe("練習の読み込み", () => {
+  it("まとめた映像の ID を、まとめた順に読む", () => {
+    const p = parsePractice(samples.practice!);
+    expect(p).toMatchObject({ name: "投球ドリル", date: "2026-10-05", kind: "drill", camera: "side", memo: "" });
+    expect(p.videoIds).toEqual((samples.practiceRequest as { videoIds: string[] }).videoIds);
+    const list = samples.practices as unknown as Record<string, unknown>[];
+    expect(list.map(parsePractice).map((x) => x.id)).toEqual([p.id]);
   });
 });
 
@@ -182,5 +197,21 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
     const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
     await expect(lib.throws(parseFootage(samples.upload!))).rejects.toThrow("まだ解析していません");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("練習を作り、消す", async () => {
+    const calls: { url: string; method?: string; body?: unknown }[] = [];
+    const fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(url), method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return init?.method === "DELETE" ? new Response(null, { status: 204 }) : jsonResponse(samples.practice, 201);
+    }) as unknown as typeof globalThis.fetch;
+    const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
+    const input = samples.practiceRequest as unknown as Parameters<typeof lib.createPractice>[0];
+    const p = await lib.createPractice(input);
+    await lib.deletePractice(p.id);
+    expect(calls).toEqual([
+      { url: "http://127.0.0.1:8787/api/practices", method: "POST", body: samples.practiceRequest },
+      { url: `http://127.0.0.1:8787/api/practices/${p.id}`, method: "DELETE", body: undefined },
+    ]);
   });
 });

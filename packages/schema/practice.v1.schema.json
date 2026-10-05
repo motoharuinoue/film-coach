@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "practice.v1.schema.json",
+  "title": "Practice",
+  "description": "練習（設計書のデータモデルの Session）。何本かの映像を 1 回の練習としてまとめ、投球を比べる単位。まとめるのは映像の ID だけ。",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "date", "kind", "camera", "memo", "videoIds", "createdAt"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "date": { "type": "string", "format": "date", "description": "練習した日（YYYY-MM-DD）" },
+    "kind": { "enum": ["drill", "game"], "description": "ドリル／試合" },
+    "camera": { "enum": ["side", "behind", "front", "endzone", "sideline"] },
+    "memo": { "type": "string", "maxLength": 400 },
+    "videoIds": {
+      "type": "array",
+      "description": "まとめた映像（並べる順）",
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[0-9a-f]{12}$" }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

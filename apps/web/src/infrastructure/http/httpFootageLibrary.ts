@@ -1,9 +1,10 @@
 // FootageLibrary の HTTP 実装（services/analyzer の API）。
-// API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1）を、ドメインの型に読み替える。
+// API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1 / practice.v1）を、ドメインの型に読み替える。
 
 import type { FootageLibrary, TrackingHandlers, TrackingProgress, TrackingSummary } from "../../application/ports";
 import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFrame, TrackHint } from "../../domain/footage";
 import type { PoseSequence } from "../../domain/pose";
+import type { Practice, PracticeInput } from "../../domain/practice";
 import type { ThrowAnalysis, ThrowRep, ThrowsRequest } from "../../domain/throws";
 
 type Json = Record<string, unknown>;
@@ -83,6 +84,19 @@ export function parseThrows(j: Json): ThrowAnalysis {
         sequence: toSequence(r.sequence as Json),
       }),
     ),
+  };
+}
+
+export function parsePractice(j: Json): Practice {
+  return {
+    id: String(j.id),
+    name: String(j.name),
+    date: String(j.date),
+    kind: j.kind === "game" ? "game" : "drill",
+    camera: j.camera as Practice["camera"],
+    memo: String(j.memo ?? ""),
+    videoIds: (j.videoIds as string[]) ?? [],
+    createdAt: String(j.createdAt),
   };
 }
 
@@ -190,6 +204,23 @@ export class HttpFootageLibrary implements FootageLibrary {
       body: JSON.stringify(req),
     });
     return parseThrows(j);
+  }
+
+  async practices() {
+    return ((await this.json("/api/practices")) as unknown as Json[]).map(parsePractice);
+  }
+
+  async practice(id: string) {
+    return parsePractice(await this.json(`/api/practices/${encodeURIComponent(id)}`));
+  }
+
+  async createPractice(input: PracticeInput) {
+    const j = await this.json("/api/practices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    return parsePractice(j);
+  }
+
+  async deletePractice(id: string) {
+    await this.json(`/api/practices/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   follow(events: string, handlers: TrackingHandlers) {

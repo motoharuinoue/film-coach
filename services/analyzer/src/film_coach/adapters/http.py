@@ -33,6 +33,7 @@ from ..application.library import (
     run_tracking,
 )
 from ..application.ports import ModelStore
+from ..application.practice import PracticeStore, create_practice, delete_practice, get_practice, list_practices
 from ..application.track_target import (
     CameraMotionEstimator,
     FrameSink,
@@ -45,6 +46,7 @@ from ..application.track_target import (
 )
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord
+from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
 from ..domain.world import NotEnoughPoseError
 from ..domain.youtube import SegmentError
 
@@ -55,6 +57,7 @@ MAX_UPLOAD_BYTES = 2 * 1024**3
 @dataclass(frozen=True, slots=True)
 class HttpDeps:
     store: VideoStore
+    practices: PracticeStore
     grabber: FrameGrabber
     fetcher: YouTubeFetcher
     jobs: JobRunner
@@ -76,6 +79,15 @@ class YouTubeImport(BaseModel):
     end: int = Field(gt=0, description="終了（秒）")
 
 
+class PracticeRequest(BaseModel):
+    name: str = Field(max_length=MAX_NAME)
+    date: str = Field(description="練習した日（YYYY-MM-DD）")
+    kind: PracticeKind = "drill"
+    camera: CameraAngle = "side"
+    memo: str = Field(default="", max_length=MAX_MEMO)
+    videoIds: list[str] = Field(max_length=MAX_VIDEOS)
+
+
 class ThrowsRequest(BaseModel):
     heightCm: float = Field(ge=120, le=230, description="選手の身長（cm）")
     camera: CameraAngle = "side"
@@ -93,7 +105,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=deps.allowed_origins,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "DELETE"],
         allow_headers=["Content-Type"],
     )
 
@@ -119,8 +131,12 @@ def create_app(deps: HttpDeps) -> FastAPI:
         except NotFoundError as e:
             raise HTTPException(404, str(e)) from e
 
+    def practice_view(p: Practice) -> dict[str, Any]:
+        return {**dto.practice_to_json(p), "links": {"self": f"/api/practices/{p.id}"}}
+
     @app.exception_handler(ImportRejected)
     @app.exception_handler(SegmentError)
+    @app.exception_handler(PracticeError)
     async def bad_request(_req: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
@@ -243,6 +259,36 @@ def create_app(deps: HttpDeps) -> FastAPI:
 
         job = deps.jobs.submit("track", video_id, work)
         return {"jobId": job.id, "events": f"/api/jobs/{job.id}/events"}
+
+    @app.get("/api/practices")
+    def practices() -> list[dict[str, Any]]:
+        return [practice_view(p) for p in list_practices(deps.practices)]
+
+    @app.post("/api/practices", status_code=201)
+    def new_practice(body: PracticeRequest) -> dict[str, Any]:
+        try:
+            p = create_practice(
+                deps.practices, deps.store, body.name, body.date, body.kind, body.camera, body.memo, body.videoIds
+            )
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        return practice_view(p)
+
+    @app.get("/api/practices/{practice_id}")
+    def practice(practice_id: str) -> dict[str, Any]:
+        try:
+            return practice_view(get_practice(deps.practices, practice_id))
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+
+    @app.delete("/api/practices/{practice_id}", status_code=204)
+    def remove_practice(practice_id: str) -> Response:
+        """まとめを消すだけで、映像と解析結果は残す"""
+        try:
+            delete_practice(deps.practices, practice_id)
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        return Response(status_code=204)
 
     @app.get("/api/jobs/{job_id}")
     def job_state(job_id: str) -> dict[str, Any]:
