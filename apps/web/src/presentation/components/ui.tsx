@@ -1,5 +1,5 @@
 import { IconAlertCircle, IconAlertTriangle, IconCircleCheck, IconCircleDashed } from "@tabler/icons-react";
-import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 import { STATUS_LABEL, type Status } from "../../domain/judgement";
 
@@ -155,12 +155,17 @@ export function Toggle({ on, onChange, children, tone = "turf" }: { on: boolean;
 
 /** 数値のカウントアップ */
 export function CountUp({ value, digits = 0, className }: { value: number; digits?: number; className?: string }) {
-  const mv = useMotionValue(0);
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? value : 0);
   const text = useTransform(mv, (v) => v.toFixed(digits));
   useEffect(() => {
+    if (reduce) {
+      mv.set(value);
+      return;
+    }
     const c = animate(mv, value, { duration: 1.1, ease: [0.16, 1, 0.3, 1] });
     return () => c.stop();
-  }, [mv, value]);
+  }, [mv, value, reduce]);
   return <motion.span className={className}>{text}</motion.span>;
 }
 
