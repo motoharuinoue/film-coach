@@ -16,10 +16,23 @@
 | ディレクトリ | 内容 | 追加する段階 |
 |---|---|---|
 | `docs` | 設計書と ADR | 済み |
-| `apps/web` | フロントエンド（React + TypeScript + Vite） | M0 |
+| `apps/web` | フロントエンド（React + TypeScript + Vite）と、解析ロジックの TypeScript 版 | M0 |
 | `services/analyzer` | 解析サービス（Python + FastAPI） | M1 |
 
 段階ごとの内容は [docs/roadmap.md](docs/roadmap.md) を参照してください。
+
+## 開発
+
+Node 22.12 以上と npm 11 以上を使います（npm 10 には、この依存関係の解決で失敗する不具合があります）。
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # 解析ロジックのユニットテスト
+npm run build
+```
+
+M0 では、骨格は合成データ（`apps/web/src/lib/synth.ts`）です。フェーズ分割・指標・重み付けは、実データと同じ計算を通しています。選手・チャンネル・動画はすべて架空です。
 
 ## 設計書
 

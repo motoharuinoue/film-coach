@@ -107,7 +107,7 @@ film-coach/
 
 | ツール | 状態 |
 |---|---|
-| Node 23 / npm（workspaces） | 導入済み |
+| Node 23 / npm（workspaces） | 導入済み。依存の解決は npm 11 で行う（npm 10 は不具合で失敗する） |
 | ffmpeg | 導入済み |
 | Python 3.14 | 導入済み。ML 系ライブラリとの互換性のため、uv で 3.12 を固定して使う |
 | uv / ollama / yt-dlp | 未導入（M1 で導入） |
