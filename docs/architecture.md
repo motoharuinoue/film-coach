@@ -95,7 +95,7 @@ film-coach/
 | 用途 | 採用 |
 |---|---|
 | 実行環境 | Python 3.13（uv で固定。onnxruntime・OpenCV・rtmlib が対応済みで、手元に入っているため） |
-| API | FastAPI + SSE |
+| API | FastAPI + SSE（127.0.0.1 だけで待ち受け、CORS は手元の画面だけ許可） |
 | 人物検出・骨格推定 | rtmlib（YOLOX-m / RTMPose-m、ONNX Runtime の CPU。CoreML は YOLOX で失敗するため使わない） |
 | 追跡と対象選手のロック | 自前の IoU 追跡（`domain/tracking.py`）。途切れた追跡を位置と大きさでつなぎ直し、短い抜けは補間する |
 | 対象選手のマスク（M4） | SAM 2 |
@@ -104,7 +104,7 @@ film-coach/
 | YouTube の取得 | yt-dlp（区間のみ） |
 | YouTube の検索・情報 | YouTube Data API v3 |
 | LLM | Ollama |
-| 保存 | SQLite（SQLModel）。骨格データは Parquet / npz |
+| 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果）。件数が増えたら SQLite に移す |
 
 ## 4. データモデル
 

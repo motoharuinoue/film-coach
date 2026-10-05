@@ -7,7 +7,9 @@
 from __future__ import annotations
 
 import sys
+from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .adapters.cli import CliDeps, run
 from .application.track_target import (
@@ -16,12 +18,15 @@ from .application.track_target import (
     PersonDetector,
     PoseEstimator,
     TargetTrack,
-    VideoInfo,
     VideoReader,
 )
+from .domain.library import VideoInfo
 from .infrastructure.json_pose import JsonAnalysisWriter, JsonPoseSequenceReader
 from .infrastructure.models import LocalModelStore
 from .infrastructure.paths import data_dir
+
+if TYPE_CHECKING:  # FastAPI は serve のときだけ読み込む
+    from .adapters.http import HttpDeps
 
 
 def _open_video(path: Path) -> VideoReader:
@@ -59,6 +64,39 @@ def _write_track(tt: TargetTrack, dest: Path) -> None:
     write_track(tt, dest)
 
 
+def http_deps() -> HttpDeps:
+    """HTTP の解析サービスの依存。モデルは最初に使うときに 1 回だけ読み込む"""
+    import os
+
+    from .adapters.http import HttpDeps
+    from .application.jobs import JobRunner
+    from .infrastructure.library_fs import FileVideoStore
+    from .infrastructure.video_cv import OpenCvFrameGrabber
+    from .infrastructure.youtube_dlp import YtDlpFetcher
+
+    origins = os.environ.get("FILM_COACH_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    return HttpDeps(
+        store=FileVideoStore(),
+        grabber=OpenCvFrameGrabber(),
+        fetcher=YtDlpFetcher(),
+        jobs=JobRunner(),
+        models=LocalModelStore(),
+        open_video=_open_video,
+        detector=cache(_detector),
+        pose=cache(_pose),
+        sink_for=_preview,
+        allowed_origins=[o.strip() for o in origins.split(",") if o.strip()],
+    )
+
+
+def _serve(host: str, port: int) -> None:
+    import uvicorn
+
+    from .adapters.http import create_app
+
+    uvicorn.run(create_app(http_deps()), host=host, port=port)
+
+
 def cli_deps() -> CliDeps:
     return CliDeps(
         reader=JsonPoseSequenceReader(),
@@ -70,6 +108,7 @@ def cli_deps() -> CliDeps:
         preview=_preview,
         write_track=_write_track,
         output_dir=lambda video: data_dir() / "outputs" / video.stem,
+        serve=_serve,
     )
 
 

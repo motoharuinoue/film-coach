@@ -10,9 +10,9 @@ from film_coach.application.track_target import (
     TargetFrame,
     TargetHint,
     TargetNotFoundError,
-    VideoInfo,
     track_target,
 )
+from film_coach.domain.library import VideoInfo
 from film_coach.domain.tracking import Box
 
 N = 60

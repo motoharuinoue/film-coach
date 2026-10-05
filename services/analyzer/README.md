@@ -11,7 +11,7 @@ Film Coach の解析サービス（Python）。骨格の時系列から、フェ
 | `domain` | 骨格・フェーズ分割・指標。標準ライブラリだけを使う | domain |
 | `application` | ユースケースとポート（外部への窓口） | domain |
 | `infrastructure` | ポートの実装（JSON の読み書き、人物検出・骨格推定（rtmlib）、動画の読み書き（OpenCV・ffmpeg）、モデルの取得） | domain, application |
-| `adapters` | 入口（CLI。M1-3 で HTTP） | domain, application |
+| `adapters` | 入口（CLI、HTTP の API） | domain, application |
 | `bootstrap.py` | 依存を組み立てる | すべて |
 
 依存の向きは `uv run lint-imports` で検査します。
@@ -52,6 +52,32 @@ uv run film-coach track ../../data/videos/clip.mov --at 5 --point 1440,430 --lab
 4. 対象選手の枠だけ骨格を推定する（RTMPose-m）
 
 1920×1080・30fps・20 秒の動画で、Apple M4 の CPU で約 85 秒かかります。
+
+## HTTP の解析サービス
+
+画面（`apps/web`）から使う API です。手元の画面からだけ使う前提で、`127.0.0.1` だけで待ち受けます。
+
+```bash
+uv run film-coach serve   # http://127.0.0.1:8787/api/health
+```
+
+| メソッド | パス | 内容 |
+|---|---|---|
+| GET | `/api/health` | 状態とモデルの有無 |
+| GET | `/api/videos` | 取り込んだ動画の一覧 |
+| POST | `/api/videos` | 動画のアップロード（multipart、mp4 / mov / m4v、2 GB まで） |
+| POST | `/api/videos/youtube` | YouTube の区間の取り込み（`{url, start, end}`、60 秒まで） |
+| GET | `/api/videos/{id}` | 記録（`video-record.v1.schema.json`）と、使える URL |
+| GET | `/api/videos/{id}/frame?t=秒` | 本人を指すためのフレーム（JPEG、幅 1280 まで） |
+| GET | `/api/videos/{id}/media` | 元の動画（Range 対応）。YouTube の区間は解析のあとに消すので 410 |
+| POST | `/api/videos/{id}/track` | 追跡の開始（`{t, x, y, label}`、座標は元の動画のピクセル）。202 でジョブを返す |
+| GET | `/api/jobs/{jobId}/events` | 進み具合（SSE：`state` → `progress` → `done` / `failed`） |
+| GET | `/api/videos/{id}/track` | 追跡結果（`target-track.v1.schema.json`） |
+| GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
+
+- 解析は 1 本ずつ裏で動かします（ONNX Runtime が CPU を使い切るため）
+- YouTube から取り込んだ区間は、追跡が終わったら元の動画を消し、枠・骨格と出典だけを残します（ADR-0005）
+- 画面の開発サーバー以外から使うときは、`FILM_COACH_ALLOWED_ORIGINS` で許可する画面を指定します
 
 実際の動画とモデルを使う確認は、手元にあるときだけ動かします（CI では動かしません）。
 

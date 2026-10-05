@@ -1,6 +1,6 @@
 # ADR-0005: YouTube の規約と著作権への対応
 
-- 状態：提案（利用者の確認待ち）
+- 状態：採用（M1-3 で実装）
 - 日付：2026-10-05
 
 ## 背景
@@ -18,6 +18,13 @@
 | ライセンス | 「Creative Commons のみ」で絞り込むモードを用意する（検索の `videoLicense=creativeCommon`） |
 | 公開デモ | 再生する映像は自分で撮ったものだけ。お手本は埋め込みと骨格だけで見せる |
 | API キー | `.env`（git 管理外）か macOS Keychain に保存する。リポジトリやログに出さない |
+
+## 実装（M1-3）
+
+- 取り込み：`POST /api/videos/youtube` で `{url, start, end}` を受け、区間は 60 秒まで。URL は動画 ID だけを取り出して組み立て直してから yt-dlp に渡す
+- 消す：追跡が終わったら元の動画（区間）を消し、`mediaRetained: false` を記録する（`domain/library.py` の `retain_media_after_analysis`）。以降、元の動画とフレームの API は 410 を返す
+- 残す：枠・骨格（`track.json`）と出典（動画 ID・区間・題名・チャンネル・ライセンス）
+- 表示：画面では公式の埋め込みプレイヤーに骨格を重ねる（M1-3b）
 
 ## 結果
 
