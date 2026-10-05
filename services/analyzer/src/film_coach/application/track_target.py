@@ -1,7 +1,7 @@
 """ユースケース：大勢が映る映像から、利用者が指した 1 人を追い、その人の骨格を出す。
 
 1 回目の読み込みで全員を検出・追跡し（場面の切り替わりで追跡を切る）、指した点を含む追跡を選んで、
-同じ場面の中で途切れた所をつなぐ。
+同じ場面の中で途切れた所をつなぐ。あわせて、背景からカメラの動きを見積もっておく（投球の解析で打ち消す）。
 2 回目の読み込みで、その人の枠だけ骨格を推定する（全員の骨格は出さない）。
 フレーム（画像）の中身はポートの実装だけが扱い、この層では中身を見ない。
 """
@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from ..domain.library import VideoInfo
+from ..domain.motion import Affine, accumulate
 from ..domain.pose import NUM_KEYPOINTS, js_round
 from ..domain.tracking import Box, IouTracker, Track, fill_gaps, link_tracks, merge_boxes, pick_track
 
@@ -46,6 +47,17 @@ class ShotBoundaryDetector(Protocol):
 
     def is_cut(self, frame: Frame) -> bool:
         """このフレームが新しい場面の始まりか"""
+        ...
+
+
+class CameraMotionEstimator(Protocol):
+    """カメラの動き（手持ちで追いかける、ズームする）を、人の映っていない背景から見積もる。
+
+    フレームを先頭から順に 1 回ずつ渡す。
+    """
+
+    def step(self, frame: Frame, people: list[Box]) -> Affine | None:
+        """このフレームの座標を、1 つ前のフレームの座標に移す変換。最初のフレームや、見積もれなければ None"""
         ...
 
 
@@ -109,6 +121,8 @@ class TargetTrack:
     """映像全体で追跡した人数"""
     cuts: list[int]
     """場面の切り替わり（新しい場面の最初のフレーム番号）"""
+    camera: list[Affine] | None = None
+    """フレームごとの、その場面の最初のフレームの座標への変換（カメラの動きを打ち消す）。見積もっていなければ None"""
 
     @property
     def coverage(self) -> float:
@@ -136,18 +150,23 @@ def track_target(
     sink: FrameSink | None = None,
     progress: Progress = _noop,
     shots: ShotBoundaryDetector | None = None,
+    motion: CameraMotionEstimator | None = None,
 ) -> TargetTrack:
     info = video.info()
 
     # 1 回目：全員を検出して追跡する
     tracker = IouTracker()
     cut_frames: list[int] = []
+    steps: list[Affine | None] = []
     for i, frame in video.frames():
         # 先頭のフレームも渡す（次のフレームと比べるため）。先頭は切り替わりに数えない
         cut = (shots.is_cut(frame) if shots else False) and i > 0
         if cut:
             cut_frames.append(i)
-        tracker.update(i, detector.detect(frame), cut=cut)
+        people = detector.detect(frame)
+        tracker.update(i, people, cut=cut)
+        if motion:
+            steps.append(motion.step(frame, people))
         progress("detect", i + 1, info.frame_count)
     cuts = frozenset(cut_frames)
 
@@ -177,4 +196,5 @@ def track_target(
         sink.close()
 
     segments = [TrackSegment(t.id, t.first, t.last) for t in chain]
-    return TargetTrack(info, hint, segments, frames, len(tracker.tracks), cut_frames)
+    camera = accumulate(steps, cuts) if motion else None
+    return TargetTrack(info, hint, segments, frames, len(tracker.tracks), cut_frames, camera)

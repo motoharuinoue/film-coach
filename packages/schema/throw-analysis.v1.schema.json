@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "throw-analysis.v1.schema.json",
+  "title": "ThrowAnalysis",
+  "description": "本人を追った骨格（target-track.v1）から見つけた投球と、1 本ずつのフェーズ・QB 指標。横から固定カメラで撮った映像を前提に、画像の座標をワールド 2D に直して計算する。",
+  "type": "object",
+  "required": ["schemaVersion", "video", "heightM", "camera", "hand", "reps", "warnings"],
+  "additionalProperties": false,
+  "$defs": {
+    "frame": { "type": "integer", "minimum": 0 },
+    "transform": {
+      "type": "object",
+      "description": "画像の座標 → ワールド 2D。world = ((x − originX) · direction · mPerPx, (groundY − y) · mPerPx + ankleM)",
+      "required": ["mPerPx", "originX", "groundY", "direction", "ankleM"],
+      "additionalProperties": false,
+      "properties": {
+        "mPerPx": { "type": "number", "exclusiveMinimum": 0 },
+        "originX": { "type": "number", "description": "ワールドの x = 0 にあたる画像の x（投球の最初の骨盤）" },
+        "groundY": { "type": "number", "description": "地面に着いた足首の画像の y" },
+        "direction": { "enum": [1, -1], "description": "画像の右へ投げるなら 1、左へ投げるなら -1" },
+        "ankleM": { "type": "number", "minimum": 0, "description": "地面に着いた足首の高さ（m）" }
+      }
+    },
+    "events": {
+      "type": "object",
+      "description": "投球の区間の中のフレーム番号で表したイベント",
+      "required": ["setStart", "strideStart", "plant", "release", "followStart", "last"],
+      "additionalProperties": false,
+      "properties": {
+        "setStart": { "$ref": "#/$defs/frame" },
+        "strideStart": { "$ref": "#/$defs/frame" },
+        "plant": { "$ref": "#/$defs/frame" },
+        "release": { "$ref": "#/$defs/frame" },
+        "followStart": { "$ref": "#/$defs/frame" },
+        "last": { "$ref": "#/$defs/frame" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "description": "QB 指標。カメラ角度で測れない指標は入れない",
+      "additionalProperties": false,
+      "properties": {
+        "releaseTime": { "type": "number" },
+        "strideRatio": { "type": "number" },
+        "frontKnee": { "type": "number" },
+        "hipShoulderSep": { "type": "number" },
+        "sequenceGap": { "type": "number" },
+        "elbowHeight": { "type": "number" },
+        "elbowAngle": { "type": "number" },
+        "releaseHeight": { "type": "number" },
+        "trunkTilt": { "type": "number" },
+        "headStability": { "type": "number" }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "video": {
+      "type": "object",
+      "required": ["name", "fps", "width", "height", "frameCount"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "frameCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "heightM": { "type": "number", "exclusiveMinimum": 0, "description": "選手の身長（m）。縮尺と、身長比の指標に使う" },
+    "camera": { "enum": ["side", "behind", "front", "endzone", "sideline"] },
+    "hand": { "enum": ["right", "left"], "description": "投げる腕。左投げは左右の関節を入れ替えて、右投げの規則で計算する" },
+    "warnings": {
+      "type": "array",
+      "description": "解析の結果を読むときの注意（本人が小さく映っている、投球が見つからない など）",
+      "items": { "type": "string" }
+    },
+    "reps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["index", "start", "end", "transform", "events", "phases", "metrics", "sequence"],
+        "additionalProperties": false,
+        "properties": {
+          "index": { "type": "integer", "minimum": 1 },
+          "start": { "$ref": "#/$defs/frame", "description": "映像のフレーム番号（区間の最初）" },
+          "end": { "$ref": "#/$defs/frame", "description": "映像のフレーム番号（区間の最後、含む）" },
+          "transform": { "$ref": "#/$defs/transform" },
+          "events": { "$ref": "#/$defs/events" },
+          "phases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["key", "start", "end"],
+              "additionalProperties": false,
+              "properties": {
+                "key": { "enum": ["drop", "set", "stride", "release", "follow"] },
+                "start": { "$ref": "#/$defs/frame" },
+                "end": { "$ref": "#/$defs/frame" }
+              }
+            }
+          },
+          "metrics": { "$ref": "#/$defs/metrics" },
+          "sequence": { "$ref": "pose-sequence.v1.schema.json", "description": "平滑化した骨格（ワールド 2D、時刻は区間の最初が 0）" }
+        }
+      }
+    }
+  }
+}

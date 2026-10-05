@@ -100,6 +100,8 @@ film-coach/
 | 人物検出・骨格推定 | rtmlib（YOLOX-m / RTMPose-m、ONNX Runtime の CPU。CoreML は YOLOX で失敗するため使わない） |
 | 追跡と対象選手のロック | 自前の IoU 追跡（`domain/tracking.py`）。途切れた追跡を位置と大きさでつなぎ直し、短い抜けは補間する。場面の切り替わり（OpenCV で検出）はまたがない |
 | 対象選手のマスク（M4） | SAM 2 |
+| カメラの動きの補正 | OpenCV。人の枠を除いた背景の特徴点を Lucas-Kanade で追い、RANSAC で相似変換を当てはめる（`OpenCvCameraMotion`） |
+| 画像の座標 → ワールド 2D | 自前（`domain/world.py`）。縮尺は脚と体幹の長さ（人体寸法の比率）、地面は足首、向きと利き腕は手首の動きから |
 | 画像処理 | OpenCV |
 | 動画の変換 | ffmpeg |
 | YouTube の取得 | yt-dlp（区間のみ） |

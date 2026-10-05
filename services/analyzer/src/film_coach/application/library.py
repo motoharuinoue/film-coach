@@ -7,9 +7,12 @@ from dataclasses import replace
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
+from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord, YouTubeSource, retain_media_after_analysis
 from ..domain.youtube import check_segment, parse_youtube_id
+from .throws import ThrowAnalysis, analyze_throws
 from .track_target import (
+    CameraMotionEstimator,
     FrameSink,
     PersonDetector,
     PoseEstimator,
@@ -47,9 +50,17 @@ class VideoStore(Protocol):
         """追跡結果・プレビュー動画の置き場所"""
         ...
 
-    def save_track(self, video_id: str, track: TargetTrack) -> None: ...
+    def save_track(self, video_id: str, track: TargetTrack) -> None:
+        """追跡結果を保存する。前の投球の解析は、追跡が変わると合わなくなるので消す"""
+        ...
 
     def track_path(self, video_id: str) -> Path | None: ...
+
+    def load_track(self, video_id: str) -> TargetTrack | None: ...
+
+    def save_throws(self, video_id: str, throws: ThrowAnalysis) -> None: ...
+
+    def throws_path(self, video_id: str) -> Path | None: ...
 
     def output_file(self, video_id: str, name: str) -> Path | None:
         """preview.mp4 / focus.mp4（なければ None）"""
@@ -150,6 +161,7 @@ def run_tracking(
     label: str,
     progress: Progress,
     shots: ShotBoundaryDetector | None = None,
+    motion: CameraMotionEstimator | None = None,
 ) -> TargetTrack:
     record = get_record(store, video_id)
     path = store.media(video_id)
@@ -161,7 +173,7 @@ def run_tracking(
         video = open_video(path)
         # 確認用の動画（プレビュー・フォーカス）は元の動画の複製になるので、元の動画を残す映像でだけ作る
         sink = sink_for(store.output_dir(video_id), video.info(), label) if sink_for and retained else None
-        track = track_target(video, detector, pose, hint, sink, progress, shots)
+        track = track_target(video, detector, pose, hint, sink, progress, shots, motion)
     except Exception as e:
         store.save(replace(record, track_status="failed", label=label, errors=[str(e)]))
         raise
@@ -170,3 +182,16 @@ def run_tracking(
         store.delete_media(video_id)
     store.save(replace(record, track_status="done", label=label, media_retained=retained, errors=[]))
     return track
+
+
+def analyze_footage_throws(
+    store: VideoStore, video_id: str, height_m: float, camera: CameraAngle = "side"
+) -> ThrowAnalysis:
+    """追跡の済んだ映像から投球を見つけて解析し、保存する。骨格だけを使うので、元の動画が消えていても動く"""
+    get_record(store, video_id)
+    track = store.load_track(video_id)
+    if track is None:
+        raise NotFoundError("まだ本人を追跡していません。先に本人を選んで追跡してください")
+    throws = analyze_throws(track, height_m, camera)
+    store.save_throws(video_id, throws)
+    return throws

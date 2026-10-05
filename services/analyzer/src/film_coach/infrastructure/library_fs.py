@@ -19,9 +19,11 @@ from pathlib import Path
 from typing import Any, BinaryIO
 
 from ..application import dto
+from ..application.throws import ThrowAnalysis
 from ..application.track_target import TargetTrack
 from ..domain.library import VideoRecord
-from .json_track import write_track
+from .json_throws import write_throws
+from .json_track import read_track, write_track
 from .paths import data_dir
 from .schema import validate
 
@@ -102,9 +104,21 @@ class FileVideoStore:
 
     def save_track(self, video_id: str, track: TargetTrack) -> None:
         write_track(track, self.output_dir(video_id) / "track.json")
+        (self.output_dir(video_id) / "throws.json").unlink(missing_ok=True)
 
     def track_path(self, video_id: str) -> Path | None:
         p = self._dir(video_id) / "outputs" / "track.json"
+        return p if p.exists() else None
+
+    def load_track(self, video_id: str) -> TargetTrack | None:
+        p = self.track_path(video_id)
+        return read_track(p) if p else None
+
+    def save_throws(self, video_id: str, throws: ThrowAnalysis) -> None:
+        write_throws(throws, self.output_dir(video_id) / "throws.json")
+
+    def throws_path(self, video_id: str) -> Path | None:
+        p = self._dir(video_id) / "outputs" / "throws.json"
         return p if p.exists() else None
 
     def output_file(self, video_id: str, name: str) -> Path | None:

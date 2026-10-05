@@ -4,7 +4,7 @@
   "title": "TargetTrack",
   "description": "大勢が映る映像で、指定した 1 人を追った結果。座標は画像のピクセル（左上が原点、y は下向き）。",
   "type": "object",
-  "required": ["schemaVersion", "video", "hint", "segments", "peopleTracked", "cuts", "frames"],
+  "required": ["schemaVersion", "video", "hint", "segments", "peopleTracked", "cuts", "camera", "frames"],
   "additionalProperties": false,
   "$defs": {
     "box": {
@@ -59,6 +59,16 @@
       "type": "array",
       "description": "場面の切り替わり（新しい場面の最初のフレーム番号）。追跡とつなぎ直しはこれをまたがない",
       "items": { "type": "integer", "minimum": 1 }
+    },
+    "camera": {
+      "description": "フレームごとの、その場面の最初のフレームの座標への変換 [a, b, tx, c, d, ty]（x' = a·x + b·y + tx、y' = c·x + d·y + ty）。カメラの動きを打ち消すのに使う。見積もっていなければ null",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": "number" }, "minItems": 6, "maxItems": 6 }
+        }
+      ]
     },
     "frames": {
       "type": "array",

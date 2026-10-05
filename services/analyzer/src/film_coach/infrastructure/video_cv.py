@@ -1,4 +1,4 @@
-"""OpenCV による動画の読み込みと、確認用のプレビュー動画の書き出し。"""
+"""OpenCV による動画の読み込み、場面の切り替わりとカメラの動きの見積もり、確認用のプレビュー動画の書き出し。"""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ import numpy as np
 
 from ..application.track_target import Frame, TargetFrame
 from ..domain.library import VideoInfo
+from ..domain.motion import Affine
+from ..domain.tracking import Box
 
 # 骨格の線（COCO-17 の関節番号の組）
 BONES = [(5, 6), (11, 12), (5, 11), (6, 12), (5, 7), (7, 9), (6, 8), (8, 10), (11, 13), (13, 15), (12, 14), (14, 16)]
@@ -101,6 +103,52 @@ class OpenCvShotDetector:
             self._since = 0
             return True
         return False
+
+
+class OpenCvCameraMotion:
+    """カメラの動きを、人の映っていない背景の点の動きから見積もる（手持ちで追いかける、ズームする映像のため）。
+
+    1 つ前のフレームで背景の角（特徴点）を選び、Lucas-Kanade のオプティカルフローで今のフレームまで追い、
+    RANSAC で相似変換（回転・拡大・平行移動）を当てはめる。人の枠（少し広げた範囲）の点は使わない。
+    計算は縮小した白黒の画像で行い、結果は元の大きさの座標に直す。
+    """
+
+    def __init__(self, width: int = 960, max_points: int = 400, min_points: int = 20) -> None:
+        self.width = width
+        self.max_points = max_points
+        self.min_points = min_points
+        self._prev: tuple[Any, Any] | None = None
+
+    def _mask(self, shape: tuple[int, int], people: list[Box], scale: float) -> Any:
+        mask = np.full(shape, 255, np.uint8)
+        for b in people:
+            pad = 0.1 * (b.y2 - b.y1)
+            x1, y1 = int((b.x1 - pad) * scale), int((b.y1 - pad) * scale)
+            x2, y2 = int((b.x2 + pad) * scale), int((b.y2 + pad) * scale)
+            mask[max(0, y1) : max(0, y2), max(0, x1) : max(0, x2)] = 0
+        return mask
+
+    def step(self, frame: Frame, people: list[Box]) -> Affine | None:
+        img = np.asarray(frame)
+        scale = self.width / img.shape[1]
+        gray = cv2.cvtColor(cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2GRAY)
+        mask = self._mask(gray.shape, people, scale)
+        prev, self._prev = self._prev, (gray, mask)
+        if prev is None:
+            return None
+        pts = cv2.goodFeaturesToTrack(prev[0], self.max_points, 0.01, 8, mask=prev[1])
+        if pts is None or len(pts) < self.min_points:
+            return None
+        nxt, status, _ = cv2.calcOpticalFlowPyrLK(prev[0], gray, pts, pts.copy())
+        ok = status.ravel() == 1
+        if int(ok.sum()) < self.min_points:
+            return None
+        # 今のフレームの点 → 1 つ前のフレームの点
+        m, _ = cv2.estimateAffinePartial2D(nxt[ok], pts[ok], method=cv2.RANSAC, ransacReprojThreshold=2.0)
+        if m is None:
+            return None
+        (a, b, tx), (c, d, ty) = m.tolist()
+        return Affine(a, b, tx / scale, c, d, ty / scale)
 
 
 class _Mp4Writer:

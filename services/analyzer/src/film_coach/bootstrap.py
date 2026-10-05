@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .adapters.cli import CliDeps, run
+from .application.throws import ThrowAnalysis
 from .application.track_target import (
+    CameraMotionEstimator,
     FanoutSink,
     FrameSink,
     PersonDetector,
@@ -54,6 +56,12 @@ def _shots() -> ShotBoundaryDetector:
     return OpenCvShotDetector()
 
 
+def _motion() -> CameraMotionEstimator:
+    from .infrastructure.video_cv import OpenCvCameraMotion
+
+    return OpenCvCameraMotion()
+
+
 def _preview(dest_dir: Path, info: VideoInfo, label: str) -> FrameSink:
     from .infrastructure.video_cv import FocusVideoWriter, PreviewVideoWriter
 
@@ -69,6 +77,18 @@ def _write_track(tt: TargetTrack, dest: Path) -> None:
     from .infrastructure.json_track import write_track
 
     write_track(tt, dest)
+
+
+def _read_track(src: Path) -> TargetTrack:
+    from .infrastructure.json_track import read_track
+
+    return read_track(src)
+
+
+def _write_throws(ta: ThrowAnalysis, dest: Path) -> None:
+    from .infrastructure.json_throws import write_throws
+
+    write_throws(ta, dest)
 
 
 def http_deps() -> HttpDeps:
@@ -94,6 +114,7 @@ def http_deps() -> HttpDeps:
         sink_for=_preview,
         allowed_origins=[o.strip() for o in origins.split(",") if o.strip()],
         shots=_shots,
+        motion=_motion,
     )
 
 
@@ -117,7 +138,10 @@ def cli_deps() -> CliDeps:
         write_track=_write_track,
         output_dir=lambda video: data_dir() / "outputs" / video.stem,
         serve=_serve,
+        read_track=_read_track,
+        write_throws=_write_throws,
         shots=_shots,
+        motion=_motion,
     )
 
 

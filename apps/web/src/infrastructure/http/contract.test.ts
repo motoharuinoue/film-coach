@@ -19,6 +19,9 @@ const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 const validRecord = ajv.compile(read("video-record.v1.schema.json"));
 const validTrack = ajv.compile(read("target-track.v1.schema.json"));
+// 投球の解析は、骨格の列を pose-sequence.v1 で参照する
+ajv.addSchema(read("pose-sequence.v1.schema.json"));
+const validThrows = ajv.compile(read("throw-analysis.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -32,6 +35,14 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("追跡結果", () => {
     expect(validTrack(samples.track), JSON.stringify(validTrack.errors)).toBe(true);
+  });
+
+  it("投球の解析", () => {
+    expect(validThrows(samples.throws), JSON.stringify(validThrows.errors)).toBe(true);
+    // 骨格の列が pose-sequence.v1 に合わなければ失敗すること（参照が効いている）
+    const broken = structuredClone(samples.throws) as { reps: { sequence: { space: string } }[] };
+    broken.reps[0]!.sequence.space = "image";
+    expect(validThrows(broken)).toBe(false);
   });
 });
 
