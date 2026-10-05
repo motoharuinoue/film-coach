@@ -37,7 +37,8 @@ jobs:
         working-directory: services/analyzer
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv は v10 のような大まかなタグを出していないので、細かい版まで指定する
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
           working-directory: services/analyzer
           enable-cache: true
