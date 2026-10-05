@@ -10,7 +10,7 @@ export const STEPS: { key: StepKey; no: number; title: string; desc: string }[] 
   { key: "keep", no: 4, title: "続ける", desc: "日ごとの変化を追う" },
 ];
 
-export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer" | "practice";
+export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer" | "practice" | "referenceSearch";
 
 export type Guide = {
   step?: StepKey;
@@ -85,6 +85,14 @@ export const GUIDES: Record<GuideId, Guide> = {
       "表の列の番号を押すと、その投球を選べます。選んだ投球の骨格を、リリースの瞬間で緑に描きます",
       "リリース点の散らばりが小さいほど、毎回同じ位置でボールを離せています",
       "「映像で見る」で、その投球のリリースの瞬間を開きます",
+    ],
+  },
+  referenceSearch: {
+    purpose: "YouTube から、お手本にする投球の動画を探す画面です（手元の解析サービスと YouTube Data API のキーが必要です）。",
+    actions: [
+      "検索語を入れて「探す」と、候補に人気度（P）と発信者（C）の見込みが付きます",
+      "候補を押すと埋め込みで確かめられます。投げている場面を 60 秒以内で指定して取り込みます",
+      "右上の帯は今日の無料枠です。検索 1 回で 102 ユニット使います",
     ],
   },
   references: {

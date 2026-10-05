@@ -100,6 +100,8 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
 | POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera}`）。追跡した骨格だけを使うので、YouTube の区間でも動く |
 | GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
+| GET | `/api/youtube/status` | YouTube Data API のキーがあるか（キーそのものは返さない）と、今日の無料枠 |
+| GET | `/api/youtube/search?q=&cc=&max=` | お手本の候補を探す（`youtube-search.v1.schema.json`）。1 回 102 ユニット。キーがなければ 503、無料枠を超えたら 429 |
 | GET | `/api/practices` | 練習（映像のまとめ）の一覧。新しい順 |
 | POST | `/api/practices` | 練習を作る（`{name, date, kind, camera, memo, videoIds}`、映像は 50 本まで）。`data/practices/<id>.json` に置く |
 | GET | `/api/practices/{id}` | 練習（`practice.v1.schema.json`） |
@@ -114,3 +116,13 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 ```bash
 uv run pytest -m integration
 ```
+
+### YouTube Data API のキー
+
+お手本を探す（`/api/youtube/search`）には、YouTube Data API v3 のキーが要ります。Google Cloud のコンソールでプロジェクトを作って YouTube Data API v3 を有効にし、API キーを作ったら（「API の制限」を YouTube Data API v3 だけにする）、ターミナルで次を実行してキーを貼り付けます。
+
+```bash
+security add-generic-password -a "$USER" -s film-coach-youtube -w
+```
+
+キーは macOS のキーチェーンにだけ置き、リポジトリにもログにも出しません（環境変数 `YOUTUBE_API_KEY` でも渡せます）。無料枠は 1 日 10,000 ユニットで、検索 1 回に 102 ユニット使います。使った量は `data/youtube-quota.json` に、米国太平洋時間の日ごとに数えます。

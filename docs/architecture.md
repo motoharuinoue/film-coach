@@ -105,7 +105,7 @@ film-coach/
 | 画像処理 | OpenCV |
 | 動画の変換 | ffmpeg |
 | YouTube の取得 | yt-dlp（区間のみ） |
-| YouTube の検索・情報 | YouTube Data API v3 |
+| YouTube の検索・情報 | YouTube Data API v3（標準ライブラリの urllib で呼ぶ。キーは macOS のキーチェーンか環境変数 `YOUTUBE_API_KEY`。無料枠は `data/youtube-quota.json` に、米国太平洋時間の日ごとに数える） |
 | LLM | Ollama |
 | 保存 | M1 はファイル（`data/library/<id>/` に記録の JSON・元の動画・解析結果、`data/practices/<id>.json` に練習）。件数が増えたら SQLite に移す |
 
@@ -153,4 +153,4 @@ film-coach/
 | Python 3.13 / 3.14 | 導入済み。解析サービスは uv で 3.13 に固定する（`services/analyzer/.python-version`） |
 | uv / yt-dlp | 導入済み（M1） |
 | ollama | 未導入（M3 で導入） |
-| YouTube Data API キー | 利用者本人が Google Cloud のコンソールで発行する |
+| YouTube Data API キー | 利用者本人が Google Cloud のコンソールで発行し、`security add-generic-password -a "$USER" -s film-coach-youtube -w` でキーチェーンに置く（キーがコマンドの履歴に残らない） |

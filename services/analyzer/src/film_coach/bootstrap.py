@@ -99,6 +99,7 @@ def http_deps() -> HttpDeps:
     from .application.jobs import JobRunner
     from .infrastructure.library_fs import FilePracticeStore, FileVideoStore
     from .infrastructure.video_cv import OpenCvFrameGrabber
+    from .infrastructure.youtube_api import FileQuotaLedger, YouTubeDataApi
     from .infrastructure.youtube_dlp import YtDlpFetcher
 
     origins = os.environ.get("FILM_COACH_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
@@ -116,6 +117,8 @@ def http_deps() -> HttpDeps:
         allowed_origins=[o.strip() for o in origins.split(",") if o.strip()],
         shots=_shots,
         motion=_motion,
+        youtube=YouTubeDataApi(),
+        quota=FileQuotaLedger(),
     )
 
 

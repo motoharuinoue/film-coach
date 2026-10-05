@@ -6,6 +6,7 @@ import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFra
 import type { PoseSequence } from "../../domain/pose";
 import type { Practice, PracticeInput } from "../../domain/practice";
 import type { ThrowAnalysis, ThrowRep, ThrowsRequest } from "../../domain/throws";
+import type { QuotaStatus, YouTubeSearchResult } from "../../domain/youtube";
 
 type Json = Record<string, unknown>;
 
@@ -221,6 +222,16 @@ export class HttpFootageLibrary implements FootageLibrary {
 
   async deletePractice(id: string) {
     await this.json(`/api/practices/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async youtubeStatus() {
+    const j = await this.json("/api/youtube/status");
+    return { configured: Boolean(j.configured), quota: (j.quota as QuotaStatus | null) ?? null };
+  }
+
+  async searchYouTube(query: string, opts: { creativeCommonsOnly?: boolean; max?: number } = {}) {
+    const params = new URLSearchParams({ q: query, cc: String(Boolean(opts.creativeCommonsOnly)), max: String(opts.max ?? 12) });
+    return (await this.json(`/api/youtube/search?${params}`)) as unknown as YouTubeSearchResult;
   }
 
   follow(events: string, handlers: TrackingHandlers) {

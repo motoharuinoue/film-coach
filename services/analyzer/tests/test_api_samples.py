@@ -18,12 +18,14 @@ from test_http import FakeModels, events
 from test_throws_io_api import synth_track
 from test_track_target import FakeDetector, FakeMotion, FakePose, FakeShots, FakeVideo
 from test_youtube_library import FakeFetcher, FakeGrabber
+from test_youtube_search import NOW, FakeSearch
 
 from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application import library
 from film_coach.application.jobs import JobRunner
 from film_coach.domain.pose import PoseSequence
 from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
+from film_coach.infrastructure.youtube_api import FileQuotaLedger
 
 REPO = Path(__file__).resolve().parents[3]
 SAMPLES = REPO / "packages" / "schema" / "fixtures" / "api-samples.v1.json"
@@ -57,6 +59,9 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         allowed_origins=[],
         shots=lambda: FakeShots(50),  # 50 フレーム目で場面が変わる
         motion=FakeMotion,  # カメラが 1 フレームに 3 px ずつ振れる
+        youtube=FakeSearch(),  # 架空の候補を返す
+        quota=FileQuotaLedger(tmp_path / "quota.json"),
+        clock=lambda: NOW,
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()
@@ -98,6 +103,8 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "practiceRequest": practice_request,
         "practice": practice,
         "practices": c.get("/api/practices").json(),
+        "youtubeStatus": c.get("/api/youtube/status").json(),
+        "youtubeSearch": c.get("/api/youtube/search", params={"q": "QB throwing mechanics", "max": 3}).json(),
     }
 
 

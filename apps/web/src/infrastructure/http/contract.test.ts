@@ -23,6 +23,7 @@ const validTrack = ajv.compile(read("target-track.v1.schema.json"));
 ajv.addSchema(read("pose-sequence.v1.schema.json"));
 const validThrows = ajv.compile(read("throw-analysis.v1.schema.json"));
 const validPractice = ajv.compile(read("practice.v1.schema.json"));
+const validYouTubeSearch = ajv.compile(read("youtube-search.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -36,6 +37,10 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("追跡結果", () => {
     expect(validTrack(samples.track), JSON.stringify(validTrack.errors)).toBe(true);
+  });
+
+  it("YouTube の検索", () => {
+    expect(validYouTubeSearch(samples.youtubeSearch), JSON.stringify(validYouTubeSearch.errors)).toBe(true);
   });
 
   it("練習", () => {
@@ -213,5 +218,21 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
       { url: "http://127.0.0.1:8787/api/practices", method: "POST", body: samples.practiceRequest },
       { url: `http://127.0.0.1:8787/api/practices/${p.id}`, method: "DELETE", body: undefined },
     ]);
+  });
+
+  it("YouTube の候補を探す。キーそのものは画面に来ない", async () => {
+    const urls: string[] = [];
+    const fetch = vi.fn(async (url: string | URL | Request) => {
+      urls.push(String(url));
+      return jsonResponse(String(url).includes("/status") ? samples.youtubeStatus : samples.youtubeSearch);
+    }) as unknown as typeof globalThis.fetch;
+    const lib = new HttpFootageLibrary("http://127.0.0.1:8787", { fetch });
+    const status = await lib.youtubeStatus();
+    expect(status.configured).toBe(true);
+    expect(JSON.stringify(status)).not.toMatch(/key/i);
+    const r = await lib.searchYouTube("QB throwing mechanics", { creativeCommonsOnly: true, max: 3 });
+    expect(urls[1]).toBe("http://127.0.0.1:8787/api/youtube/search?q=QB+throwing+mechanics&cc=true&max=3");
+    expect(r.candidates[0]).toMatchObject({ videoId: expect.stringMatching(/^[A-Za-z0-9_-]{11}$/), license: "youtube" });
+    expect(r.quota.used).toBe(102);
   });
 });

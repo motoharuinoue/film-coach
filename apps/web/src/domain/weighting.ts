@@ -27,7 +27,7 @@ const PRIOR_RATE = 0.03;
 const PRIOR_VIEWS = 5000;
 
 /** 人気度：補正した高評価率と再生数（対数）の幾何平均。0.3 を下限にして、無名でも良い動画を残す */
-export function popularity(s: ReferenceStats) {
+export function popularity(s: Pick<ReferenceStats, "views" | "likes">) {
   const rate = (s.likes + PRIOR_VIEWS * PRIOR_RATE) / (s.views + PRIOR_VIEWS);
   const rateScore = clamp01(rate / 0.06);
   const viewScore = clamp01(Math.log10(Math.max(1, s.views)) / 7);
@@ -35,7 +35,7 @@ export function popularity(s: ReferenceStats) {
 }
 
 /** 発信者：登録者数（対数）。信頼チャンネルは 1.25 倍（上限 1） */
-export function creator(s: ReferenceStats) {
+export function creator(s: Pick<ReferenceStats, "subscribers" | "trustedChannel">) {
   const base = 0.4 + 0.6 * clamp01(Math.log10(Math.max(1, s.subscribers)) / 6.5);
   return Math.min(1, base * (s.trustedChannel ? 1.25 : 1));
 }

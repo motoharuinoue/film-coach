@@ -8,6 +8,7 @@
 | `video-record.v1.schema.json` | 解析サービスに取り込んだ動画の記録（API の応答と保存の形） |
 | `target-track.v1.schema.json` | 大勢が映る映像で、指定した 1 人を追った結果（フレームごとの枠と骨格、画像のピクセル座標、場面の切り替わり、カメラの動き） |
 | `throw-analysis.v1.schema.json` | 追跡した骨格から見つけた投球と、1 本ずつのフェーズ・QB 指標（骨格は `pose-sequence.v1` を参照） |
+| `youtube-search.v1.schema.json` | YouTube Data API で探したお手本の候補（再生数・高評価数・登録者数・ライセンス）と、今日の無料枠 |
 | `practice.v1.schema.json` | 練習（映像のまとめ）。名前・日付・種別・カメラ角度・メモと、まとめた映像の ID |
 | `fixtures/api-samples.v1.json` | API の応答の見本（Python のテストが作り、TypeScript の契約テストが使う） |
 | `fixtures/parity.v1.json` | 両言語の実装が同じ結果を出すことを確かめる共通データ（合成骨格と、フェーズ・指標の期待値） |

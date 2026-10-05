@@ -53,3 +53,36 @@ export function checkSegment(startText: string, endText: string): SegmentCheck {
   if (end - start > MAX_SEGMENT_SEC) return { ok: false, error: `区間は ${MAX_SEGMENT_SEC} 秒以内にしてください` };
   return { ok: true, start, end };
 }
+
+// ---- お手本の候補（YouTube Data API。形は packages/schema の youtube-search.v1） ----
+
+export type YouTubeCandidate = {
+  videoId: string;
+  title: string;
+  channel: string;
+  channelId: string;
+  publishedAt: string;
+  durationSec: number;
+  views: number;
+  /** 非公開なら null */
+  likes: number | null;
+  comments: number | null;
+  subscribers: number | null;
+  license: "youtube" | "creativeCommon";
+  definition: "hd" | "sd";
+  thumbnail: string;
+  url: string;
+};
+
+/** その日（米国太平洋時間）の無料枠（1 日 10,000 ユニット） */
+export type QuotaStatus = { day: string; used: number; limit: number; remaining: number; resetsAt: string };
+
+export type YouTubeSearchResult = { query: string; creativeCommonsOnly: boolean; candidates: YouTubeCandidate[]; quota: QuotaStatus };
+
+/** 1 回の検索で使うユニット（検索 100 + 動画の情報 1 + チャンネルの情報 1） */
+export const SEARCH_COST = 102;
+
+/** 取り込む区間の初期値：最初の 30 秒（動画が短ければその長さ） */
+export function defaultSegment(durationSec: number) {
+  return { start: 0, end: Math.max(1, Math.min(30, MAX_SEGMENT_SEC, durationSec || 30)) };
+}

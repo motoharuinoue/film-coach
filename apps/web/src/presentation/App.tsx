@@ -29,6 +29,7 @@ const router = createHashRouter([
       { path: "/sessions/:id/compare", element: <CompareRedirect /> },
       { path: "/sessions/:id/report", ...page(() => import("./pages/Report"), "Report") },
       { path: "/references", ...page(() => import("./pages/References"), "References") },
+      { path: "/references/search", ...page(() => import("./pages/ReferenceSearch"), "ReferenceSearch") },
       { path: "/progress", ...page(() => import("./pages/Progress"), "Progress") },
       { path: "/footage", ...page(() => import("./pages/footage/FootageList"), "FootageList") },
       { path: "/footage/:id/pick", ...page(() => import("./pages/footage/FootagePick"), "FootagePick") },
