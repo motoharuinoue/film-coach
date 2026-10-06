@@ -295,3 +295,49 @@ def test_スロー再生の映像は_倍率を入れれば等速と同じ結果�
     # リリースの瞬間の値（手首の高さ・肘角度）は、腕が速く動くので、半フレームのずれで数 % 変わる
     with pytest.raises(ValueError, match="倍率"):
         analyze_throws(track_of(slow, 60), 1.8, slowmo=0.5)
+
+
+def test_投げる腕は_肩より上にいた長さで決め_グラブ側の速い動きに引っ張られない(base_sequence: PoseSequence) -> None:
+    from film_coach.domain.world import throwing_hand
+
+    rep = project(base_sequence)
+    # 投げたあと、グラブ側（左）の手首が肩より下で一瞬だけ速く動く（取り違えや、グラブを下ろす動き）
+    spiked = [list(p) for p in rep]
+    for k, i in enumerate(range(80, 84)):
+        x, y, c = spiked[i][9]
+        spiked[i][9] = (x + (300 if k % 2 else -300), y, c)
+    assert throwing_hand(spiked, 60, body_px=1.8 * PX_PER_M) == "right"
+    assert throwing_hand([mirror_pose(p) for p in spiked], 60, body_px=1.8 * PX_PER_M) == "left"
+
+
+def test_数フレームだけ飛んで戻る位置は補い_速い腕の動きはそのまま残す(base_sequence: PoseSequence) -> None:
+    from film_coach.domain.world import remove_spikes
+
+    rep = project(base_sequence)
+    body = 1.8 * PX_PER_M
+    spiked = [list(p) for p in rep]
+    for i in (30, 31, 32):  # 手首が 3 フレームだけ反対側へ飛び、元に戻る（信頼度は高めのまま）
+        x, y, _ = spiked[i][10]
+        spiked[i][10] = (x + 0.5 * body, y, 0.6)
+    fixed = remove_spikes(spiked, body)
+    for i in (30, 31, 32):
+        assert abs(fixed[i][10][0] - rep[i][10][0]) < 0.05 * body
+        assert fixed[i][10][2] == 0.6  # 信頼度はそのまま
+    # リリースの前後の速い腕の動き（戻らない）は変えない
+    untouched = remove_spikes(rep, body)
+    assert all(untouched[i][10] == rep[i][10] for i in range(len(rep)))
+
+
+@pytest.mark.parametrize("direction", [1, -1])
+def test_投げる向きは体の向きで決め_振りかぶる速い動きに引っ張られない(
+    base_sequence: PoseSequence, direction: int
+) -> None:
+    from film_coach.domain.world import throw_direction
+
+    rep = project(base_sequence, direction)
+    # 振りかぶるときに、投げる手首が後ろへ速く動く（スロー再生で取り違えが混じると、リリースより速く出ることがある）
+    cocked = [list(p) for p in rep]
+    for k, i in enumerate(range(40, 46)):
+        x, y, c = cocked[i][10]
+        cocked[i][10] = (x - direction * 120 * k, y, c)
+    assert throw_direction(cocked, 60, "right", body_px=1.8 * PX_PER_M) == direction

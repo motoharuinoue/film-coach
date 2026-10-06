@@ -18,7 +18,9 @@ from ..domain.world import (
     ImagePoint,
     NotEnoughPoseError,
     WorldTransform,
+    body_px_of,
     estimate_transform,
+    remove_spikes,
     repair_low_confidence,
     to_world,
 )
@@ -92,8 +94,10 @@ def _runs(frames: list[TargetFrame], cuts: set[int]) -> list[list[TargetFrame]]:
 
 
 def _poses(frames: list[TargetFrame], fps: float) -> list[list[ImagePoint]]:
-    """骨格の列。信頼度の低い関節（腕を速く振ったときの取り違えなど）は、前後から補う"""
-    return repair_low_confidence([f.keypoints for f in frames if f.keypoints is not None], fps)
+    """骨格の列。信頼度の低い関節（腕を速く振ったときの取り違えなど）と、数フレームだけ飛んで戻る位置は、前後から補う"""
+    poses = repair_low_confidence([f.keypoints for f in frames if f.keypoints is not None], fps)
+    body = body_px_of(poses)
+    return remove_spikes(poses, body) if body else poses
 
 
 def analyze_throws(

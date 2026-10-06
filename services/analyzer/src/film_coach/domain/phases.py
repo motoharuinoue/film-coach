@@ -54,6 +54,8 @@ DROP_SPEED = 0.5
 """骨盤が後ろへ下がっている（ドロップ）とみなす速さ（m/s）"""
 STRIDE_SEARCH_S = 0.8
 """リリースからさかのぼって前足の動きを探す範囲（秒）"""
+MIN_STRIDE = 0.04
+"""ステップとみなす、前足が続けて前へ動いた距離（身長比）。リリースのときの軸足の小さなひねりと見分ける"""
 
 
 def _find(n: int, pred: Callable[[int], bool]) -> int:
@@ -76,7 +78,7 @@ def detect_events(seq: PoseSequence) -> Events:
     （実際の映像では、カメラから遠い足ほど画面の上に映り、高さで接地を判定できないため）。
 
     1. リリース：投げる手首が最も速い瞬間
-    2. 接地：さかのぼって、前足（左）が前へ動いていた最後のフレームの次
+    2. 接地：さかのぼって、前足（左）が前へ身長の MIN_STRIDE 倍以上動いた区間の、最後のフレームの次
     3. ステップ：さらにさかのぼって、前足が前へ動き始めたフレーム
     4. セット：その前で、骨盤が後ろへ下がっていた（ドロップ）最後のフレームの次。ドロップがなければ 0
     5. フォロースルー：手首の速さがピークの 45% を下回る
@@ -95,16 +97,24 @@ def detect_events(seq: PoseSequence) -> Events:
             release = i
 
     limit = max(0, release - js_round(STRIDE_SEARCH_S * fps))
-    i = release
-    while i > limit and ankle_vx[i] <= STRIDE_SPEED:
-        i -= 1
+    ankle_x = [kp(f, "lAnkle").x for f in frames]
     plant = release
     stride_start = max(0, release - 1)
-    if ankle_vx[i] > STRIDE_SPEED:
-        plant = i + 1
+    # さかのぼって、前足が前へ動いていた区間を探す。短すぎる動き（軸足のひねりなど）は飛ばして、さらにさかのぼる
+    i = release
+    while i > limit:
+        while i > limit and ankle_vx[i] <= STRIDE_SPEED:
+            i -= 1
+        if ankle_vx[i] <= STRIDE_SPEED:
+            break
+        end = i
         while i > 0 and ankle_vx[i - 1] > STRIDE_SPEED:
             i -= 1
-        stride_start = i
+        if ankle_x[min(last, end + 1)] - ankle_x[i] >= MIN_STRIDE * seq.height_m:
+            plant = min(last, end + 1)
+            stride_start = i
+            break
+        i -= 1
 
     set_start = 0
     for k in range(stride_start - 1, -1, -1):
