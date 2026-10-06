@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { useLocation, useNavigate } from "react-router";
 import { Button, cx } from "../components/ui";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { useServices } from "../services";
+import { useCoach } from "../state/benchmarks";
 
 type TourStep = { route: string; target: string; title: string; body: string };
 
@@ -35,7 +35,7 @@ export function useTour() {
 type Rect = { x: number; y: number; w: number; h: number };
 
 export function TourProvider({ children }: { children: ReactNode }) {
-  const { coach } = useServices();
+  const { coach } = useCoach();
   const navigate = useNavigate();
   const location = useLocation();
   const [seen, setSeen] = usePersistentState("film-coach:tour-seen", false);

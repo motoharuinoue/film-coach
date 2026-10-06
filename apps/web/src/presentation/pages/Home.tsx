@@ -3,7 +3,7 @@ import { motion } from "motion/react";
 import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import type { Session } from "../../domain/entities";
-import { formatMetric, METRIC_BY_KEY, type MetricKey } from "../../domain/metrics";
+import { formatMetric, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
 import { ScoreRing, Sparkline } from "../components/charts";
 import { PoseThumb } from "../components/scene";
 import { Badge, Button, Card, CountUp, SectionTitle, StatusPill } from "../components/ui";
@@ -11,6 +11,7 @@ import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel } from "../state/session";
 
+/** 主要指標として先に出すもの。測れていない指標（2D の映像の回転など）は飛ばして、測れたほかの指標で 4 つにする */
 const KPIS: MetricKey[] = ["strideRatio", "elbowHeight", "sequenceGap", "releaseTime"];
 const STATUS_COLOR = { good: "#2EE59D", caution: "#FFC24B", flag: "#FF4D5E", na: "#8A96A3" };
 
@@ -20,7 +21,7 @@ function sessionMean(s: Session, key: MetricKey) {
 }
 
 export function Home() {
-  const { coach, bench } = useCoach();
+  const { coach, bench, source } = useCoach();
   const player = coach.player();
   const sessions = coach.sessions();
   const { session: current, rep } = coach.focus();
@@ -32,6 +33,7 @@ export function Home() {
   const peak = scored.filter((s) => s.id !== current.id).sort((a, b) => scoreOf(b) - scoreOf(a))[0];
   const top = coach.findings(rep, current.camera, bench)[0];
   const evals = coach.evaluate(rep, current.camera, bench);
+  const kpis = [...new Set([...KPIS, ...METRICS.map((m) => m.key)])].filter((k) => evals.find((e) => e.key === k)?.value !== undefined).slice(0, 4);
   const best = bench.best;
   const today = new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
 
@@ -40,12 +42,12 @@ export function Home() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm text-muted">{today}</p>
-          <h1 className="mt-1 text-[28px] font-semibold tracking-tight">おかえり、{player.name.split(" ")[1] ?? player.name}</h1>
+          <h1 className="mt-1 text-[28px] font-semibold tracking-tight">{player.name ? `おかえり、${player.name.split(" ")[1] ?? player.name}` : "おかえりなさい"}</h1>
         </div>
-        <Link to="/sessions/new">
+        <Link to={source === "local" ? "/footage" : "/sessions/new"}>
           <Button variant="primary">
             <IconPlus size={16} aria-hidden />
-            新規セッション
+            {source === "local" ? "映像を取り込む" : "新規セッション"}
           </Button>
         </Link>
       </div>
@@ -65,10 +67,14 @@ export function Home() {
             <div className="space-y-3">
               <div>
                 <div className="text-xs text-muted">前回のドリル比</div>
-                <div className={delta >= 0 ? "font-display text-2xl text-turf" : "font-display text-2xl text-flag"}>
-                  {delta >= 0 ? "+" : ""}
-                  {delta}
-                </div>
+                {prev ? (
+                  <div className={delta >= 0 ? "font-display text-2xl text-turf" : "font-display text-2xl text-flag"}>
+                    {delta >= 0 ? "+" : ""}
+                    {delta}
+                  </div>
+                ) : (
+                  <div className="font-display text-2xl text-muted">—</div>
+                )}
               </div>
               {best && (
                 <div>
@@ -83,11 +89,13 @@ export function Home() {
                   <IconFlame size={14} aria-hidden />
                   {formatDate(peak.date)}（{scoreOf(peak)} 点）から {scoreOf(peak) - score} 点下がっています
                 </div>
-              ) : (
+              ) : scored.length > 1 ? (
                 <div className="flex items-center gap-1.5 text-xs text-turf">
                   <IconTrendingUp size={14} aria-hidden />
                   これまでで最も高いスコアです
                 </div>
+              ) : (
+                <div className="text-xs text-muted">最初のセッションです。次の練習から推移を出します</div>
               )}
             </div>
           </div>
@@ -140,7 +148,7 @@ export function Home() {
 
       {/* 主要指標 */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {KPIS.map((k, i) => {
+        {kpis.map((k, i) => {
           const def = METRIC_BY_KEY[k];
           const e = evals.find((r) => r.key === k)!;
           return (

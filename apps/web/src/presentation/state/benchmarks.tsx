@@ -1,10 +1,12 @@
 // 判定の基準（お手本ゾーンと自己ベスト）を全画面で共有する。
 // お手本の手動調整（ピン留め・除外・星）を変えると、すべての画面の判定が変わる。
+// ここで持つのはデモの手動調整（ブラウザに保存）。手元のお手本の手動調整は LocalDataProvider（解析サービスに保存）。
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Benchmarks, CoachService } from "../../application/coach";
 import type { ManualAdjust } from "../../domain/weighting";
 import { useServices } from "../services";
+import { useDataSource, useLocalData, type DataSource } from "./local";
 
 type Ctx = {
   bench: Benchmarks;
@@ -35,9 +37,17 @@ export function useBenchmarks(): Ctx {
   return c;
 }
 
-/** 画面でよく使う組み合わせ：CoachService と現在の基準 */
-export function useCoach(): { coach: CoachService; bench: Benchmarks } {
+/** デモの CoachService と基準（お手本ライブラリのデモ表示など） */
+export function useDemoCoach(): { coach: CoachService; bench: Benchmarks } {
   const { coach } = useServices();
   const { bench } = useBenchmarks();
   return { coach, bench };
+}
+
+/** 画面でよく使う組み合わせ：表示するデータ（手元の練習かデモ）の CoachService と現在の基準 */
+export function useCoach(): { coach: CoachService; bench: Benchmarks; source: DataSource } {
+  const demo = useDemoCoach();
+  const { local } = useLocalData();
+  const { source } = useDataSource();
+  return source === "local" && local ? { ...local, source } : { ...demo, source: "demo" };
 }

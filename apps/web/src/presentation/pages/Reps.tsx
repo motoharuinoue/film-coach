@@ -12,7 +12,7 @@ import { formatDate, repLabel, useSessionRep } from "../state/session";
 
 export function Reps() {
   const { session } = useSessionRep();
-  const { coach, bench } = useCoach();
+  const { coach, bench, source } = useCoach();
   const sessions = coach.sessions();
   const focus = coach.focus().rep;
   const scores = session.reps.map((r) => coach.repScore(r, bench));
@@ -62,7 +62,17 @@ export function Reps() {
         })}
       </div>
 
-      <TargetLock />
+      {/* 試合映像での対象選手のロックは M4。手元のデータでは、本人は「自分の映像」で選んで追跡している */}
+      {source === "demo" ? (
+        <TargetLock />
+      ) : (
+        <DemoNote>
+          この練習の投球は、「自分の映像」で本人を選んで追跡した骨格から切り出しています。試合映像で対象選手を 1 回押してロックする機能（SAM 2）は M4 で追加します。
+          <Link to={`/footage/practices/${session.id}`} className="ml-1 text-ice underline">
+            練習の画面で見る
+          </Link>
+        </DemoNote>
+      )}
     </div>
   );
 }

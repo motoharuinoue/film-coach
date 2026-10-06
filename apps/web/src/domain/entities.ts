@@ -7,13 +7,14 @@ import type { PoseSequence } from "./pose";
 import type { Approach } from "./throws";
 import type { ReferenceStats } from "./weighting";
 
+/** 選手。手元のデータでは名前・背番号・チームを持たない（個人の情報はリポジトリにもサーバーにも置かない） */
 export type Player = {
-  name: string;
-  number: number;
+  name?: string;
+  number?: number;
   position: string;
-  heightCm: number;
+  heightCm?: number;
   throws: string;
-  team: string;
+  team?: string;
 };
 
 /** 骨盤・体幹・腕の回転速度（度/秒）。フレームごとの値 */

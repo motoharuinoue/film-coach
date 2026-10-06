@@ -22,7 +22,8 @@ export function Progress() {
   const { coach, bench } = useCoach();
   const sessions = coach.sessions();
   const [target, setTarget] = useState<Target>("score");
-  const metricKeys = METRICS.filter((m) => sessions.some((s) => isValidFor(m, s.camera))).map((m) => m.key);
+  // 測れた値のある指標だけ（2D の映像では回転を測らない など）
+  const metricKeys = METRICS.filter((m) => sessions.some((s) => isValidFor(m, s.camera) && s.reps.some((r) => r.metrics[m.key] !== undefined))).map((m) => m.key);
 
   const points =
     target === "score"
@@ -39,14 +40,15 @@ export function Progress() {
   const def = target === "score" ? undefined : METRIC_BY_KEY[target];
 
   // 指標ごとの自己ベスト（お手本ゾーンの中央に最も近いレップ）
-  const records = METRICS.filter((m) => bench.zones[m.key]).map((m) => {
+  // ゾーンは、レップの投げ始めに合うもの（投げ始めで意味が変わる指標は、投げ始めが同じお手本だけ）
+  const records = METRICS.filter((m) => sessions.some((s) => s.reps.some((r) => coach.zonesOf(r, bench)[m.key]))).map((m) => {
     let best: { value: number; date: string; dist: number } | undefined;
     for (const s of sessions) {
       if (!isValidFor(m, s.camera)) continue;
       for (const r of s.reps) {
         const v = r.metrics[m.key];
-        if (v === undefined) continue;
-        const z = bench.zones[m.key]!;
+        const z = coach.zonesOf(r, bench)[m.key];
+        if (v === undefined || !z) continue;
         const d = deviation(v, z) * 10 + Math.abs(v - z.p50) / Math.max(1e-6, z.p75 - z.p25);
         if (!best || d < best.dist) best = { value: v, date: s.date, dist: d };
       }
@@ -68,7 +70,8 @@ export function Progress() {
           ))}
         </div>
         <SectionTitle right={def && <span className="text-xs text-faint">{def.hint}</span>}>{def ? def.label : "メカニクス スコア"}</SectionTitle>
-        <TrendChart points={points} band={target === "score" ? undefined : bench.zones[target]} digits={def ? def.digits : 0} />
+        {/* 投げ始めで意味が変わる指標は、お手本ゾーンが投げ始めごとに違うので帯を出さない */}
+        <TrendChart points={points} band={target === "score" || def?.byApproach ? undefined : bench.zones[target]} digits={def ? def.digits : 0} />
       </Card>
 
       <Card className="p-5">
