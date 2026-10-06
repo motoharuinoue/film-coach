@@ -9,9 +9,10 @@ import { DemoReferenceRepository, DemoSessionRepository } from "./infrastructure
 import { SimulatedAnalysisGateway } from "./infrastructure/demo/simulatedAnalysisGateway";
 import { HttpFootageLibrary } from "./infrastructure/http/httpFootageLibrary";
 import { MemoryReferenceRepository, MemorySessionRepository } from "./infrastructure/memory/repositories";
+import { OllamaNarrator } from "./infrastructure/ollama/ollamaNarrator";
 import { TemplateFindingWriter } from "./infrastructure/writer/templateFindingWriter";
 
-export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL): Services {
+export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL, ollamaUrl = import.meta.env.VITE_OLLAMA_URL, ollamaModel = import.meta.env.VITE_OLLAMA_MODEL ?? "gemma3:12b"): Services {
   const sessions = new DemoSessionRepository();
   const writer = new TemplateFindingWriter();
   const coach = new CoachService({ sessions, references: new DemoReferenceRepository(), writer });
@@ -22,6 +23,7 @@ export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL):
     videoMeta: new BrowserVideoMetadataReader(),
     footage: analyzerUrl ? new HttpFootageLibrary(analyzerUrl) : undefined,
     profile: new LocalStorageProfileStore(),
+    narrator: ollamaUrl ? new OllamaNarrator(ollamaUrl, ollamaModel) : undefined,
     localCoach: (data) => new CoachService({ sessions: new MemorySessionRepository(data), references: new MemoryReferenceRepository(data), writer }),
   };
 }

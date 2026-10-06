@@ -6,8 +6,9 @@ import type { Session } from "../../domain/entities";
 import { formatMetric, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
 import { ScoreRing, Sparkline } from "../components/charts";
 import { PoseThumb } from "../components/scene";
-import { Badge, Button, Card, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { Badge, Button, Card, CountUp, SectionTitle, StatusPill, cx } from "../components/ui";
 import { DrillLink } from "../components/drill";
+import { NarrationSource, useNarration } from "../state/narration";
 import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel } from "../state/session";
@@ -33,6 +34,7 @@ export function Home() {
   const delta = prev ? score - scoreOf(prev) : 0;
   const peak = scored.filter((s) => s.id !== current.id).sort((a, b) => scoreOf(b) - scoreOf(a))[0];
   const top = coach.findings(rep, current.camera, bench)[0];
+  const topText = useNarration(top);
   const evals = coach.evaluate(rep, current.camera, bench);
   const kpis = [...new Set([...KPIS, ...METRICS.map((m) => m.key)])].filter((k) => evals.find((e) => e.key === k)?.value !== undefined).slice(0, 4);
   const best = bench.best;
@@ -123,8 +125,9 @@ export function Home() {
             <div className="flex flex-col p-6">
               <SectionTitle>次に直すこと</SectionTitle>
               <StatusPill status={top.severity} className="self-start" />
-              <h2 className="mt-3 text-xl font-semibold">{top.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{top.body}</p>
+              <h2 className="mt-3 text-xl font-semibold">{topText.narration?.title ?? top.title}</h2>
+              <p className={cx("mt-2 text-sm leading-relaxed text-muted", topText.pending && "opacity-60")}>{topText.narration?.body ?? top.body}</p>
+              <NarrationSource {...topText} />
               <div className="mt-3 text-xs text-muted">
                 目標：<span className="font-mono text-ice">{top.target}</span>
               </div>
