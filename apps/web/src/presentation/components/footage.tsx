@@ -271,6 +271,8 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
   onTimeRef.current = onTime;
   const player = useRef<YTPlayer | null>(null);
   const pending = useRef<number | null>(null);
+  // まだ再生していない動画で seekTo すると再生が始まるので、指定した時刻へ移ったら一度だけ止める
+  const pauseOnPlay = useRef(false);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.5);
@@ -295,7 +297,14 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
               pending.current = null;
             }
           },
-          onStateChange: (e: { data: number }) => setPlaying(e.data === 1),
+          onStateChange: (e: { data: number }) => {
+            if (e.data === 1 && pauseOnPlay.current) {
+              pauseOnPlay.current = false;
+              player.current?.pauseVideo();
+              return;
+            }
+            setPlaying(e.data === 1);
+          },
         },
       });
       const tick = () => {
@@ -326,6 +335,7 @@ export function YouTubeFootagePlayer({ videoId, start, end, track, label, layers
     if (!seekTo) return;
     // プレイヤーの準備ができる前なら、準備ができたときに移る
     if (!player.current?.seekTo) pending.current = seekTo.t;
+    pauseOnPlay.current = true;
     player.current?.pauseVideo?.();
     player.current?.seekTo?.(start + seekTo.t, true);
     setT(seekTo.t);

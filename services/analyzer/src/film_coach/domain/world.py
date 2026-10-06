@@ -106,16 +106,63 @@ def _top_mean(values: list[float], k: int) -> float:
     return sum(sorted(values, reverse=True)[:k]) / max(1, min(k, len(values)))
 
 
-def throwing_hand(poses: Sequence[ImagePose], fps: float) -> Hand:
-    """手首の速いフレームの平均（上位数フレーム）が大きいほうを投げる腕とする。1 フレームだけの誤検出に引っ張られない"""
+OVERHEAD_MARGIN = 0.05
+"""肩より上とみなす高さ（画像の上での身長比）"""
+MIN_OVERHEAD_FRAMES = 3
+"""投げる腕を、肩より上にいた長さで決めるのに要るフレーム数"""
+
+
+def _overhead_frames(poses: Sequence[ImagePose], wrist: KeypointName, shoulder: KeypointName, margin_px: float) -> int:
+    """手首が肩より上（画像の y が小さい）にあったフレームの数。信頼度の低い関節は数えない"""
+    n = 0
+    for p in poses:
+        w, s = _p(p, wrist), _p(p, shoulder)
+        if w[2] >= MIN_CONF and s[2] >= MIN_CONF and w[1] < s[1] - margin_px:
+            n += 1
+    return n
+
+
+def throwing_hand(poses: Sequence[ImagePose], fps: float, body_px: float = 0.0) -> Hand:
+    """投げる腕。肩より上にいた時間が長いほうの手首にする（振りかぶってからリリースまで、投げる腕は肩より上にある）。
+
+    手首の速さでは決めない。スロー再生の映像では、投げたあとのグラブ側の手の動きや、左右の取り違えの数フレームの
+    ほうが速く出ることがあるため。どちらの手首もほとんど肩より上に来なければ、速いフレームの平均で決める。
+    """
+    margin = OVERHEAD_MARGIN * body_px
+    right = _overhead_frames(poses, "rWrist", "rShoulder", margin)
+    left = _overhead_frames(poses, "lWrist", "lShoulder", margin)
+    if max(right, left) >= MIN_OVERHEAD_FRAMES:
+        return "left" if left > right else "right"
     k = max(3, round(fps * 0.05))
-    right = _top_mean([s for s, _ in _wrist_speeds(poses, fps, "rWrist")], k)
-    left = _top_mean([s for s, _ in _wrist_speeds(poses, fps, "lWrist")], k)
-    return "left" if left > right else "right"
+    right_speed = _top_mean([s for s, _ in _wrist_speeds(poses, fps, "rWrist")], k)
+    left_speed = _top_mean([s for s, _ in _wrist_speeds(poses, fps, "lWrist")], k)
+    return "left" if left_speed > right_speed else "right"
 
 
-def throw_direction(poses: Sequence[ImagePose], fps: float, hand: Hand) -> Literal[1, -1]:
-    """投げる手首が最も速い数フレームの、横の速度の向き"""
+LEAD_PAIRS: dict[Hand, tuple[tuple[KeypointName, KeypointName], ...]] = {
+    "right": (("lShoulder", "rShoulder"), ("lHip", "rHip"), ("lAnkle", "rAnkle")),
+    "left": (("rShoulder", "lShoulder"), ("rHip", "lHip"), ("rAnkle", "lAnkle")),
+}
+"""投げる向きの手がかりにする（前の側, 後ろの側）の関節の組。右投げなら左が前（投げる側）"""
+MIN_LEAD_SPREAD = 0.03
+"""体の向きで投げる向きを決めるのに要る、左右の関節の横のずれの中央値（画像の上での身長比）"""
+
+
+def throw_direction(poses: Sequence[ImagePose], fps: float, hand: Hand, body_px: float = 0.0) -> Literal[1, -1]:
+    """投げる向き。横から見ると、前の側（右投げなら左の肩・腰・足）が投げる側にある（カメラがどちら側でも同じ）。
+
+    肩・腰・足首の左右の横のずれの中央値で決める。手首の速さの向きでは決めない。スロー再生の映像では、
+    振りかぶる（後ろへ引く）動きのほうが速く出て、向きが逆になることがあるため。
+    体の向きで決めきれないとき（ずれが小さい）だけ、手首が最も速い数フレームの向きで決める。
+    """
+    diffs: list[float] = []
+    for p in poses:
+        for front, back in LEAD_PAIRS[hand]:
+            pa, pb = _p(p, front), _p(p, back)
+            if pa[2] >= MIN_CONF and pb[2] >= MIN_CONF:
+                diffs.append(pa[0] - pb[0])
+    if diffs and abs(statistics.median(diffs)) >= MIN_LEAD_SPREAD * body_px:
+        return 1 if statistics.median(diffs) > 0 else -1
     speeds = _wrist_speeds(poses, fps, "rWrist" if hand == "right" else "lWrist")
     k = max(3, round(fps * 0.05))
     top = sorted(speeds, key=lambda s: s[0], reverse=True)[:k]
@@ -152,6 +199,57 @@ def repair_low_confidence(
     return out
 
 
+SPIKE_MAX_FRAMES = 3
+"""飛びとみなす、続けて外れているフレーム数の上限"""
+SPIKE_DISTANCE = 0.15
+"""飛びとみなす、前後のフレームからの距離（画像の上での身長比）"""
+
+
+def remove_spikes(poses: Sequence[ImagePose], body_px: float) -> list[list[ImagePoint]]:
+    """関節ごとに、1〜SPIKE_MAX_FRAMES フレームだけ遠くへ飛んで戻る位置（取り違え）を、前後の線形補間で置き換える。
+
+    飛びの条件：その間の位置がどれも前後のフレームから SPIKE_DISTANCE × 身長より離れていて、前後のフレームどうしは
+    その半分より近い（行って戻る）。本当に速い腕の動きは前後の位置が離れていくので、置き換えない。
+    信頼度が少し高めに出た取り違え（スロー再生で数フレーム続くもの）を、信頼度だけでは補えないため。
+    """
+    out = [list(p) for p in poses]
+    n = len(out)
+    limit = SPIKE_DISTANCE * body_px
+    for j in range(NUM_KEYPOINTS):
+        i = 1
+        while i < n - 1:
+            fixed = False
+            for span in range(1, SPIKE_MAX_FRAMES + 1):
+                end = i + span  # 飛びのあとの最初のフレーム
+                if end >= n:
+                    break
+                a, b = out[i - 1][j], out[end][j]
+                gap = math.hypot(b[0] - a[0], b[1] - a[1])
+                away = min(
+                    min(
+                        math.hypot(out[k][j][0] - a[0], out[k][j][1] - a[1]),
+                        math.hypot(out[k][j][0] - b[0], out[k][j][1] - b[1]),
+                    )
+                    for k in range(i, end)
+                )
+                if away > limit and gap < away / 2:
+                    for k in range(i, end):
+                        r = (k - (i - 1)) / (end - (i - 1))
+                        out[k][j] = (a[0] + (b[0] - a[0]) * r, a[1] + (b[1] - a[1]) * r, out[k][j][2])
+                    i = end
+                    fixed = True
+                    break
+            if not fixed:
+                i += 1
+    return out
+
+
+def body_px_of(poses: Sequence[ImagePose], ratio: float = SEGMENT_RATIO) -> float | None:
+    """画像の上での身長の見積もり（太もも・すね・体幹の長さの中央値から）"""
+    lengths = [v for p in poses if (v := body_length_px(p)) is not None]
+    return statistics.median(lengths) / ratio if lengths else None
+
+
 class NotEnoughPoseError(ValueError):
     """骨格が足りず、縮尺や地面を見積もれない"""
 
@@ -171,8 +269,8 @@ def estimate_transform(
     ]
     if not ankles:
         raise NotEnoughPoseError("足首が映っておらず、地面の位置を見積もれません")
-    hand = throwing_hand(poses, fps)
-    direction = throw_direction(poses, fps, hand)
+    hand = throwing_hand(poses, fps, body_px)
+    direction = throw_direction(poses, fps, hand, body_px)
     transform = WorldTransform(
         m_per_px=height_m / body_px,
         origin_x=0.0,
