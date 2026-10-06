@@ -7,7 +7,7 @@ import { zonesFor, type ZoneSet, type Zones } from "../domain/judgement";
 import type { ManualAdjust } from "../domain/weighting";
 import { buildFindings } from "./coaching";
 import { consistency, evaluateRep, radarScores, releasePoints, repScore, selectBestRep, sessionScore, strengths } from "./evaluation";
-import type { AnalysisGateway, FindingWriter, FootageLibrary, ManualAdjustmentStore, PlayerProfileStore, ReferenceRepository, SessionRepository, VideoMetadataReader } from "./ports";
+import type { AnalysisGateway, FindingNarrator, FindingWriter, FootageLibrary, ManualAdjustmentStore, PlayerProfileStore, ReferenceRepository, SessionRepository, VideoMetadataReader } from "./ports";
 import { defaultManual, weighByApproach, weighReferences, zoneSetOf, type ReferenceWeights } from "./references";
 
 /**
@@ -99,5 +99,7 @@ export type Services = {
   footage?: FootageLibrary;
   /** 手元のデータを、デモと同じ CoachService に載せる */
   localCoach: (data: CoachData) => CoachService;
+  /** 改善点の文章を手元の LLM（Ollama）で書く。設定があるときだけある（公開デモではない） */
+  narrator?: FindingNarrator;
   profile: PlayerProfileStore;
 };

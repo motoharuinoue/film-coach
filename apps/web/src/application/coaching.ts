@@ -16,6 +16,8 @@ export type Finding = {
   drill?: DrillPick;
   /** 根拠のフレーム */
   frame: number;
+  /** 判定結果（LLM で文章にするときの材料） */
+  evaluation: MetricEvaluation;
 };
 
 export function buildFindings(rep: AnalyzedRep, evals: MetricEvaluation[], writer: FindingWriter, references: ReferenceRepository, max = 3): Finding[] {
@@ -30,6 +32,7 @@ export function buildFindings(rep: AnalyzedRep, evals: MetricEvaluation[], write
       target: `${e.zone!.p25.toFixed(d.digits)}〜${e.zone!.p75.toFixed(d.digits)}${d.unit}`,
       drill,
       frame: d.at === "range" ? rep.events.setStart : rep.events[d.at],
+      evaluation: e,
     };
   });
 }

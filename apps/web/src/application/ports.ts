@@ -40,10 +40,37 @@ export interface ManualAdjustmentStore {
 
 /**
  * 判定結果を文章にする（ADR-0003）。数値は判定結果からだけ取り、文章の側で数値を作らない。
- * いまはテンプレート、M3 で Ollama のローカル LLM の実装を足す。
+ * すぐに返すテンプレートの文章。手元の LLM が使えれば、その文章を下書きにして FindingNarrator が書き直す。
  */
 export interface FindingWriter {
   write(evaluation: MetricEvaluation): { title: string; body: string };
+}
+
+/** LLM に渡す改善点の材料。数値は指標の桁数にそろえた文字列（単位付き） */
+export type NarrationInput = {
+  metric: string;
+  hint: string;
+  unit: string;
+  value: string;
+  zone: { low: string; high: string };
+  /** お手本の範囲のどちら側に外れたか */
+  side: "low" | "high";
+  severity: "flag" | "caution";
+  best?: string;
+  /** 添えるドリル動画の名前（あれば、直し方としてこの名前だけを挙げてよい） */
+  drill?: string;
+  /** テンプレートの文章（言い回しの下書き） */
+  draft: { title: string; body: string };
+};
+
+/** 改善点の文章を、手元の LLM（Ollama）に書いてもらう。公開デモにはない */
+export interface FindingNarrator {
+  readonly model: string;
+  /** 指示文の版。変えたら、覚えておいた文章を書き直す */
+  readonly version: string;
+  /** 使えるか（Ollama が動いていて、モデルがあるか） */
+  status(): Promise<{ ok: boolean; reason?: string }>;
+  write(input: NarrationInput, signal?: AbortSignal): Promise<{ title: string; body: string }>;
 }
 
 // ---- 取り込みと解析 ----

@@ -4,17 +4,32 @@ import { useState } from "react";
 import { formatMetric, METRIC_BY_KEY, RADAR_LABEL, type RadarAxis } from "../../domain/metrics";
 import { Radar, ScoreRing, Scatter } from "../components/charts";
 import { AngleArc, FieldScene, PoseThumb, Skeleton, Trail } from "../components/scene";
-import { Badge, Button, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { Badge, Button, CountUp, SectionTitle, StatusPill, cx } from "../components/ui";
+import type { Finding } from "../../application/coaching";
 import { DrillLink } from "../components/drill";
+import { NarrationSource, useNarration, useNarrator } from "../state/narration";
 import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel, useSessionRep } from "../state/session";
 
 const AXES: RadarAxis[] = ["footwork", "base", "rotation", "armPath", "release", "posture", "consistency"];
 
+/** 改善点の文章。手元の LLM が使えれば、その文章（数値を確かめたもの） */
+function FindingText({ f }: { f: Finding }) {
+  const { narration, pending } = useNarration(f);
+  return (
+    <>
+      <h3 className="mt-2 text-lg font-semibold">{narration?.title ?? f.title}</h3>
+      <p className={cx("mt-1.5 text-sm leading-relaxed text-muted", pending && "opacity-60")}>{narration?.body ?? f.body}</p>
+      <NarrationSource narration={narration} pending={pending} />
+    </>
+  );
+}
+
 export function Report() {
   const { session, rep } = useSessionRep();
   const { coach, bench, source } = useCoach();
+  const narrator = useNarrator();
   const [copied, setCopied] = useState(false);
   const player = coach.player();
   const findings = coach.findings(rep, session.camera, bench);
@@ -126,8 +141,7 @@ export function Report() {
                       <StatusPill status={f.severity} />
                       <span className="text-xs text-muted">{METRIC_BY_KEY[f.key].label}</span>
                     </div>
-                    <h3 className="mt-2 text-lg font-semibold">{f.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-muted">{f.body}</p>
+                    <FindingText f={f} />
                     <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
                       <span>
                         今回 <span className="font-mono text-pylon">{formatMetric(f.key, rep.metrics[f.key])}</span>
@@ -199,7 +213,8 @@ export function Report() {
           </section>
 
           <footer className="border-t border-line pt-5 text-[11px] leading-relaxed text-faint">
-            判定はルールエンジン、文章はテンプレートで作成しています（M3 でローカル LLM による文章化を追加。数値は判定結果からだけ取ります）。単眼 2D 映像による推定のため、角度・距離には誤差があります。
+            判定はルールエンジンが行い、
+            {narrator.ok && narrator.narrator ? `改善点の文章は手元の LLM（${narrator.narrator.model}）が判定結果をもとに書いています。文章に出る数値とドリル動画が判定結果と登録のものだけかを確かめ、合わなければテンプレートの文章にします。` : "文章はテンプレートで作成しています（数値は判定結果からだけ取ります）。"}単眼 2D 映像による推定のため、角度・距離には誤差があります。
             {source === "demo" ? "チャンネル・動画・選手はすべて架空のデモデータです。" : "お手本は YouTube から取り込んだ区間で、元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。"}
           </footer>
         </div>
