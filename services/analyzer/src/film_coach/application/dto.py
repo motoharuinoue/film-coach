@@ -312,6 +312,8 @@ def evaluation_to_json(targets: list[TargetVideo], report: EvaluationReport) -> 
                         "joint": e.joint,
                         "rawCm": _opt(e.raw_cm, 2),
                         "finalCm": round(e.final_cm, 2),
+                        "finalDxCm": round(e.final_dx_cm, 2),
+                        "finalDyCm": round(e.final_dy_cm, 2),
                     }
                     for e in report.joint_errors
                 ],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LABEL_JOINTS, cropFor, isFrameDone, jointLabel, nextJoint, progressOf, withEvent, withPoint, withoutPoint, type AnnotationInput, type EvaluationTarget } from "./evaluation";
+import { LABEL_JOINTS, biasOf, cropFor, errorStats, isFrameDone, jointLabel, nextJoint, progressOf, withEvent, withPoint, withoutPoint, type AnnotationInput, type EvaluationTarget } from "./evaluation";
 
 const empty: AnnotationInput = { throws: [], frames: [] };
 
@@ -74,5 +74,18 @@ describe("cropFor", () => {
     expect(cropFor(boxes, 12, 10, 13, 1920, 1080).x).toBe(820 - 420);
     expect(cropFor(new Map([[5, box(100, 600)]]), 5, 0, 9, 1920, 1080)).toMatchObject({ x: 0, y: 80 });
     expect(cropFor(new Map(), 5, 0, 9, 1920, 1080)).toEqual({ x: 0, y: 0, w: 1920, h: 1080 });
+  });
+});
+
+describe("errorStats・biasOf", () => {
+  it("誤差の要約は、解析サービスと同じく絶対値の平均・中央値・90% 点と、閾値以内の割合", () => {
+    expect(errorStats([1, -2, 3, 4, 20], [5, 10])).toEqual({ n: 5, mean: 6, median: 3, p90: 20, within: [0.8, 0.8] });
+    expect(errorStats([])).toBeNull();
+  });
+
+  it("部位ごとのかたよりは、正解から見た向きの平均", () => {
+    const j = (joint: "lHip" | "rHip" | "nose", dx: number, dy: number) => ({ videoId: "a", frame: 1, joint, rawCm: null, finalCm: Math.hypot(dx, dy), finalDxCm: dx, finalDyCm: dy });
+    expect(biasOf([j("lHip", -2, 14), j("rHip", 0, 16), j("nose", 1, 1)], "hip")).toEqual({ forward: -1, up: 15 });
+    expect(biasOf([], "knee")).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 // 精度の評価の結果：関節の位置（cm）、接地・リリースの瞬間（ミリ秒）、指標（手で測った値との差）。
 
-import { EVALUATED_METRICS, EVENT_LABEL, GROUP_LABEL, JOINT_GROUPS, type ErrorStats, type Evaluation, type EventKey } from "../../../domain/evaluation";
+import { EVALUATED_METRICS, EVENT_LABEL, GROUP_LABEL, GROUP_OF, JOINT_GROUPS, biasOf, errorStats, type ErrorStats, type Evaluation, type EventKey } from "../../../domain/evaluation";
 import { METRIC_BY_KEY, isImprecise } from "../../../domain/metrics";
 import { Card, SectionTitle, cx } from "../../components/ui";
 
@@ -19,6 +19,12 @@ const fmt = (s: ErrorStats | null, digits = 1, unit = " cm") => (s ? `${s.mean.t
 export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh: () => void; busy: boolean }) {
   const { report, thresholdsCm } = data;
   const th = thresholdsCm.map((t) => `${t} cm 以内`);
+  // 股関節は、点の付け方の違い（かたより）が大きいので、除いた値も出す
+  const noHip = errorStats(
+    report.details.joints.filter((e) => GROUP_OF[e.joint] !== "hip").map((e) => e.finalCm),
+    thresholdsCm,
+  );
+  const signed = (v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}`;
   return (
     <Card className="space-y-6 p-5" data-tour="evaluation-results">
       <SectionTitle
@@ -56,6 +62,7 @@ export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh
                   [
                     ["モデルの出力", report.joints.raw],
                     ["指標に使う骨格（補正・平滑化のあと）", report.joints.final],
+                    ["指標に使う骨格（股関節を除く）", noHip],
                   ] as const
                 ).map(([name, s]) => (
                   <tr key={name} className="border-b border-line/60">
@@ -81,11 +88,13 @@ export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh
                   {th.map((x) => (
                     <Th key={x}>{x}</Th>
                   ))}
+                  <Th>かたより（前・上）</Th>
                 </tr>
               </thead>
               <tbody>
                 {JOINT_GROUPS.map((g) => {
                   const { raw, final } = report.groups[g];
+                  const bias = biasOf(report.details.joints, g);
                   return (
                     <tr key={g} className="border-b border-line/60">
                       <Td left strong>
@@ -96,11 +105,15 @@ export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh
                       {thresholdsCm.map((_, i) => (
                         <Td key={i}>{final ? pct(final.within[i] ?? 0) : "—"}</Td>
                       ))}
+                      <Td>{bias ? `${signed(bias.forward)}・${signed(bias.up)} cm` : "—"}</Td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+            <p className="mt-2 text-[11px] leading-relaxed text-faint">
+              かたよりは、指標に使う骨格の点が、正解から見てどちらにずれているかの平均です（前・上が正）。部位ごとに一定の向きへずれているときは、モデルと正解とで点の付け方が違います。
+            </p>
           </section>
 
           <section className="overflow-x-auto">
@@ -163,7 +176,7 @@ export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh
               </tbody>
             </table>
             <p className="mt-2 text-[11px] leading-relaxed text-faint">
-              「判定に使わない値」は、瞬間が半コマずれたときの変わり幅が上限を超え、画面で判定していない値の数です。差のうち「骨格の誤差による分」を除いた残りは、瞬間のずれによるものです。
+              「骨格の誤差による分」は、解析の骨格を正解の瞬間で測った値との差です。解析の値との差がこれより大きければ、その分は瞬間のずれによるものです。「判定に使わない値」は、瞬間が半コマずれたときの変わり幅が上限を超え、画面で判定していない値の数です。リリース時の体幹の前傾は、リリースの瞬間に奥の肩が隠れて手では測れないことが多く、そのときは「—」になります。
             </p>
           </section>
         </>

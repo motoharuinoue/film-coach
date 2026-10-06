@@ -139,6 +139,10 @@ class JointError:
     """モデルの出力そのもの（元の映像の座標）と正解の距離。追跡がそのフレームの骨格を持たなければ None"""
     final_cm: float
     """補正・平滑化を経て指標に使う骨格（ワールド 2D）と正解の距離"""
+    final_dx_cm: float
+    """final の、正解から見た向き（前が正）"""
+    final_dy_cm: float
+    """final の、正解から見た向き（上が正）。部位ごとに平均すると、関節の点の付け方の違い（かたより）が分かる"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,8 +219,8 @@ def _joint_errors(x: _Loaded, label: FrameLabel) -> list[JointError]:
             raw_cm = ((rx - p[0]) ** 2 + (ry - p[1]) ** 2) ** 0.5 * rep.transform.m_per_px * 100
         wx, wy = to_world_point(p, camera, rep.transform)
         k = final.kp[KP[world_name(joint, x.throws.hand)]]
-        final_cm = ((k.x - wx) ** 2 + (k.y - wy) ** 2) ** 0.5 * 100
-        out.append(JointError(x.record.id, label.frame, joint, raw_cm, final_cm))
+        dx, dy = (k.x - wx) * 100, (k.y - wy) * 100
+        out.append(JointError(x.record.id, label.frame, joint, raw_cm, (dx**2 + dy**2) ** 0.5, dx, dy))
     return out
 
 

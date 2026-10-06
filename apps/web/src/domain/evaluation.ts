@@ -76,7 +76,8 @@ export type EvaluationReport = {
   /** total：解析の値と手で測った値の差。pose：解析の骨格を正解の瞬間で測った値との差（骨格の誤差による分） */
   metrics: Partial<Record<MetricKey, { total: ErrorStats | null; pose: ErrorStats | null }>>;
   details: {
-    joints: { videoId: string; frame: number; joint: LabelJoint; rawCm: number | null; finalCm: number }[];
+    /** finalDxCm・finalDyCm は、指標に使う骨格の点の正解から見た向き（前・上が正）。部位ごとの平均が、点の付け方の違い（かたより） */
+    joints: { videoId: string; frame: number; joint: LabelJoint; rawCm: number | null; finalCm: number; finalDxCm: number; finalDyCm: number }[];
     events: { videoId: string; rep: number; event: EventKey; label: number; found: number; frames: number; ms: number }[];
     metrics: { videoId: string; rep: number; metric: MetricKey; labeled: number; analyzed: number | null; analyzedAtLabel: number | null; uncertainty: number | null }[];
   };
@@ -101,6 +102,39 @@ export function jointLabel(joint: LabelJoint, hand: ThrowHand): string {
 /** 投げる腕の側・後ろ足の側か（点の色分けに使う） */
 export function isThrowingSide(joint: LabelJoint, hand: ThrowHand) {
   return joint !== "nose" && (joint[0] === "r") === (hand === "right");
+}
+
+export const GROUP_OF: Record<LabelJoint, JointGroup> = {
+  nose: "head",
+  lShoulder: "shoulder",
+  rShoulder: "shoulder",
+  lElbow: "elbow",
+  rElbow: "elbow",
+  lWrist: "wrist",
+  rWrist: "wrist",
+  lHip: "hip",
+  rHip: "hip",
+  lKnee: "knee",
+  rKnee: "knee",
+  lAnkle: "ankle",
+  rAnkle: "ankle",
+};
+
+/** 誤差（絶対値）の要約（解析サービスの error_stats と同じ求め方） */
+export function errorStats(errors: number[], thresholds: number[] = []): ErrorStats | null {
+  if (!errors.length) return null;
+  const xs = errors.map(Math.abs).sort((a, b) => a - b);
+  const mid = xs.length / 2;
+  const median = xs.length % 2 ? xs[Math.floor(mid)]! : (xs[mid - 1]! + xs[mid]!) / 2;
+  const p90 = xs[Math.min(xs.length - 1, Math.ceil(0.9 * xs.length) - 1)]!;
+  return { n: xs.length, mean: xs.reduce((a, x) => a + x, 0) / xs.length, median, p90, within: thresholds.map((t) => xs.filter((x) => x <= t).length / xs.length) };
+}
+
+/** 部位ごとの、指標に使う骨格の点のかたより（正解から見た向きの平均、cm） */
+export function biasOf(joints: EvaluationReport["details"]["joints"], group: JointGroup): { forward: number; up: number } | undefined {
+  const es = joints.filter((e) => GROUP_OF[e.joint] === group);
+  if (!es.length) return undefined;
+  return { forward: es.reduce((a, e) => a + e.finalDxCm, 0) / es.length, up: es.reduce((a, e) => a + e.finalDyCm, 0) / es.length };
 }
 
 export const isFrameDone = (f: FrameLabel | undefined) => !!f && LABEL_JOINTS.every((j) => j in f.points);

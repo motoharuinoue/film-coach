@@ -7,6 +7,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import fmean
 from typing import TextIO
 
 from ..application.analyze_pose import RepAnalysis, analyze_pose
@@ -28,7 +29,7 @@ from ..application.track_target import (
 )
 from ..domain.approach import APPROACH_LABEL
 from ..domain.camera import CAMERA_ANGLES, CameraAngle
-from ..domain.evaluation import ErrorStats
+from ..domain.evaluation import GROUP_OF, ErrorStats, error_stats
 from ..domain.library import VideoInfo
 from ..domain.metrics import METRIC_BY_KEY, METRICS
 from ..domain.phases import PHASE_LABEL
@@ -149,10 +150,18 @@ def print_evaluation(r: EvaluationReport, out: TextIO) -> None:
     )
     out.write(row("モデルの出力", r.joints_raw))
     out.write(row("指標に使う骨格", r.joints_final))
-    out.write(f"\n| 部位（指標に使う骨格） | 平均 | 中央値 | 90% 点 | {th} |\n|---|---|---|---|")
-    out.write("---|" * len(r.thresholds_cm) + "\n")
+    no_hip = [e.final_cm for e in r.joint_errors if GROUP_OF[e.joint] != "hip"]
+    out.write(row("指標に使う骨格（股関節を除く）", error_stats(no_hip, r.thresholds_cm)))
+    out.write(f"\n| 部位（指標に使う骨格） | 平均 | 中央値 | 90% 点 | {th} | かたより（前・上） |\n|---|---|---|---|")
+    out.write("---|" * (len(r.thresholds_cm) + 1) + "\n")
     for g, s in r.groups_final.items():
-        out.write(row(GROUP_LABEL[g], s))
+        es = [e for e in r.joint_errors if GROUP_OF[e.joint] == g]
+        bias = (
+            f" {fmean(e.final_dx_cm for e in es):+.1f} cm・{fmean(e.final_dy_cm for e in es):+.1f} cm |"
+            if es
+            else " — |"
+        )
+        out.write(row(GROUP_LABEL[g], s).rstrip("\n") + bias + "\n")
     out.write("\n| 瞬間（解析との差） | 平均 | 中央値 | 90% 点 |\n|---|---|---|---|\n")
     for k, s in r.events.items():
         out.write(row(EVENT_LABEL[k], s, " ms", 0))

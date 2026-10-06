@@ -136,14 +136,16 @@
               "type": "array",
               "items": {
                 "type": "object",
-                "required": ["videoId", "frame", "joint", "rawCm", "finalCm"],
+                "required": ["videoId", "frame", "joint", "rawCm", "finalCm", "finalDxCm", "finalDyCm"],
                 "additionalProperties": false,
                 "properties": {
                   "videoId": { "$ref": "#/$defs/id" },
                   "frame": { "$ref": "#/$defs/frame" },
                   "joint": { "$ref": "#/$defs/joint" },
                   "rawCm": { "$ref": "#/$defs/optNumber" },
-                  "finalCm": { "type": "number", "minimum": 0 }
+                  "finalCm": { "type": "number", "minimum": 0 },
+                  "finalDxCm": { "type": "number", "description": "指標に使う骨格の点の、正解から見た向き（前が正、cm）" },
+                  "finalDyCm": { "type": "number", "description": "指標に使う骨格の点の、正解から見た向き（上が正、cm）。部位ごとの平均が、点の付け方の違い（かたより）" }
                 }
               }
             },
