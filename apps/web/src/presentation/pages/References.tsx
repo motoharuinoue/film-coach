@@ -13,6 +13,7 @@ import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, Tog
 import { usePlayback } from "../hooks/usePlayback";
 import { PageGuide } from "../guide/PageGuide";
 import { useAnalyzer } from "../state/analyzer";
+import { DrillList } from "./drills";
 import { useDemoLibrary, useLocalLibrary, type LibraryView } from "../state/library";
 
 const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
@@ -185,6 +186,7 @@ export function References() {
       </div>
 
       <Distribution view={view} metric={metric} setMetric={setMetric} />
+      {view.source === "local" && <DrillList />}
         </>
       ) : null}
     </div>

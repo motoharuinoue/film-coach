@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..domain.drill import Drill, DrillTarget
 from ..domain.library import VideoInfo, VideoRecord, YouTubeSource
 from ..domain.practice import Practice
 from ..domain.reference import Manual, Reference, YouTubeStats
@@ -92,6 +93,33 @@ def practice_from_json(d: dict[str, Any]) -> Practice:
         camera=d["camera"],
         memo=d["memo"],
         video_ids=tuple(d["videoIds"]),
+        created_at=d["createdAt"],
+    )
+
+
+def drill_to_json(d: Drill) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "id": d.id,
+        "youtubeId": d.youtube_id,
+        "title": d.title,
+        "channel": d.channel,
+        "startSec": d.start_sec,
+        "label": d.label,
+        "targets": [{"metric": t.metric, "side": t.side} for t in d.targets],
+        "createdAt": d.created_at,
+    }
+
+
+def drill_from_json(d: dict[str, Any]) -> Drill:
+    return Drill(
+        id=d["id"],
+        youtube_id=d["youtubeId"],
+        title=d["title"],
+        channel=d["channel"],
+        start_sec=int(d["startSec"]),
+        label=d["label"],
+        targets=tuple(DrillTarget(t["metric"], t["side"]) for t in d["targets"]),
         created_at=d["createdAt"],
     )
 

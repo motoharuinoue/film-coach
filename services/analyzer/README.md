@@ -110,6 +110,9 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | PATCH | `/api/references/{id}` | 種類・信頼チャンネル・手動調整（ピン留め・除外・星）を変える |
 | POST | `/api/references/{id}/refresh` | YouTube の統計を取り直す（2 ユニット） |
 | DELETE | `/api/references/{id}` | お手本の登録だけを消す（元の映像と解析結果は残す） |
+| GET | `/api/drills` | 改善点に添えるドリル動画の一覧（`drill.v1.schema.json`）。新しい順 |
+| POST | `/api/drills` | ドリル動画を登録する（`{youtubeId, title, channel, startSec, label, targets: [{metric, side}]}`）。動画は取り込まない。`data/drills/<id>.json` に置く |
+| DELETE | `/api/drills/{id}` | ドリル動画の登録を消す |
 | GET | `/api/practices` | 練習（映像のまとめ）の一覧。新しい順 |
 | POST | `/api/practices` | 練習を作る（`{name, date, kind, camera, memo, videoIds}`、映像は 50 本まで）。`data/practices/<id>.json` に置く |
 | GET | `/api/practices/{id}` | 練習（`practice.v1.schema.json`） |

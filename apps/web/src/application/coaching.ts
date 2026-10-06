@@ -2,9 +2,9 @@
 
 import { pickFindings } from "../domain/coaching";
 import type { AnalyzedRep } from "../domain/entities";
-import type { MetricEvaluation } from "../domain/judgement";
+import { outside, type MetricEvaluation } from "../domain/judgement";
 import { METRIC_BY_KEY, type MetricKey } from "../domain/metrics";
-import type { FindingWriter, ReferenceRepository } from "./ports";
+import type { DrillPick, FindingWriter, ReferenceRepository } from "./ports";
 
 export type Finding = {
   key: MetricKey;
@@ -13,7 +13,7 @@ export type Finding = {
   body: string;
   /** 目標（お手本ゾーンの四分位の範囲） */
   target: string;
-  drill?: { refId: string; label: string; at: string };
+  drill?: DrillPick;
   /** 根拠のフレーム */
   frame: number;
 };
@@ -21,14 +21,14 @@ export type Finding = {
 export function buildFindings(rep: AnalyzedRep, evals: MetricEvaluation[], writer: FindingWriter, references: ReferenceRepository, max = 3): Finding[] {
   return pickFindings(evals, max).map((e) => {
     const d = METRIC_BY_KEY[e.key];
-    const drill = references.drillFor(e.key);
-    const ref = drill && references.get(drill.refId);
+    // 改善点は注意・要改善なので、値は必ずお手本ゾーンの外にある
+    const drill = references.drillFor(e.key, outside(e.value, e.zone) ?? "low");
     return {
       key: e.key,
       severity: e.status as Finding["severity"],
       ...writer.write(e),
       target: `${e.zone!.p25.toFixed(d.digits)}〜${e.zone!.p75.toFixed(d.digits)}${d.unit}`,
-      drill: drill && ref ? { ...drill, at: ref.segment.start } : undefined,
+      drill,
       frame: d.at === "range" ? rep.events.setStart : rep.events[d.at],
     };
   });

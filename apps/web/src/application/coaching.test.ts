@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AnalyzedRep, Reference } from "../domain/entities";
+import type { AnalyzedRep } from "../domain/entities";
 import { evaluateMetric, type Zone } from "../domain/judgement";
 import { buildFindings } from "./coaching";
 import type { FindingWriter, ReferenceRepository } from "./ports";
@@ -10,8 +10,9 @@ const rep = { events: { setStart: 30, strideStart: 45, plant: 60, release: 66, f
 
 const references: ReferenceRepository = {
   list: () => [],
-  get: (id) => (id === "drill-1" ? ({ id, segment: { start: "2:14", end: "2:17" } } as Reference) : undefined),
-  drillFor: (key) => (key === "strideRatio" ? { refId: "drill-1", label: "ステップ・アンド・スロー" } : undefined),
+  get: () => undefined,
+  // 小さい側（ステップが狭い）を直すドリルだけを返す
+  drillFor: (key, side) => (key === "strideRatio" && side === "low" ? { label: "ステップ・アンド・スロー", channel: "QB Lab", at: "2:14", youtubeId: "Qb7Drill_01", startSec: 134 } : undefined),
 };
 
 describe("buildFindings", () => {
@@ -25,7 +26,7 @@ describe("buildFindings", () => {
       title: "タイトル",
       body: "本文",
       target: "0.50〜0.54",
-      drill: { refId: "drill-1", label: "ステップ・アンド・スロー", at: "2:14" },
+      drill: { label: "ステップ・アンド・スロー", channel: "QB Lab", at: "2:14", youtubeId: "Qb7Drill_01" },
       frame: rep.events.plant,
     });
   });

@@ -4382,6 +4382,71 @@
    "events": null
   }
  },
+ "drillRequest": {
+  "youtubeId": "Qb7Drill_01",
+  "title": "Step and Throw Drill",
+  "channel": "QB Lab",
+  "startSec": 95,
+  "label": "ライン目印のステップ・アンド・スロー",
+  "targets": [
+   {
+    "metric": "strideRatio",
+    "side": "low"
+   },
+   {
+    "metric": "frontKnee",
+    "side": "any"
+   }
+  ]
+ },
+ "drill": {
+  "schemaVersion": 1,
+  "id": "000000000007",
+  "youtubeId": "Qb7Drill_01",
+  "title": "Step and Throw Drill",
+  "channel": "QB Lab",
+  "startSec": 95,
+  "label": "ライン目印のステップ・アンド・スロー",
+  "targets": [
+   {
+    "metric": "strideRatio",
+    "side": "low"
+   },
+   {
+    "metric": "frontKnee",
+    "side": "any"
+   }
+  ],
+  "createdAt": "2026-10-05T12:00:00+00:00",
+  "links": {
+   "self": "/api/drills/000000000007"
+  }
+ },
+ "drills": [
+  {
+   "schemaVersion": 1,
+   "id": "000000000007",
+   "youtubeId": "Qb7Drill_01",
+   "title": "Step and Throw Drill",
+   "channel": "QB Lab",
+   "startSec": 95,
+   "label": "ライン目印のステップ・アンド・スロー",
+   "targets": [
+    {
+     "metric": "strideRatio",
+     "side": "low"
+    },
+    {
+     "metric": "frontKnee",
+     "side": "any"
+    }
+   ],
+   "createdAt": "2026-10-05T12:00:00+00:00",
+   "links": {
+    "self": "/api/drills/000000000007"
+   }
+  }
+ ],
  "youtubeStatus": {
   "configured": true,
   "quota": {

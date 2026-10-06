@@ -3,6 +3,7 @@
 
 import type { CameraAngle } from "../domain/camera";
 import type { AnalyzedRep, Player, Reference, Session, SessionKind } from "../domain/entities";
+import type { Drill, DrillInput } from "../domain/drill";
 import type { Footage, TargetTrack, TrackHint } from "../domain/footage";
 import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
@@ -21,11 +22,14 @@ export interface SessionRepository {
   focus(): { session: Session; rep: AnalyzedRep };
 }
 
+/** 改善点に添えるドリル動画。youtubeId があれば YouTube で開ける（デモの架空の動画にはない） */
+export type DrillPick = { label: string; channel: string; at: string; youtubeId?: string; startSec?: number };
+
 export interface ReferenceRepository {
   list(): Reference[];
   get(id: string): Reference | undefined;
-  /** その指標を改善するドリルを解説しているお手本 */
-  drillFor(key: MetricKey): { refId: string; label: string } | undefined;
+  /** その指標を、お手本の範囲から外れた側（小さい／大きい）に応じて直すドリル動画 */
+  drillFor(key: MetricKey, side: "low" | "high"): DrillPick | undefined;
 }
 
 /** お手本の手動調整（ピン留め・除外・星）の保存先 */
@@ -124,6 +128,11 @@ export interface FootageLibrary {
   refreshReference(id: string): Promise<LocalReference>;
   /** お手本の登録だけを消す（元の映像と解析結果は残す） */
   deleteReference(id: string): Promise<void>;
+  /** 改善点に添えるドリル動画（新しい順） */
+  drills(): Promise<Drill[]>;
+  /** ドリル動画を登録する。動画は取り込まない */
+  createDrill(input: DrillInput): Promise<Drill>;
+  deleteDrill(id: string): Promise<void>;
 }
 
 /** 選手の身体の情報。指標の計算に使い、この端末の中にだけ保存する（リポジトリにもサーバーにも置かない） */

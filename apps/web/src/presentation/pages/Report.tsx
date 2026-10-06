@@ -1,10 +1,11 @@
-import { IconBrandYoutube, IconCheck, IconCircleCheck, IconLink, IconPrinter } from "@tabler/icons-react";
+import { IconCheck, IconCircleCheck, IconLink, IconPrinter } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { formatMetric, METRIC_BY_KEY, RADAR_LABEL, type RadarAxis } from "../../domain/metrics";
 import { Radar, ScoreRing, Scatter } from "../components/charts";
 import { AngleArc, FieldScene, PoseThumb, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { DrillLink } from "../components/drill";
 import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel, useSessionRep } from "../state/session";
@@ -136,15 +137,7 @@ export function Report() {
                       </span>
                       <span className="text-muted">根拠 {(f.frame / rep.seq.fps).toFixed(2)}s</span>
                     </div>
-                    {f.drill && (
-                      <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs">
-                        <IconBrandYoutube size={16} className="text-flag" aria-hidden />
-                        <span>{f.drill.label}</span>
-                        <span className="text-muted">
-                          {coach.reference(f.drill.refId)?.channel} · {f.drill.at} から
-                        </span>
-                      </div>
-                    )}
+                    {f.drill && <DrillLink drill={f.drill} className="mt-3 inline-flex max-w-full" />}
                   </div>
                 </motion.div>
               ))}

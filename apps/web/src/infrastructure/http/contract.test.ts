@@ -10,7 +10,7 @@ import addFormats from "ajv-formats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFootage } from "../../application/footage";
 import { toReference } from "../../application/localReferences";
-import { HttpFootageLibrary, parseFootage, parsePractice, parseReference, parseThrows, parseTrack } from "./httpFootageLibrary";
+import { HttpFootageLibrary, parseDrill, parseFootage, parsePractice, parseReference, parseThrows, parseTrack } from "./httpFootageLibrary";
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/schema");
 const read = (name: string) => JSON.parse(readFileSync(resolve(SCHEMA, name), "utf8")) as Record<string, unknown>;
@@ -26,6 +26,7 @@ const validThrows = ajv.compile(read("throw-analysis.v1.schema.json"));
 const validPractice = ajv.compile(read("practice.v1.schema.json"));
 const validYouTubeSearch = ajv.compile(read("youtube-search.v1.schema.json"));
 const validReference = ajv.compile(read("reference.v1.schema.json"));
+const validDrill = ajv.compile(read("drill.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -43,6 +44,10 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("お手本", () => {
     expect(validReference(withoutLinks(samples.reference!)), JSON.stringify(validReference.errors)).toBe(true);
+  });
+
+  it("ドリル動画", () => {
+    expect(validDrill(withoutLinks(samples.drill!)), JSON.stringify(validDrill.errors)).toBe(true);
   });
 
   it("YouTube の検索", () => {
@@ -121,6 +126,21 @@ describe("投球の解析の読み込み", () => {
     const f = parseFootage(samples.uploadWithThrows!);
     expect(f.links.throws).toBe(`/api/videos/${f.id}/throws`);
     expect(parseFootage(samples.upload!).links.throws).toBeNull();
+  });
+});
+
+describe("ドリル動画の読み込み", () => {
+  it("登録した内容（直す指標と外れた側）を読み、一覧は新しい順", () => {
+    const d = parseDrill(samples.drill!);
+    expect(d).toMatchObject({ youtubeId: "Qb7Drill_01", startSec: 95, label: "ライン目印のステップ・アンド・スロー" });
+    expect(d.targets).toEqual([
+      { metric: "strideRatio", side: "low" },
+      { metric: "frontKnee", side: "any" },
+    ]);
+    // 登録の依頼は、画面の DrillInput と同じ形
+    const { id: _id, createdAt: _c, ...input } = d;
+    expect(input).toEqual(samples.drillRequest);
+    expect((samples.drills as unknown as Record<string, unknown>[]).map(parseDrill).map((x) => x.id)).toEqual([d.id]);
   });
 });
 

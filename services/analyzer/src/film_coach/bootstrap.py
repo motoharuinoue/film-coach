@@ -97,7 +97,7 @@ def http_deps() -> HttpDeps:
 
     from .adapters.http import HttpDeps
     from .application.jobs import JobRunner
-    from .infrastructure.library_fs import FilePracticeStore, FileReferenceStore, FileVideoStore
+    from .infrastructure.library_fs import FileDrillStore, FilePracticeStore, FileReferenceStore, FileVideoStore
     from .infrastructure.video_cv import OpenCvFrameGrabber
     from .infrastructure.youtube_api import FileQuotaLedger, YouTubeDataApi
     from .infrastructure.youtube_dlp import YtDlpFetcher
@@ -106,6 +106,7 @@ def http_deps() -> HttpDeps:
     return HttpDeps(
         store=FileVideoStore(),
         practices=FilePracticeStore(),
+        drills=FileDrillStore(),
         grabber=OpenCvFrameGrabber(),
         fetcher=YtDlpFetcher(),
         jobs=JobRunner(),

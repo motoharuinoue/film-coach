@@ -24,7 +24,7 @@ from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application import library
 from film_coach.application.jobs import JobRunner
 from film_coach.domain.pose import PoseSequence
-from film_coach.infrastructure.library_fs import FilePracticeStore, FileReferenceStore, FileVideoStore
+from film_coach.infrastructure.library_fs import FileDrillStore, FilePracticeStore, FileReferenceStore, FileVideoStore
 from film_coach.infrastructure.youtube_api import FileQuotaLedger
 
 REPO = Path(__file__).resolve().parents[3]
@@ -45,6 +45,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
     monkeypatch.setattr(FileVideoStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(FilePracticeStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(FileReferenceStore, "new_id", lambda _self: f"{next(ids):012x}")
+    monkeypatch.setattr(FileDrillStore, "new_id", lambda _self: f"{next(ids):012x}")
     monkeypatch.setattr(library, "_now", lambda: "2026-10-05T12:00:00+00:00")
     deps = HttpDeps(
         store=FileVideoStore(tmp_path / "library"),
@@ -64,6 +65,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         quota=FileQuotaLedger(tmp_path / "quota.json"),
         clock=lambda: NOW,
         references=FileReferenceStore(tmp_path / "references"),
+        drills=FileDrillStore(tmp_path / "drills"),
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()
@@ -93,6 +95,16 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
     c.post(f"/api/videos/{model['id']}/throws", json={"heightCm": 188})
     reference_request = {"footageId": model["id"], "kind": "model", "trustedChannel": False, "playerHeightCm": 188}
     reference = c.post("/api/references", json=reference_request).json()
+    # ドリル動画：検索の結果から、動画を取り込まずに登録する
+    drill_request = {
+        "youtubeId": "Qb7Drill_01",
+        "title": "Step and Throw Drill",
+        "channel": "QB Lab",
+        "startSec": 95,
+        "label": "ライン目印のステップ・アンド・スロー",
+        "targets": [{"metric": "strideRatio", "side": "low"}, {"metric": "frontKnee", "side": "any"}],
+    }
+    drill = c.post("/api/drills", json=drill_request).json()
     return {
         "schemaVersion": 1,
         "generatedBy": "services/analyzer/tests/test_api_samples.py",
@@ -115,6 +127,9 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "reference": reference,
         "references": c.get("/api/references").json(),
         "referenceFootage": c.get(f"/api/videos/{model['id']}").json(),
+        "drillRequest": drill_request,
+        "drill": drill,
+        "drills": c.get("/api/drills").json(),
         "youtubeStatus": c.get("/api/youtube/status").json(),
         "youtubeSearch": c.get("/api/youtube/search", params={"q": "QB throwing mechanics", "max": 3}).json(),
     }

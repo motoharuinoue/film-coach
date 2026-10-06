@@ -16,7 +16,8 @@ describe("デモデータ（CoachService 経由）", () => {
 
   it("改善点にドリル動画と根拠のフレームが付く", () => {
     const f = coach.findings(rep, session.camera, bench).find((x) => x.key === "strideRatio")!;
-    expect(f.drill?.refId).toBe("r3");
+    expect(f.drill).toMatchObject({ label: "ライン目印のステップ・アンド・スロー", at: expect.any(String) });
+    expect(f.drill?.youtubeId).toBeUndefined(); // 架空の動画なので開けない
     expect(f.frame).toBe(rep.events.plant);
     expect(f.body).toContain("自己ベスト");
   });

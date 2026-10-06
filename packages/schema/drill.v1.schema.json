@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "drill.v1.schema.json",
+  "title": "Drill",
+  "description": "改善点に添えるドリル動画。練習ドリルを解説した YouTube の動画の開始位置と、どの指標をどちら側に外れたときに直すドリルか。動画は取り込まず、埋め込みかリンクで見る（ADR-0005）。",
+  "type": "object",
+  "required": ["schemaVersion", "id", "youtubeId", "title", "channel", "startSec", "label", "targets", "createdAt"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "youtubeId": { "type": "string", "pattern": "^[A-Za-z0-9_-]{11}$" },
+    "title": { "type": "string" },
+    "channel": { "type": "string" },
+    "startSec": { "type": "integer", "minimum": 0, "description": "ドリルの説明が始まる位置（秒）" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 40, "description": "ドリルの名前" },
+    "targets": {
+      "type": "array",
+      "description": "直す指標と、お手本の範囲のどちら側に外れたときのドリルか（low：小さいとき、high：大きいとき、any：どちらでも）",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["metric", "side"],
+        "additionalProperties": false,
+        "properties": {
+          "metric": { "enum": ["releaseTime", "strideRatio", "frontKnee", "hipShoulderSep", "sequenceGap", "elbowHeight", "elbowAngle", "releaseHeight", "trunkTilt", "headStability"] },
+          "side": { "enum": ["low", "high", "any"] }
+        }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}
