@@ -3,6 +3,7 @@
 
 import type { RotationCurve } from "../../domain/entities";
 import type { Keypoint, PoseFrame, PoseSequence } from "../../domain/pose";
+import { rng } from "../../domain/random";
 
 type J = [number, number];
 type Body = {
@@ -304,17 +305,6 @@ function sample(frames: [number, Body][], t: number): Body {
   return out;
 }
 
-/** シード付きの擬似乱数（mulberry32） */
-export function rng(seed: number) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 const NOISE_M = 0.004;
 

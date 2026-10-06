@@ -5,7 +5,8 @@ import type { Reference } from "../domain/entities";
 import type { ZoneSet, Zones } from "../domain/judgement";
 import { METRICS, preciseOnly, type MetricKey } from "../domain/metrics";
 import { APPROACH_GROUPS, type ApproachGroup } from "../domain/throws";
-import { computeWeights, type ManualAdjust, type WeightParts } from "../domain/weighting";
+import { validateWeighting, type ValidationOptions, type WeightValidation } from "../domain/weightValidation";
+import { computeWeights, type ManualAdjust, type WeightedReference, type WeightParts } from "../domain/weighting";
 
 export type PartsByMetric = Partial<Record<MetricKey, WeightParts>>;
 
@@ -25,18 +26,19 @@ export function defaultManual(refs: Reference[]): Record<string, ManualAdjust> {
   return Object.fromEntries(refs.map((r) => [r.id, NEUTRAL_MANUAL]));
 }
 
+/** お手本のレップを、重み付けの標本にする */
+function samplesOf(r: Reference, manual: Record<string, ManualAdjust>): WeightedReference[] {
+  return r.reps.map((rep) => ({
+    id: rep.id,
+    stats: r.stats,
+    manual: manual[r.id] ?? NEUTRAL_MANUAL,
+    // 瞬間の時刻のずれで大きく変わる値（関節の取り違えなど）は、お手本ゾーンに入れない
+    metrics: preciseOnly(rep.metrics, rep.uncertainty),
+  }));
+}
+
 export function weighReferences(refs: Reference[], manual: Record<string, ManualAdjust>): ReferenceWeights {
-  const result = computeWeights(
-    refs.flatMap((r) =>
-      r.reps.map((rep) => ({
-        id: rep.id,
-        stats: r.stats,
-        manual: manual[r.id] ?? NEUTRAL_MANUAL,
-        // 瞬間の時刻のずれで大きく変わる値（関節の取り違えなど）は、お手本ゾーンに入れない
-        metrics: preciseOnly(rep.metrics, rep.uncertainty),
-      })),
-    ),
-  );
+  const result = computeWeights(refs.flatMap((r) => samplesOf(r, manual)));
   const parts: Record<string, PartsByMetric> = {};
   const overall: Record<string, number> = {};
   for (const r of refs) {
@@ -69,4 +71,12 @@ export function weighByApproach(refs: Reference[], manual: Record<string, Manual
 /** 判定に使うゾーン一式（全部のお手本と、投げ始めごと） */
 export function zoneSetOf(all: ReferenceWeights, byApproach: Record<ApproachGroup, ReferenceWeights>): ZoneSet {
   return { all: all.zones, byApproach: Object.fromEntries(APPROACH_GROUPS.map((g) => [g, byApproach[g].zones])) as ZoneSet["byApproach"] };
+}
+
+/** 重み付けの検証。お手本 1 本（そのレップすべて）を、選び直しの単位にする */
+export function validateReferences(refs: Reference[], manual: Record<string, ManualAdjust>, options?: ValidationOptions): WeightValidation {
+  return validateWeighting(
+    refs.map((r) => ({ id: r.id, samples: samplesOf(r, manual) })),
+    options,
+  );
 }
