@@ -73,6 +73,8 @@ uv run film-coach throws ../../data/outputs/clip/track.json --height 180
    - 投げる向き：前の側（右投げなら左）の肩・腰・足首が、投げる側にある（横から見れば、カメラがどちら側でも同じ）。振りかぶる動きのほうが速く出ても、向きが逆にならない
 4. 投球を見つける（`domain/throws.py`）：投げる手首の速さのピーク（身長の 3 倍/秒以上）のうち、手首が肩より上にあるもの。区間は、ドロップの前の構えの終わりから始める
 5. 1 本ずつ、平滑化 → フェーズ分割 → 指標（画面と同じ規則、`analyze-pose` と同じ）。フェーズは、リリースからさかのぼって、前足と骨盤の横の動きの速さで決める（足首の高さは、カメラからの距離で見え方が変わるので使わない）。ステップは、前足が身長の 4% 以上続けて前へ動いた区間とし、リリースのときの軸足の小さなひねりと見分ける
+   - 映っていない区間からは測らない：ステップの始まりが映っていなければ始動からリリースを、ステップが見つからなければステップ幅と前膝角度を、ステップの前が 0.3 秒未満なら頭の上下動を出さない
+6. 投げ始め（`domain/approach.py`）：ステップの前に骨盤が 0.5 m 以上後ろへ下がっていればドロップから、下がらずに構えが 0.3 秒以上映っていればその場から。横から以外の角度や、構えが映っていなければ分からない。`--approach drop|standing` で指定もできる。画面は、頭の上下動のようにドロップの有無で意味が変わる指標を、投げ始めが同じお手本とだけ比べる
 
 合成データを画像に写したテストで、TypeScript の実装と同じフェーズ（±2 フレーム）と指標（角度は一致、長さは縮尺の見積もりのずれの数 % 以内）になること、カメラが動いても打ち消して同じ結果になることを確かめています。本人が小さく映っている（画面の高さの 40% 未満）ときは、結果に注意を添えます。
 
@@ -99,7 +101,7 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/jobs/{jobId}/events` | 進み具合（SSE：`state` → `progress` → `done` / `failed`） |
 | GET | `/api/videos/{id}/track` | 追跡結果（`target-track.v1.schema.json`） |
 | GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
-| POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera, slowmo}`）。追跡した骨格だけを使うので、YouTube の区間でも動く。`slowmo` はスロー再生の倍率（YouTube のお手本はスロー再生が多い。速さと時間を実際の時間に直す） |
+| POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera, slowmo, approach}`）。`approach` は投げ始め（`auto` は骨格から見分ける）。追跡した骨格だけを使うので、YouTube の区間でも動く。`slowmo` はスロー再生の倍率（YouTube のお手本はスロー再生が多い。速さと時間を実際の時間に直す） |
 | GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
 | GET | `/api/youtube/status` | YouTube Data API のキーがあるか（キーそのものは返さない）と、今日の無料枠 |
 | GET | `/api/youtube/search?q=&cc=&max=` | お手本の候補を探す（`youtube-search.v1.schema.json`）。1 回 102 ユニット。キーがなければ 503、無料枠を超えたら 429 |

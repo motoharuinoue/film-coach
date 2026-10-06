@@ -99,7 +99,15 @@ def test_追跡した骨格から投球を解析し_記録にリンクを添え�
     body = res.json()
     assert body["heightM"] == 1.8 and len(body["reps"]) == 1
     assert client.get(f"/api/videos/{vid}").json()["links"]["throws"] == f"/api/videos/{vid}/throws"
-    assert client.get(f"/api/videos/{vid}/throws").json() == body
+    got = client.get(f"/api/videos/{vid}/throws")
+    assert got.json() == body
+    # 計算し直すと中身が変わるので、ブラウザには使うたびに確かめさせる
+    assert got.headers["cache-control"] == "no-cache" and got.headers["etag"]
+    assert client.get(f"/api/videos/{vid}/track").headers["cache-control"] == "no-cache"
+    assert body["approachMode"] == "auto" and body["reps"][0]["approach"]["kind"] == "drop"
+    fixed = client.post(f"/api/videos/{vid}/throws", json={"heightCm": 180, "approach": "standing"}).json()
+    assert fixed["approachMode"] == "standing" and fixed["reps"][0]["approach"]["kind"] == "standing"
+    assert client.post(f"/api/videos/{vid}/throws", json={"heightCm": 180, "approach": "run"}).status_code == 422
 
 
 def test_身長の範囲外と_骨格から縮尺を出せない映像は断る(api: tuple[TestClient, FileVideoStore]) -> None:
@@ -124,5 +132,11 @@ def test_CLIのthrowsで投球と指標を書き出す(tmp_path: Path, base_sequ
     assert run(["throws", str(src), "--height", "180"], cli_deps(), out) == 0
     text = out.getvalue()
     assert "右投げ、投球 1 本" in text and "ステップ幅（身長比）" in text
+    assert "投げ始め         ドロップから（下がった距離" in text
+    assert run(["throws", str(src), "--height", "180", "--approach", "standing"], cli_deps(), io.StringIO()) == 0
+    fixed = json.loads((tmp_path / "throws.json").read_text(encoding="utf-8"))
+    assert fixed["reps"][0]["approach"]["kind"] == "standing"
+    write_track(synth_track(base_sequence), src)
+    assert run(["throws", str(src), "--height", "180"], cli_deps(), io.StringIO()) == 0
     data = json.loads((tmp_path / "throws.json").read_text(encoding="utf-8"))
     assert len(data["reps"]) == 1

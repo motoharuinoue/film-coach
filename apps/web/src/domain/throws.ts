@@ -9,6 +9,29 @@ import type { PoseSequence } from "./pose";
 
 export type ThrowHand = "right" | "left";
 
+/**
+ * 投げ始め：ドロップしてから投げたか、その場で構えてから投げたか。
+ * 頭の上下動のように、ドロップの有無で値の意味が変わる指標は、投げ始めが同じお手本とだけ比べる（judgement.zonesFor）。
+ * 横から以外の角度・構えが映っていない・ステップが見つからないときは unknown
+ */
+export type Approach = "drop" | "standing" | "unknown";
+/** 投げ始めのうち、お手本の分布を分けるもの */
+export type ApproachGroup = Exclude<Approach, "unknown">;
+export const APPROACH_GROUPS: ApproachGroup[] = ["drop", "standing"];
+/** 投げ始めの決め方：骨格から見分ける／指定する */
+export type ApproachMode = "auto" | ApproachGroup;
+
+export const APPROACH_LABEL: Record<Approach, string> = { drop: "ドロップから", standing: "その場から", unknown: "投げ始め不明" };
+export const APPROACH_MODE_LABEL: Record<ApproachMode, string> = { auto: "自動で見分ける", drop: "ドロップから", standing: "その場から" };
+
+export type ApproachInfo = {
+  kind: Approach;
+  /** ステップの前に骨盤が後ろへ下がった距離（m）。測れない角度なら null */
+  dropM: number | null;
+};
+
+export const isApproachGroup = (a: Approach | undefined): a is ApproachGroup => a === "drop" || a === "standing";
+
 /** 画像の座標（カメラの動きを打ち消した座標）→ ワールド 2D の変換 */
 export type WorldTransform = { mPerPx: number; originX: number; groundY: number; direction: 1 | -1; ankleM: number };
 
@@ -22,6 +45,8 @@ export type ThrowRep = {
   events: Events;
   phases: Phase[];
   metrics: MetricValues;
+  /** 投げ始め（投げ始めを入れる前に解析した結果にはない） */
+  approach?: ApproachInfo;
   /** 平滑化した骨格（ワールド 2D、時刻は区間の最初が 0） */
   sequence: PoseSequence;
 };
@@ -36,9 +61,11 @@ export type ThrowAnalysis = {
   warnings: string[];
   /** スロー再生の倍率（1 は等速）。速さと時間は実際の時間に直して計算している */
   slowmo: number;
+  /** 投げ始めの決め方 */
+  approachMode: ApproachMode;
 };
 
-export type ThrowsRequest = { heightCm: number; camera: CameraAngle; slowmo?: number };
+export type ThrowsRequest = { heightCm: number; camera: CameraAngle; slowmo?: number; approach?: ApproachMode };
 
 /** 選べるスロー再生の倍率（YouTube のお手本はスロー再生が多い） */
 export const SLOWMO_OPTIONS = [1, 2, 4, 8] as const;

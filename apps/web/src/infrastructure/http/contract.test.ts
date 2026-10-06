@@ -102,6 +102,12 @@ describe("投球の解析の読み込み", () => {
     // スロー再生の倍率を入れる前の結果も読める（等速とみなす）
     const { slowmo: _s, ...old } = samples.throws as Record<string, unknown>;
     expect(parseThrows(old).slowmo).toBe(1);
+    // 投げ始めは投球ごとに見分ける。入れる前の結果も読める（自動・投げ始めなし）
+    expect(a.approachMode).toBe("auto");
+    expect(a.reps[0]!.approach).toEqual({ kind: "drop", dropM: expect.any(Number) });
+    const { approachMode: _m, ...before } = samples.throws as Record<string, unknown>;
+    const legacy = parseThrows({ ...before, reps: (before.reps as Record<string, unknown>[]).map(({ approach: _a, ...r }) => r) });
+    expect([legacy.approachMode, legacy.reps[0]!.approach]).toEqual(["auto", undefined]);
     expect(a.reps).toHaveLength(1);
     const r = a.reps[0]!;
     expect(r.start).toBeLessThan(r.start + r.events.release);

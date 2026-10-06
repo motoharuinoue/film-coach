@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Zones } from "../domain/judgement";
-import { judgeMetrics, MIN_JUDGED_FOR_SCORE, statusOf } from "./judgeThrows";
+import type { ZoneSet, Zones } from "../domain/judgement";
+import { METRIC_BY_KEY } from "../domain/metrics";
+import { judgeMetrics, judgeRep, MIN_JUDGED_FOR_SCORE, noZoneReason, statusOf } from "./judgeThrows";
 
 const zones: Zones = {
   strideRatio: { p10: 0.38, p25: 0.42, p50: 0.45, p75: 0.48, p90: 0.52 },
@@ -29,5 +30,31 @@ describe("自分の投球をお手本の分布で判定する", () => {
 
   it("表の色分けには、値ごとの判定を使う", () => {
     expect([statusOf("strideRatio", 0.45, zones), statusOf("strideRatio", 0.6, zones), statusOf("headStability", 2, zones)]).toEqual(["good", "flag", "na"]);
+  });
+});
+
+describe("投げ始めをそろえて判定する", () => {
+  const head = { p10: 4, p25: 5, p50: 6, p75: 7, p90: 8 };
+  const set: ZoneSet = { all: { ...zones, headStability: { p10: 0, p25: 0.2, p50: 0.4, p75: 0.6, p90: 1 } }, byApproach: { drop: { headStability: head }, standing: {} } };
+  const metrics = { strideRatio: 0.45, frontKnee: 150, elbowAngle: 110, headStability: 6.5 };
+
+  it("ドロップからの投球の頭の上下動は、ドロップからのお手本とだけ比べる", () => {
+    const j = judgeRep({ metrics, approach: { kind: "drop", dropM: 1.4 } }, set);
+    expect(j.evals.find((e) => e.key === "headStability")).toMatchObject({ status: "good", zone: head });
+    expect(j.judged).toBe(4);
+  });
+
+  it("投げ始めが分からない・同じ投げ始めのお手本がなければ、頭の上下動は判定しない", () => {
+    for (const approach of [undefined, { kind: "unknown" as const, dropM: null }, { kind: "standing" as const, dropM: 0.1 }]) {
+      const j = judgeRep({ metrics, approach }, set);
+      expect(j.evals.find((e) => e.key === "headStability")!.status).toBe("na");
+      expect(j.judged).toBe(3);
+    }
+  });
+
+  it("判定できない理由を、投げ始めの有無で書き分ける", () => {
+    expect(noZoneReason(METRIC_BY_KEY.strideRatio, "drop")).toBe("この指標を測れるお手本が 2 本以上必要です");
+    expect(noZoneReason(METRIC_BY_KEY.headStability, "unknown")).toContain("投げ始め（ドロップの有無）が分からない");
+    expect(noZoneReason(METRIC_BY_KEY.headStability, "standing")).toContain("投げ始めが同じ（その場から）お手本");
   });
 });

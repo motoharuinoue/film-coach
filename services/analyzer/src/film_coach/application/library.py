@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import BinaryIO, Protocol
 
+from ..domain.approach import ApproachMode
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord, YouTubeSource, retain_media_after_analysis
 from ..domain.youtube import check_segment, parse_youtube_id
@@ -187,13 +188,18 @@ def run_tracking(
 
 
 def analyze_footage_throws(
-    store: VideoStore, video_id: str, height_m: float, camera: CameraAngle = "side", slowmo: float = 1.0
+    store: VideoStore,
+    video_id: str,
+    height_m: float,
+    camera: CameraAngle = "side",
+    slowmo: float = 1.0,
+    approach: ApproachMode = "auto",
 ) -> ThrowAnalysis:
     """追跡の済んだ映像から投球を見つけて解析し、保存する。骨格だけを使うので、元の動画が消えていても動く"""
     get_record(store, video_id)
     track = store.load_track(video_id)
     if track is None:
         raise NotFoundError("まだ本人を追跡していません。先に本人を選んで追跡してください")
-    throws = analyze_throws(track, height_m, camera, slowmo)
+    throws = analyze_throws(track, height_m, camera, slowmo, approach)
     store.save_throws(video_id, throws)
     return throws

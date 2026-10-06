@@ -8,6 +8,7 @@ from typing import Any
 
 from ..application.analyze_pose import RepAnalysis
 from ..application.throws import ThrowAnalysis, ThrowRep
+from ..domain.approach import ApproachInfo
 from ..domain.library import VideoInfo
 from ..domain.phases import Events, Phase
 from ..domain.pose import Keypoint, PoseSequence
@@ -61,12 +62,17 @@ def throws_to_json(ta: ThrowAnalysis) -> dict[str, Any]:
                 "events": r.analysis.events.to_json(),
                 "phases": [{"key": p.key, "start": p.start, "end": p.end} for p in r.analysis.phases],
                 "metrics": {k: round(v, 4) for k, v in r.analysis.metrics.items()},
+                "approach": {
+                    "kind": r.approach.kind,
+                    "dropM": None if r.approach.drop_m is None else round(r.approach.drop_m, 3),
+                },
                 "sequence": _sequence(r.analysis.sequence),
             }
             for r in ta.reps
         ],
         "warnings": list(ta.warnings),
         "slowmo": ta.slowmo,
+        "approachMode": ta.approach_mode,
     }
     validate(THROWS_SCHEMA, data)
     return data
@@ -94,7 +100,10 @@ def throws_from_json(data: dict[str, Any]) -> ThrowAnalysis:
         transform = WorldTransform(
             float(t["mPerPx"]), float(t["originX"]), float(t["groundY"]), t["direction"], float(t["ankleM"])
         )
-        reps.append(ThrowRep(int(r["index"]), int(r["start"]), int(r["end"]), transform, analysis))
+        # 投げ始めを入れる前に解析した結果は、分からないとして読む
+        a = r.get("approach") or {"kind": "unknown", "dropM": None}
+        approach = ApproachInfo(a["kind"], None if a["dropM"] is None else float(a["dropM"]))
+        reps.append(ThrowRep(int(r["index"]), int(r["start"]), int(r["end"]), transform, analysis, approach))
     return ThrowAnalysis(
         VideoInfo(v["name"], float(v["fps"]), int(v["width"]), int(v["height"]), int(v["frameCount"])),
         float(data["heightM"]),
@@ -103,6 +112,7 @@ def throws_from_json(data: dict[str, Any]) -> ThrowAnalysis:
         reps,
         list(data["warnings"]),
         float(data.get("slowmo", 1.0)),
+        data.get("approachMode", "auto"),
     )
 
 

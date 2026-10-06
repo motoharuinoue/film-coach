@@ -63,6 +63,7 @@ from ..application.youtube_search import (
     quota_status,
     search_candidates,
 )
+from ..domain.approach import ApproachMode
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo, VideoRecord
 from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
@@ -138,6 +139,7 @@ class ThrowsRequest(BaseModel):
     heightCm: float = Field(ge=120, le=230, description="選手の身長（cm）")
     camera: CameraAngle = "side"
     slowmo: float = Field(default=1, ge=1, le=16, description="スロー再生の倍率（1 は等速）")
+    approach: ApproachMode = Field(default="auto", description="投げ始め（auto は骨格から見分ける）")
 
 
 class TrackRequest(BaseModel):
@@ -145,6 +147,10 @@ class TrackRequest(BaseModel):
     x: float = Field(ge=0, description="元の動画のピクセル座標")
     y: float = Field(ge=0)
     label: str = Field(default="", max_length=20)
+
+
+REVALIDATE = {"Cache-Control": "no-cache"}
+"""追跡のやり直しや計算し直しで中身が変わる結果は、使うたびにブラウザに確かめさせる（変わっていなければ ETag で 304）"""
 
 
 def create_app(deps: HttpDeps) -> FastAPI:
@@ -242,7 +248,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
         path = deps.store.output_file(video_id, name)
         if path is None:
             raise HTTPException(404, f"{name} はまだありません")
-        return FileResponse(path, media_type="video/mp4")
+        return FileResponse(path, media_type="video/mp4", headers=REVALIDATE)
 
     @app.get("/api/videos/{video_id}/track")
     def track(video_id: str) -> FileResponse:
@@ -250,14 +256,14 @@ def create_app(deps: HttpDeps) -> FastAPI:
         path = deps.store.track_path(video_id)
         if path is None:
             raise HTTPException(404, "追跡はまだ終わっていません")
-        return FileResponse(path, media_type="application/json")
+        return FileResponse(path, media_type="application/json", headers=REVALIDATE)
 
     @app.post("/api/videos/{video_id}/throws")
     def analyze_throws(video_id: str, body: ThrowsRequest) -> FileResponse:
         """追跡した骨格から投球を見つけて、1 本ずつ指標を出す。骨格だけを使うので、すぐに終わる"""
         record_or_404(video_id)
         try:
-            analyze_footage_throws(deps.store, video_id, body.heightCm / 100, body.camera, body.slowmo)
+            analyze_footage_throws(deps.store, video_id, body.heightCm / 100, body.camera, body.slowmo, body.approach)
         except NotFoundError as e:
             raise HTTPException(409, str(e)) from e
         except NotEnoughPoseError as e:
@@ -270,7 +276,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
         path = deps.store.throws_path(video_id)
         if path is None:
             raise HTTPException(404, "投球はまだ解析していません")
-        return FileResponse(path, media_type="application/json")
+        return FileResponse(path, media_type="application/json", headers=REVALIDATE)
 
     @app.post("/api/videos/{video_id}/track", status_code=202)
     def start_track(video_id: str, body: TrackRequest) -> dict[str, Any]:

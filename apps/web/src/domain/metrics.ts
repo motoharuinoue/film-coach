@@ -1,7 +1,7 @@
 // QB 指標の定義と計算。指標の日本語名はユビキタス言語としてドメインに置く。
 
 import { CAMERA_LABEL, type CameraAngle } from "./camera";
-import type { Events } from "./phases";
+import { strideFound, strideSeen, type Events } from "./phases";
 import { headCenter, jointAngle, kp, mid, type PoseSequence } from "./pose";
 
 export type MetricKey =
@@ -40,6 +40,8 @@ export type MetricDef = {
   /** 判定の根拠にするフレーム */
   at: keyof Events | "range";
   hint: string;
+  /** 投げ始め（ドロップの有無）で値の意味が変わる指標。投げ始めが同じお手本とだけ比べる */
+  byApproach?: true;
 };
 
 const ALL: CameraAngle[] = ["side", "behind", "front", "endzone", "sideline"];
@@ -54,12 +56,15 @@ export const METRICS: MetricDef[] = [
   { key: "elbowAngle", label: "リリース時の肘角度", short: "肘角度", unit: "°", digits: 0, validAngles: ["side"], axis: "armPath", at: "release", hint: "肩・肘・手首の角度" },
   { key: "releaseHeight", label: "リリース点の高さ（身長比）", short: "リリース高", unit: "", digits: 2, validAngles: ["side"], axis: "release", at: "release", hint: "手首の高さ ÷ 身長" },
   { key: "trunkTilt", label: "リリース時の体幹の前傾", short: "前傾", unit: "°", digits: 0, validAngles: ["side"], axis: "posture", at: "release", hint: "腰から肩のラインと鉛直線の角度" },
-  { key: "headStability", label: "頭の上下動", short: "頭の安定", unit: "cm", digits: 1, validAngles: ALL, axis: "base", at: "range", hint: "ドロップとセットの間の頭の高さの標準偏差" },
+  { key: "headStability", label: "頭の上下動", short: "頭の安定", unit: "cm", digits: 1, validAngles: ALL, axis: "base", at: "range", hint: "ドロップとセットの間の頭の高さの標準偏差", byApproach: true },
 ];
 
 export const METRIC_BY_KEY = Object.fromEntries(METRICS.map((m) => [m.key, m])) as Record<MetricKey, MetricDef>;
 
 export type MetricValues = Partial<Record<MetricKey, number>>;
+
+/** 頭の上下動を測るのに要る、ステップの前に映っている長さ（秒）。短いと、標準偏差が意味を持たない */
+export const MIN_SET_S = 0.3;
 
 export type AnalysisExtras = {
   /** 後方・正面の映像でのみ測れる値 */
@@ -78,21 +83,26 @@ export function computeMetrics(seq: PoseSequence, e: Events, extras: AnalysisExt
   const hipMid = mid(kp(rel, "lHip"), kp(rel, "rHip"));
   const tilt = (Math.atan2(shoulderMid.x - hipMid.x, shoulderMid.y - hipMid.y) * 180) / Math.PI;
 
-  const heads = seq.frames.slice(0, e.strideStart).map((fr) => headCenter(fr).y);
-  const mean = heads.reduce((a, b) => a + b, 0) / Math.max(1, heads.length);
-  const sd = Math.sqrt(heads.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, heads.length));
+  // 映っていない区間・見つからなかったイベントからは測らない
+  const found = strideFound(e);
+  let headStability: number | undefined;
+  if (found && e.strideStart >= Math.max(1, Math.round(MIN_SET_S * seq.fps))) {
+    const heads = seq.frames.slice(0, e.strideStart).map((fr) => headCenter(fr).y);
+    const mean = heads.reduce((a, b) => a + b, 0) / heads.length;
+    headStability = Math.sqrt(heads.reduce((a, b) => a + (b - mean) ** 2, 0) / heads.length) * 100;
+  }
 
   return {
-    releaseTime: (e.release - e.strideStart) / seq.fps,
-    strideRatio: Math.abs(kp(plant, "lAnkle").x - kp(plant, "rAnkle").x) / h,
-    frontKnee: jointAngle(kp(plant, "lHip"), kp(plant, "lKnee"), kp(plant, "lAnkle")),
+    releaseTime: strideSeen(e) ? (e.release - e.strideStart) / seq.fps : undefined,
+    strideRatio: found ? Math.abs(kp(plant, "lAnkle").x - kp(plant, "rAnkle").x) / h : undefined,
+    frontKnee: found ? jointAngle(kp(plant, "lHip"), kp(plant, "lKnee"), kp(plant, "lAnkle")) : undefined,
     hipShoulderSep: extras.hipShoulderSep,
     sequenceGap: extras.sequenceGapS !== undefined ? extras.sequenceGapS * 1000 : undefined,
     elbowHeight: (kp(rel, "rElbow").y - kp(rel, "rShoulder").y) * 100,
     elbowAngle: jointAngle(kp(rel, "rShoulder"), kp(rel, "rElbow"), kp(rel, "rWrist")),
     releaseHeight: kp(rel, "rWrist").y / h,
     trunkTilt: tilt,
-    headStability: sd * 100,
+    headStability,
   };
 }
 

@@ -76,6 +76,8 @@ export function parseThrows(j: Json): ThrowAnalysis {
     warnings: (j.warnings as string[]) ?? [],
     // スロー再生の倍率を入れる前に書き出した結果にはないので、等速とみなす
     slowmo: Number(j.slowmo ?? 1),
+    // 投げ始めを入れる前に書き出した結果にはないので、自動・不明とみなす
+    approachMode: (j.approachMode as ThrowAnalysis["approachMode"] | undefined) ?? "auto",
     reps: (j.reps as Json[]).map(
       (r): ThrowRep => ({
         index: Number(r.index),
@@ -85,6 +87,7 @@ export function parseThrows(j: Json): ThrowAnalysis {
         events: r.events as ThrowRep["events"],
         phases: r.phases as ThrowRep["phases"],
         metrics: r.metrics as ThrowRep["metrics"],
+        approach: r.approach as ThrowRep["approach"],
         sequence: toSequence(r.sequence as Json),
       }),
     ),

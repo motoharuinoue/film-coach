@@ -79,7 +79,8 @@ def detect_events(seq: PoseSequence) -> Events:
 
     1. リリース：投げる手首が最も速い瞬間
     2. 接地：さかのぼって、前足（左）が前へ身長の MIN_STRIDE 倍以上動いた区間の、最後のフレームの次
-    3. ステップ：さらにさかのぼって、前足が前へ動き始めたフレーム
+    3. ステップ：さらにさかのぼって、前足が前へ動き始めたフレーム。見つからなければ、ステップと接地を
+       リリースと同じフレームにする（ステップの長さ 0 ＝ 見つからない。stride_found）
     4. セット：その前で、骨盤が後ろへ下がっていた（ドロップ）最後のフレームの次。ドロップがなければ 0
     5. フォロースルー：手首の速さがピークの 45% を下回る
     """
@@ -99,7 +100,7 @@ def detect_events(seq: PoseSequence) -> Events:
     limit = max(0, release - js_round(STRIDE_SEARCH_S * fps))
     ankle_x = [kp(f, "lAnkle").x for f in frames]
     plant = release
-    stride_start = max(0, release - 1)
+    stride_start = release
     # さかのぼって、前足が前へ動いていた区間を探す。短すぎる動き（軸足のひねりなど）は飛ばして、さらにさかのぼる
     i = release
     while i > limit:
@@ -127,6 +128,16 @@ def detect_events(seq: PoseSequence) -> Events:
     if follow_start < 0:
         follow_start = min(last, release + 3)
     return Events(set_start, stride_start, plant, release, follow_start, last)
+
+
+def stride_found(e: Events) -> bool:
+    """ステップが見つかったか。見つからなければ、ステップと接地がリリースと同じフレームになっている"""
+    return e.plant > e.stride_start
+
+
+def stride_seen(e: Events) -> bool:
+    """ステップの始まりが区間の中に映っているか。区間の最初から前足が動いていれば、始まりは映っていない"""
+    return stride_found(e) and e.stride_start > 0
 
 
 def to_phases(e: Events) -> list[Phase]:

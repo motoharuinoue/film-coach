@@ -3,11 +3,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadLocalReferences, type LocalLibrary } from "../../application/localReferences";
-import { NEUTRAL_MANUAL, weighReferences, type ReferenceWeights } from "../../application/references";
+import { NEUTRAL_MANUAL, weighByApproach, weighReferences, zoneSetOf, type ReferenceWeights } from "../../application/references";
 import type { Reference } from "../../domain/entities";
-import type { Zones } from "../../domain/judgement";
+import { EMPTY_ZONE_SET, type ZoneSet, type Zones } from "../../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, type MetricKey, type MetricValues } from "../../domain/metrics";
 import type { LocalReference } from "../../domain/reference";
+import type { ApproachGroup } from "../../domain/throws";
 import type { ManualAdjust } from "../../domain/weighting";
 import { useAnalyzer } from "./analyzer";
 import { useBenchmarks, useCoach } from "./benchmarks";
@@ -17,6 +18,8 @@ export type LibraryView = {
   refs: Reference[];
   weights: ReferenceWeights;
   zones: Zones;
+  /** 投げ始めごとの重みと分布（手元のお手本だけ。デモの合成データは投げ始めを持たない） */
+  byApproach?: Record<ApproachGroup, ReferenceWeights>;
   manual: Record<string, ManualAdjust>;
   update: (id: string, patch: Partial<ManualAdjust>) => void;
   reset: () => void;
@@ -49,10 +52,11 @@ export function useDemoLibrary(): LibraryView {
 
 const same = (a: ManualAdjust, b: ManualAdjust) => a.pinned === b.pinned && a.excluded === b.excluded && a.stars === b.stars;
 
-/** 自分の投球の判定に使う、手元のお手本のゾーン。お手本がなければ zones は空 */
-export function useReferenceZones(): { zones: Zones; refCount: number; loading: boolean } {
+/** 自分の投球の判定に使う、手元のお手本のゾーン一式。お手本がなければ空 */
+export function useReferenceZones(): { zoneSet: ZoneSet; refCount: number; loading: boolean } {
   const { view, loading } = useLocalLibrary();
-  return { zones: view?.zones ?? {}, refCount: view?.refs.length ?? 0, loading };
+  const zoneSet = view?.byApproach ? zoneSetOf(view.weights, view.byApproach) : EMPTY_ZONE_SET;
+  return { zoneSet, refCount: view?.refs.length ?? 0, loading };
 }
 
 /** 手元のお手本。解析サービスにつながっていなければ view は undefined */
@@ -82,6 +86,7 @@ export function useLocalLibrary(): { view?: LibraryView; loading: boolean; error
   }, [status, load]);
 
   const weights = useMemo(() => (library ? weighReferences(library.refs, manual) : undefined), [library, manual]);
+  const byApproach = useMemo(() => (library ? weighByApproach(library.refs, manual) : undefined), [library, manual]);
 
   const update = useCallback(
     (id: string, patch: Partial<ManualAdjust>) => {
@@ -97,13 +102,14 @@ export function useLocalLibrary(): { view?: LibraryView; loading: boolean; error
     for (const [id, m] of Object.entries(manual)) if (!same(m, NEUTRAL_MANUAL)) update(id, NEUTRAL_MANUAL);
   }, [manual, update]);
 
-  if (!library || !weights) return { loading: status === "online" && !error, error };
+  if (!library || !weights || !byApproach) return { loading: status === "online" && !error, error };
   const records = Object.fromEntries(library.records.map((r) => [r.id, r]));
   const view: LibraryView = {
     source: "local",
     refs: library.refs,
     weights,
     zones: weights.zones,
+    byApproach,
     manual,
     update,
     reset,

@@ -2,8 +2,9 @@
 // お手本ごとの内訳はレップの平均で返す。
 
 import type { Reference } from "../domain/entities";
-import type { Zones } from "../domain/judgement";
+import type { ZoneSet, Zones } from "../domain/judgement";
 import { METRICS, type MetricKey } from "../domain/metrics";
+import { APPROACH_GROUPS, type ApproachGroup } from "../domain/throws";
 import { computeWeights, type ManualAdjust, type WeightParts } from "../domain/weighting";
 
 export type PartsByMetric = Partial<Record<MetricKey, WeightParts>>;
@@ -49,4 +50,22 @@ export function weighReferences(refs: Reference[], manual: Record<string, Manual
     overall[r.id] = ids.reduce((a, id) => a + (result.overall[id] ?? 0), 0) / Math.max(1, ids.length);
   }
   return { zones: result.zones, parts, overall, samples: result.parts };
+}
+
+/**
+ * 投げ始めごとの重みと分布。投げ始めが同じレップだけで重み付けする（合意度 K も、同じ投げ始めの中で見る）。
+ * 投げ始めの分からないレップと、デモの合成データ（投げ始めを持たない）は入らない
+ */
+export function weighByApproach(refs: Reference[], manual: Record<string, ManualAdjust>): Record<ApproachGroup, ReferenceWeights> {
+  const of = (g: ApproachGroup) =>
+    weighReferences(
+      refs.map((r) => ({ ...r, reps: r.reps.filter((rep) => rep.approach === g) })).filter((r) => r.reps.length > 0),
+      manual,
+    );
+  return { drop: of("drop"), standing: of("standing") };
+}
+
+/** 判定に使うゾーン一式（全部のお手本と、投げ始めごと） */
+export function zoneSetOf(all: ReferenceWeights, byApproach: Record<ApproachGroup, ReferenceWeights>): ZoneSet {
+  return { all: all.zones, byApproach: Object.fromEntries(APPROACH_GROUPS.map((g) => [g, byApproach[g].zones])) as ZoneSet["byApproach"] };
 }

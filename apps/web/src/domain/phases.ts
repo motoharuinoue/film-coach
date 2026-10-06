@@ -48,7 +48,8 @@ function velocityX(xs: number[], fps: number): number[] {
  * （実際の映像では、カメラから遠い足ほど画面の上に映り、高さで接地を判定できないため）。
  * 1. リリース：投げる手首が最も速い瞬間
  * 2. 接地：さかのぼって、前足（左）が前へ身長の MIN_STRIDE 倍以上動いた区間の、最後のフレームの次
- * 3. ステップ：さらにさかのぼって、前足が前へ動き始めたフレーム
+ * 3. ステップ：さらにさかのぼって、前足が前へ動き始めたフレーム。見つからなければ、ステップと接地を
+ *    リリースと同じフレームにする（ステップの長さ 0 ＝ 見つからない。strideFound）
  * 4. セット：その前で、骨盤が後ろへ下がっていた（ドロップ）最後のフレームの次。ドロップがなければ 0
  * 5. フォロースルー：手首の速さがピークの 45% を下回る
  */
@@ -66,7 +67,7 @@ export function detectEvents(seq: PoseSequence): Events {
   const limit = Math.max(0, release - Math.round(STRIDE_SEARCH_S * fps));
   const ankleX = frames.map((f) => kp(f, "lAnkle").x);
   let plant = release;
-  let strideStart = Math.max(0, release - 1);
+  let strideStart = release;
   // さかのぼって、前足が前へ動いていた区間を探す。短すぎる動き（軸足のひねりなど）は飛ばして、さらにさかのぼる
   let i = release;
   while (i > limit) {
@@ -94,6 +95,16 @@ export function detectEvents(seq: PoseSequence): Events {
   let followStart = frames.findIndex((_, k) => k > release && wristSpeed[k]! < peak * 0.45);
   if (followStart < 0) followStart = Math.min(last, release + 3);
   return { setStart, strideStart, plant, release, followStart, last };
+}
+
+/** ステップが見つかったか。見つからなければ、ステップと接地がリリースと同じフレームになっている */
+export function strideFound(e: Events) {
+  return e.plant > e.strideStart;
+}
+
+/** ステップの始まりが区間の中に映っているか。区間の最初から前足が動いていれば、始まりは映っていない */
+export function strideSeen(e: Events) {
+  return strideFound(e) && e.strideStart > 0;
 }
 
 export function toPhases(e: Events): Phase[] {

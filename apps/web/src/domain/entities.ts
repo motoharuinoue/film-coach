@@ -4,6 +4,7 @@ import type { CameraAngle } from "./camera";
 import type { MetricValues } from "./metrics";
 import type { Events, Phase } from "./phases";
 import type { PoseSequence } from "./pose";
+import type { Approach } from "./throws";
 import type { ReferenceStats } from "./weighting";
 
 export type Player = {
@@ -27,6 +28,8 @@ export type AnalyzedRep = {
   phases: Phase[];
   metrics: MetricValues;
   rotation: RotationCurve[];
+  /** 投げ始め（手元のお手本だけ。デモの合成データは持たない） */
+  approach?: Approach;
 };
 
 export type SessionKind = "drill" | "game";
