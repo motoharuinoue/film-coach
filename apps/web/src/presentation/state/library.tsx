@@ -49,6 +49,12 @@ export function useDemoLibrary(): LibraryView {
 
 const same = (a: ManualAdjust, b: ManualAdjust) => a.pinned === b.pinned && a.excluded === b.excluded && a.stars === b.stars;
 
+/** 自分の投球の判定に使う、手元のお手本のゾーン。お手本がなければ zones は空 */
+export function useReferenceZones(): { zones: Zones; refCount: number; loading: boolean } {
+  const { view, loading } = useLocalLibrary();
+  return { zones: view?.zones ?? {}, refCount: view?.refs.length ?? 0, loading };
+}
+
 /** 手元のお手本。解析サービスにつながっていなければ view は undefined */
 export function useLocalLibrary(): { view?: LibraryView; loading: boolean; error?: string; library?: LocalLibrary } {
   const { lib, status } = useAnalyzer();

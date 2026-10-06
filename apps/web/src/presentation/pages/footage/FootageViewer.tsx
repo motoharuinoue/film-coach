@@ -11,6 +11,7 @@ import { Badge, Button, Card, PageHeader, SectionTitle, Toggle } from "../../com
 import { PageGuide } from "../../guide/PageGuide";
 import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
+import { useReferenceZones } from "../../state/library";
 import { AnalyzerGate } from "./AnalyzerGate";
 import { RegisterReference } from "./RegisterReference";
 import { ThrowPanel } from "./ThrowPanel";
@@ -23,6 +24,8 @@ function Viewer() {
   const [error, setError] = useState<string>();
   const [layers, setLayers] = useState<Layers>({ box: true, skeleton: true, focus: false });
   const { profile } = useServices();
+  // お手本の映像そのものは判定しない（自分の映像だけ、お手本の分布と比べる）
+  const refZones = useReferenceZones();
   const [throws, setThrows] = useState<ThrowAnalysis>();
   const [throwsBusy, setThrowsBusy] = useState(false);
   const [throwsError, setThrowsError] = useState<string>();
@@ -151,6 +154,8 @@ function Viewer() {
           analysis={throws}
           heightCm={footage.source === "youtube" ? Math.round((throws?.heightM ?? DEFAULT_PLAYER_HEIGHT_CM / 100) * 100) : profile.heightCm()}
           forReference={footage.source === "youtube"}
+          zones={footage.source === "youtube" ? undefined : refZones.zones}
+          refCount={footage.source === "youtube" ? 0 : refZones.refCount}
           busy={throwsBusy}
           error={throwsError}
           frame={frame}

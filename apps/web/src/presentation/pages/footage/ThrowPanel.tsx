@@ -1,13 +1,16 @@
 // 投球の解析：身長を入れて投球を見つけ、投球ごとのフェーズと QB 指標を出す。
-// 判定（良好・要改善）は、お手本の分布ができる M2 で出す。いまは値と、その意味を示す。
+// 手元のお手本があれば、その分布（お手本ゾーン）で「良好・注意・要改善」を判定する（M2-3）。
 
 import { IconAlertTriangle, IconLoader2, IconRefresh, IconRulerMeasure, IconTarget } from "@tabler/icons-react";
 import { useState } from "react";
 import { CAMERA_LABEL, type CameraAngle } from "../../../domain/camera";
 import { formatMetric, invalidReason, isValidFor, METRICS } from "../../../domain/metrics";
 import { HEIGHT_CM, isValidHeightCm, releaseFrame, spread, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
-import { PhaseBar } from "../../components/charts";
-import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, cx } from "../../components/ui";
+import { judgeMetrics, MIN_JUDGED_FOR_SCORE, type ThrowJudgement } from "../../../application/judgeThrows";
+import { judge, type Zones } from "../../../domain/judgement";
+import { PhaseBar, ZoneBar } from "../../components/charts";
+import { Link } from "react-router";
+import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, StatusPill, cx } from "../../components/ui";
 
 /** 投球を測れる角度。エンドゾーン・サイドラインからの試合映像は M4 で扱う */
 const ANGLES: CameraAngle[] = ["side", "behind", "front"];
@@ -96,7 +99,7 @@ function RepPicker({ analysis, selected, fps, onPick }: { analysis: ThrowAnalysi
   );
 }
 
-function MetricGrid({ analysis, rep }: { analysis: ThrowAnalysis; rep: ThrowRep }) {
+function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: ThrowRep; zones: Zones }) {
   const measured = METRICS.filter((d) => rep.metrics[d.key] !== undefined);
   const unmeasured = METRICS.filter((d) => rep.metrics[d.key] === undefined);
   return (
@@ -104,10 +107,26 @@ function MetricGrid({ analysis, rep }: { analysis: ThrowAnalysis; rep: ThrowRep 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {measured.map((d) => {
           const s = spread(analysis, d.key);
+          const zone = zones[d.key];
+          const status = judge(rep.metrics[d.key], zone);
           return (
-            <div key={d.key} className="rounded-xl border border-line bg-white/[0.02] p-3">
-              <div className="text-[11px] text-muted">{d.label}</div>
+            <div key={d.key} className={cx("rounded-xl border bg-white/[0.02] p-3", status === "flag" ? "border-flag/30" : status === "caution" ? "border-caution/25" : "border-line")}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[11px] text-muted">{d.label}</div>
+                {zone && <StatusPill status={status} className="shrink-0" />}
+              </div>
               <div className="mt-1 font-display text-2xl leading-none">{formatMetric(d.key, rep.metrics[d.key])}</div>
+              {zone ? (
+                <div className="mt-2 space-y-1">
+                  <ZoneBar zone={zone} value={rep.metrics[d.key]} />
+                  <div className="font-mono text-[10px] text-ice">
+                    お手本ゾーン {zone.p25.toFixed(d.digits)}〜{zone.p75.toFixed(d.digits)}
+                    {d.unit}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-[10px] text-faint">判定不可：この指標を測れるお手本が 2 本以上必要です</p>
+              )}
               <p className="mt-2 text-[11px] leading-relaxed text-faint">{d.hint}</p>
               {s && (
                 <p className="mt-1 font-mono text-[11px] text-muted">
@@ -131,9 +150,27 @@ function MetricGrid({ analysis, rep }: { analysis: ThrowAnalysis; rep: ThrowRep 
   );
 }
 
+function ScoreLine({ judgement, refCount }: { judgement: ThrowJudgement; refCount: number }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-white/[0.02] px-4 py-3">
+      <div>
+        <div className="text-[11px] text-muted">お手本との一致</div>
+        <div className="font-display text-3xl leading-none text-turf">{judgement.score ?? "—"}</div>
+      </div>
+      <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">
+        {judgement.score !== undefined
+          ? `お手本 ${refCount} 本の分布（重み付き）で、判定できた ${judgement.judged} 指標の点数の平均です。四分位の内側を満点にし、外れるほど下げます。`
+          : `判定できた指標が ${judgement.judged} 個で、点数を出すには ${MIN_JUDGED_FOR_SCORE} 個以上必要です。同じ角度で撮ったお手本を増やしてください。`}
+      </p>
+    </div>
+  );
+}
+
 export function ThrowPanel({
   analysis,
   heightCm,
+  zones = {},
+  refCount = 0,
   forReference = false,
   busy,
   error,
@@ -146,6 +183,10 @@ export function ThrowPanel({
 }: {
   analysis?: ThrowAnalysis;
   heightCm?: number;
+  /** 判定に使う、手元のお手本のゾーン */
+  zones?: Zones;
+  /** 手元のお手本の数 */
+  refCount?: number;
   /** YouTube から取り込んだお手本の映像か（身長はお手本の選手のもので、自分の身長としては保存しない） */
   forReference?: boolean;
   busy: boolean;
@@ -212,7 +253,8 @@ export function ThrowPanel({
               onSeek={(f) => onSeekFrame(rep.start + f)}
             />
           </div>
-          <MetricGrid analysis={analysis} rep={rep} />
+          {refCount > 0 && <ScoreLine judgement={judgeMetrics(rep.metrics, zones)} refCount={refCount} />}
+          <MetricGrid analysis={analysis} rep={rep} zones={zones} />
         </>
       )}
 
@@ -240,7 +282,14 @@ export function ThrowPanel({
         />
       )}
       {error && <p className="text-xs text-flag">{error}</p>}
-      <DemoNote>お手本との比較と判定（良好・要改善）は、お手本ライブラリ（M2）でお手本の分布ができたら出します。</DemoNote>
+      {refCount === 0 && !forReference && (
+        <DemoNote>
+          お手本を登録すると、お手本の分布（重み付き）で「良好・注意・要改善」を判定します。
+          <Link to="/references/search" className="ml-1 text-ice underline">
+            お手本を探す
+          </Link>
+        </DemoNote>
+      )}
     </Card>
   );
 }

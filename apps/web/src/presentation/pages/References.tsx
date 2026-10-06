@@ -382,7 +382,7 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
             </div>
             <div>
               <dt className="text-xs text-muted">今回のあなた</dt>
-              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${def.unit}` : view.source === "local" ? "自分の映像とは次の段階で比べます" : "判定不可"}</dd>
+              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${def.unit}` : view.source === "local" ? "「見る」・練習の画面で比べます" : "判定不可"}</dd>
             </div>
           </dl>
         </div>
