@@ -70,7 +70,7 @@ export function RegisterReference({ footage, throws }: { footage: Footage; throw
           />
           <div>
             <Toggle on={trusted} onChange={setTrusted} tone="ice">
-              信頼するチャンネル（発信者 C に加点）
+              信頼するチャンネル（チャンネル C に加点）
             </Toggle>
           </div>
           <Button variant="primary" className="w-full" disabled={busy} onClick={register}>

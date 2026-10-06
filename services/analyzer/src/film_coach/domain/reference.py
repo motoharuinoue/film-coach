@@ -1,7 +1,7 @@
 """お手本：YouTube から取り込み、お手本の選手を追跡して投球を解析した映像を、判定の基準として登録したもの。
 
 重み（P × C × Q × K × M、ADR-0006）の計算は画面（apps/web/src/domain/weighting.ts）で行う。
-ここでは、その材料（YouTube の統計・発信者の信頼・手動調整）と、元になった映像を持つ。
+ここでは、その材料（YouTube の統計・チャンネルの信頼・手動調整）と、元になった映像を持つ。
 """
 
 from __future__ import annotations

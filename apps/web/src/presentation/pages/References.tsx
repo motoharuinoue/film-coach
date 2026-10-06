@@ -51,7 +51,7 @@ export function References() {
     <div className="space-y-6">
       <PageHeader
         title="お手本ライブラリ"
-        sub="YouTube のお手本を取り込み、人気度・発信者・解析品質・合意度・手動調整で重み付けします"
+        sub="YouTube のお手本を取り込み、人気度・チャンネル・解析品質・一致度・手動調整で重み付けします"
         right={
           <span className="flex flex-wrap items-center gap-2">
             {analyzer.status === "online" && (
@@ -307,7 +307,7 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
               : imprecise && !r.reps.some((x) => x.metrics[metric] !== undefined && !isImprecise(metric, x.uncertainty?.[metric]))
                 ? `${def.at === "plant" ? "接地" : "リリース"}の瞬間の前後で値が ±${imprecise.uncertainty![metric]!.toFixed(def.digits)}${def.unit} 変わる（関節の取り違えや fps の不足）ため、「${def.short}」には使っていません。`
               : parts && parts.K < 0.35
-              ? `「${def.short}」の値が他のお手本から大きく外れているため、合意度 K で重みを下げています。`
+              ? `「${def.short}」の値が他のお手本から大きく外れているため、一致度 K で重みを下げています。`
               : `${CAMERA_LABEL[r.stats.camera]}の映像で、「${def.short}」の判定に使っています。`}
         </p>
       </div>

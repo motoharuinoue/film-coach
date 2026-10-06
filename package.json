@@ -1,6 +1,7 @@
 {
   "name": "film-coach",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "apps/*"
   ],

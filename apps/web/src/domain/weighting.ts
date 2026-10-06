@@ -34,7 +34,7 @@ export function popularity(s: Pick<ReferenceStats, "views" | "likes">) {
   return { P: 0.3 + 0.7 * Math.sqrt(rateScore * viewScore), bayesRate: rate };
 }
 
-/** 発信者：登録者数（対数）。信頼チャンネルは 1.25 倍（上限 1） */
+/** チャンネル：登録者数（対数）。信頼チャンネルは 1.25 倍（上限 1） */
 export function creator(s: Pick<ReferenceStats, "subscribers" | "trustedChannel">) {
   const base = 0.4 + 0.6 * clamp01(Math.log10(Math.max(1, s.subscribers)) / 6.5);
   return Math.min(1, base * (s.trustedChannel ? 1.25 : 1));
@@ -80,7 +80,7 @@ export function weightedQuantile(values: number[], weights: number[], q: number)
   return pairs[pairs.length - 1]!.v;
 }
 
-/** 合意度：重み付き中央値と MAD によるロバスト z。z が大きいほどコーシー型で重みを下げる */
+/** 一致度（他のお手本との一致）：重み付き中央値と MAD によるロバスト z。z が大きいほどコーシー型で重みを下げる */
 export function consensus(values: (number | undefined)[], baseWeights: number[]): number[] {
   const idx = values.map((v, i) => (v === undefined || baseWeights[i] === 0 ? -1 : i)).filter((i) => i >= 0);
   if (idx.length < 3) return values.map(() => 1);

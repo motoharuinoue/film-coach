@@ -73,6 +73,12 @@ def _preview(dest_dir: Path, info: VideoInfo, label: str) -> FrameSink:
     )
 
 
+def _anonymizer(dest: Path, info: VideoInfo) -> FrameSink:
+    from .infrastructure.video_cv import AnonymizedVideoWriter
+
+    return AnonymizedVideoWriter(dest, info)
+
+
 def _write_track(tt: TargetTrack, dest: Path) -> None:
     from .infrastructure.json_track import write_track
 
@@ -146,6 +152,7 @@ def cli_deps() -> CliDeps:
         serve=_serve,
         read_track=_read_track,
         write_throws=_write_throws,
+        anonymizer=_anonymizer,
         shots=_shots,
         motion=_motion,
     )

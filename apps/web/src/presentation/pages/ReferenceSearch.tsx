@@ -1,4 +1,4 @@
-// お手本を探す：YouTube Data API で候補を探し、人気度（P）と発信者（C）の見込みを添えて並べる。
+// お手本を探す：YouTube Data API で候補を探し、人気度（P）とチャンネル（C）の見込みを添えて並べる。
 // 気に入った候補は、埋め込みプレイヤーで確かめてから、区間だけを取り込む（ADR-0005）。
 // 取り込んだ映像は、お手本の選手を選んで追跡し、投球を解析すると、「見る」画面でお手本として登録できる。
 
@@ -103,7 +103,7 @@ function CandidateCard({ c, open, onOpen }: { c: YouTubeCandidate; open: boolean
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <Bar label="P 人気度" value={P} hint="高評価率（件数の少ない動画で偏らないようベイズ平均で補正）と再生数" />
-          <Bar label="C 発信者" value={C} hint="チャンネル登録者数（対数）" />
+          <Bar label="C チャンネル" value={C} hint="チャンネル登録者数（対数）" />
         </div>
       </div>
     </button>

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 from ..application.analyze_pose import RepAnalysis, analyze_pose
+from ..application.anonymize import TrackMismatchError, anonymize_video
 from ..application.ports import AnalysisWriter, ModelStore, PoseSequenceReader
 from ..application.throws import ThrowAnalysis, analyze_throws
 from ..application.track_target import (
@@ -49,6 +50,8 @@ class CliDeps:
     """HTTP の解析サービスを起動する"""
     read_track: Callable[[Path], TargetTrack]
     write_throws: Callable[[ThrowAnalysis, Path], None]
+    anonymizer: Callable[[Path, VideoInfo], FrameSink] | None = None
+    """本人以外と顔をぼかした動画（公開用）の書き出し先"""
     shots: Callable[[], ShotBoundaryDetector] | None = None
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
     motion: Callable[[], CameraMotionEstimator] | None = None
@@ -97,6 +100,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="投げ始め（drop：ドロップから、standing：その場から）。既定は骨格から見分ける",
     )
     w.add_argument("--out", type=Path, help="書き出し先（既定は track.json と同じフォルダの throws.json）")
+
+    n = sub.add_parser("anonymize", help="公開用に、追跡した本人以外と顔をぼかした動画を書き出す（元の動画は変えない）")
+    n.add_argument("video", type=Path, help="元の動画")
+    n.add_argument("--track", type=Path, required=True, help="その動画の追跡結果（track.json）")
+    n.add_argument("--out", type=Path, required=True, help="書き出し先（mp4）")
 
     s = sub.add_parser("serve", help="画面から使う HTTP の解析サービスを起動する（127.0.0.1 だけで待ち受ける）")
     s.add_argument("--port", type=int, default=8787)
@@ -173,6 +181,19 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
     if args.command == "serve":
         out.write(f"解析サービスを起動します：http://127.0.0.1:{args.port}/api/health\n")
         deps.serve("127.0.0.1", args.port)
+        return 0
+
+    if args.command == "anonymize":
+        if deps.anonymizer is None:
+            out.write("動画を書き出す仕組みがありません\n")
+            return 1
+        try:
+            video = deps.open_video(args.video)
+            n = anonymize_video(video, deps.read_track(args.track), deps.anonymizer(args.out, video.info()))
+        except TrackMismatchError as e:
+            out.write(f"{e}\n")
+            return 1
+        out.write(f"本人以外と顔をぼかした動画を書き出しました：{args.out}（{n} フレーム）\n")
         return 0
 
     if args.command == "throws":
