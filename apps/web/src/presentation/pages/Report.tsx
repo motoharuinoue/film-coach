@@ -13,7 +13,7 @@ const AXES: RadarAxis[] = ["footwork", "base", "rotation", "armPath", "release",
 
 export function Report() {
   const { session, rep } = useSessionRep();
-  const { coach, bench } = useCoach();
+  const { coach, bench, source } = useCoach();
   const [copied, setCopied] = useState(false);
   const player = coach.player();
   const findings = coach.findings(rep, session.camera, bench);
@@ -63,7 +63,8 @@ export function Report() {
             <h1 className="mt-2 text-3xl leading-tight font-semibold md:text-4xl">{hero ? `${hero.title}。ここを直せば投球がつながる` : "大きな崩れはありません"}</h1>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
               <span>
-                {player.name} #{player.number}（{player.position}）
+                {player.name ?? "あなた"}
+                {player.number !== undefined && ` #${player.number}`}（{player.position}）
               </span>
               <span>
                 {formatDate(session.date)} {session.title} · {repLabel(rep.index)}
@@ -205,7 +206,8 @@ export function Report() {
           </section>
 
           <footer className="border-t border-line pt-5 text-[11px] leading-relaxed text-faint">
-            判定はルールエンジン、文章はテンプレートで作成しています（M3 でローカル LLM による文章化を追加。数値は判定結果からだけ取ります）。単眼 2D 映像による推定のため、角度・距離には誤差があります。チャンネル・動画・選手はすべて架空のデモデータです。
+            判定はルールエンジン、文章はテンプレートで作成しています（M3 でローカル LLM による文章化を追加。数値は判定結果からだけ取ります）。単眼 2D 映像による推定のため、角度・距離には誤差があります。
+            {source === "demo" ? "チャンネル・動画・選手はすべて架空のデモデータです。" : "お手本は YouTube から取り込んだ区間で、元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。"}
           </footer>
         </div>
       </article>

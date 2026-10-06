@@ -2,17 +2,21 @@
 
 import type { CameraAngle } from "../domain/camera";
 import type { AnalyzedRep, BestRep, Session } from "../domain/entities";
-import { evaluateMetric, type MetricEvaluation, type Zones } from "../domain/judgement";
+import { evaluateMetric, zonesFor, type MetricEvaluation, type ZoneSet } from "../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey, type RadarAxis } from "../domain/metrics";
 import { releasePoint, releaseSpread } from "../domain/practice";
 
+// お手本ゾーンは、レップの投げ始めに合うものを使う（投げ始めで意味が変わる指標は、投げ始めが同じお手本だけ。zonesFor）
+
 /** 各指標を、自分の値・自己ベスト・お手本ゾーンで評価する。カメラ角度で測れない指標は判定不可 */
-export function evaluateRep(rep: AnalyzedRep, camera: CameraAngle, zones: Zones, best?: AnalyzedRep): MetricEvaluation[] {
+export function evaluateRep(rep: AnalyzedRep, camera: CameraAngle, set: ZoneSet, best?: AnalyzedRep): MetricEvaluation[] {
+  const zones = zonesFor(set, rep.approach);
   return METRICS.map((d) => evaluateMetric(d.key, isValidFor(d, camera) ? rep.metrics[d.key] : undefined, best?.metrics[d.key], zones[d.key]));
 }
 
 /** レップのスコア：判定できた指標のスコアの平均 */
-export function repScore(rep: AnalyzedRep, zones: Zones) {
+export function repScore(rep: AnalyzedRep, set: ZoneSet) {
+  const zones = zonesFor(set, rep.approach);
   const scores = METRICS.map((d) => evaluateMetric(d.key, rep.metrics[d.key], undefined, zones[d.key]).score).filter((v): v is number => v !== undefined);
   return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
 }
@@ -20,18 +24,18 @@ export function repScore(rep: AnalyzedRep, zones: Zones) {
 /** 判定できる指標がこれより少ないセッション（試合映像など）はスコアを出さない */
 export const MIN_METRICS_FOR_SCORE = 5;
 
-export function sessionScore(s: Session, zones: Zones): number | undefined {
-  if (METRICS.filter((d) => isValidFor(d, s.camera)).length < MIN_METRICS_FOR_SCORE) return undefined;
-  return Math.round(s.reps.reduce((a, r) => a + repScore(r, zones), 0) / s.reps.length);
+export function sessionScore(s: Session, set: ZoneSet): number | undefined {
+  if (METRICS.filter((d) => isValidFor(d, s.camera)).length < MIN_METRICS_FOR_SCORE || s.reps.length === 0) return undefined;
+  return Math.round(s.reps.reduce((a, r) => a + repScore(r, set), 0) / s.reps.length);
 }
 
 /** 自己ベスト：対象セッションより前の、スコアを出せるセッションで最も高いレップ */
-export function selectBestRep(sessions: Session[], excludeSessionId: string, zones: Zones): BestRep | undefined {
+export function selectBestRep(sessions: Session[], excludeSessionId: string, set: ZoneSet): BestRep | undefined {
   let best: { rep: AnalyzedRep; s: Session; score: number } | undefined;
   for (const s of sessions) {
-    if (s.id === excludeSessionId || sessionScore(s, zones) === undefined) continue;
+    if (s.id === excludeSessionId || sessionScore(s, set) === undefined) continue;
     for (const r of s.reps) {
-      const score = repScore(r, zones);
+      const score = repScore(r, set);
       if (!best || score > best.score) best = { rep: r, s, score };
     }
   }

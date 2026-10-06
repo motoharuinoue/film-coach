@@ -28,8 +28,9 @@ import { CompareView } from "./studio/CompareView";
 type GhostTarget = "none" | "best" | string;
 
 function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) {
-  const { coach, bench } = useCoach();
-  const { zones } = bench;
+  const { coach, bench, source } = useCoach();
+  // 投げ始めで意味が変わる指標は、投げ始めが同じお手本のゾーン
+  const zones = coach.zonesOf(rep, bench);
   const pb = usePlayback(rep.seq.frames.length, rep.seq.fps, { initialRate: 0.25 });
   const [layers, setLayers] = useState({ skeleton: true, angles: true, trail: true });
   const [ghostTarget, setGhostTarget] = useState<GhostTarget>("best");
@@ -178,28 +179,34 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
             <Card className="p-4">
               <SectionTitle
                 right={
-                  <span className="flex gap-3 text-[11px] text-muted">
-                    <span style={{ color: "#1f7a52" }}>■ 骨盤</span>
-                    <span style={{ color: "#2EE59D" }}>■ 体幹</span>
-                    <span style={{ color: "#FF7A1A" }}>■ 腕</span>
-                  </span>
+                  curves.length >= 3 && (
+                    <span className="flex gap-3 text-[11px] text-muted">
+                      <span style={{ color: "#1f7a52" }}>■ 骨盤</span>
+                      <span style={{ color: "#2EE59D" }}>■ 体幹</span>
+                      <span style={{ color: "#FF7A1A" }}>■ 腕</span>
+                    </span>
+                  )
                 }
               >
                 キネマティックシーケンス（°/s）
               </SectionTitle>
-              <TimeChart
-                frame={pb.frame}
-                onSeek={pb.seek}
-                markers={markers}
-                series={[
-                  { label: "骨盤", values: curves[0]!.values, color: "#1f7a52", width: 2.5 },
-                  { label: "体幹", values: curves[1]!.values, color: "#2EE59D", width: 2.5 },
-                  { label: "腕", values: curves[2]!.values, color: "#FF7A1A", width: 2.5 },
-                ]}
-              />
+              {curves.length >= 3 ? (
+                <TimeChart
+                  frame={pb.frame}
+                  onSeek={pb.seek}
+                  markers={markers}
+                  series={[
+                    { label: "骨盤", values: curves[0]!.values, color: "#1f7a52", width: 2.5 },
+                    { label: "体幹", values: curves[1]!.values, color: "#2EE59D", width: 2.5 },
+                    { label: "腕", values: curves[2]!.values, color: "#FF7A1A", width: 2.5 },
+                  ]}
+                />
+              ) : (
+                <p className="rounded-lg border border-line bg-white/[0.02] px-3 py-6 text-center text-xs text-muted">骨盤・体幹・腕の回転の速さは、横からの 2D の映像では測れません。3D の骨格（M5）で測ります。</p>
+              )}
               <p className="mt-2 text-xs text-muted">
                 骨盤 → 体幹のピーク間隔 <span className="font-mono text-text">{formatMetric("sequenceGap", rep.metrics.sequenceGap)}</span>（お手本{" "}
-                <span className="font-mono text-ice">{zones.sequenceGap ? `${Math.round(zones.sequenceGap.p25)}〜${Math.round(zones.sequenceGap.p75)} ms` : "—"}</span>）。デモでは回転速度を合成しています（M5 の 3D 化で実測）。
+                <span className="font-mono text-ice">{zones.sequenceGap ? `${Math.round(zones.sequenceGap.p25)}〜${Math.round(zones.sequenceGap.p75)} ms` : "—"}</span>）。{source === "demo" ? "デモでは回転速度を合成しています（M5 の 3D 化で実測）。" : ""}
               </p>
             </Card>
             <Card className="p-4">

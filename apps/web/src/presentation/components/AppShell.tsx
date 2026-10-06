@@ -1,11 +1,13 @@
 import { IconBrandGithub, IconBrandYoutube, IconHome, IconMovie, IconRoute } from "@tabler/icons-react";
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 import { NavLink, Outlet, ScrollRestoration, useLocation } from "react-router";
 import { STEPS, type StepKey } from "../guide/content";
 import { TourProvider, useTour } from "../guide/Tour";
-import { useServices } from "../services";
 import { useAnalyzer } from "../state/analyzer";
-import { cx } from "./ui";
+import { useCoach } from "../state/benchmarks";
+import { useDataSource, useLocalData } from "../state/local";
+import { Segmented, cx } from "./ui";
 
 /** パスから、使う流れのどの段階にいるかを決める */
 function stepOf(path: string): StepKey | undefined {
@@ -49,15 +51,46 @@ function SideLink({ to, end, children, active }: { to: string; end?: boolean; ch
   );
 }
 
+/** 表示するデータ（手元の練習かデモ）。手元に練習がなければ「デモデータ（架空）」とだけ出す */
+function DataSourceSwitch() {
+  const ds = useDataSource();
+  if (!ds.available) return <span>デモデータ（架空）</span>;
+  return (
+    <Segmented
+      label="表示するデータ"
+      size="sm"
+      value={ds.source}
+      onChange={ds.setSource}
+      options={[
+        { value: "local", label: "手元の練習" },
+        { value: "demo", label: "デモ" },
+      ]}
+    />
+  );
+}
+
 function Shell() {
   const location = useLocation();
-  const { coach } = useServices();
+  const { coach, source } = useCoach();
+  const { available } = useDataSource();
+  const { reload } = useLocalData();
   const tour = useTour();
   const analyzer = useAnalyzer();
   const player = coach.player();
   const sid = coach.focus().session.id;
   const current = stepOf(location.pathname);
-  const to: Record<StepKey, string> = { import: "/sessions/new", watch: `/sessions/${sid}/studio`, fix: `/sessions/${sid}/report`, keep: "/progress" };
+  // 手元のデータでは、取り込みは「自分の映像」から（新規セッションの画面はデモのシミュレーション）
+  const to: Record<StepKey, string> = { import: source === "local" ? "/footage" : "/sessions/new", watch: `/sessions/${sid}/studio`, fix: `/sessions/${sid}/report`, keep: "/progress" };
+
+  // ほかの画面で解析・登録した結果を映すため、画面を移ったら手元のデータを読み直す（最初は LocalDataProvider が読む）
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    void reload();
+  }, [location.pathname, reload]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
@@ -113,7 +146,12 @@ function Shell() {
               <span className="relative whitespace-nowrap">お手本ライブラリ</span>
             </SideLink>
           </div>
-          {/* 狭い画面ではサイドバーの下部が出ないので、ここにツアーを置く */}
+          {/* 狭い画面ではサイドバーの下部が出ないので、ここに表示するデータとツアーを置く */}
+          {available && (
+            <div className="flex shrink-0 items-center lg:hidden">
+              <DataSourceSwitch />
+            </div>
+          )}
           <button type="button" onClick={tour.start} className="flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-turf lg:hidden">
             <IconRoute size={16} aria-hidden />
             ツアー
@@ -126,16 +164,16 @@ function Shell() {
             使い方ツアー
           </button>
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-turf/30 bg-turf/10 font-display text-turf">#{player.number}</div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-turf/30 bg-turf/10 font-display text-turf">{player.number !== undefined ? `#${player.number}` : player.position}</div>
             <div className="min-w-0 text-xs">
-              <div className="truncate text-sm text-text">{player.name}</div>
+              <div className="truncate text-sm text-text">{player.name ?? "あなた"}</div>
               <div className="text-muted">
                 {player.position} · {player.throws}
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between text-[11px] text-faint">
-            <span>デモデータ（架空）</span>
+          <div className="flex items-center justify-between gap-2 text-[11px] text-faint">
+            <DataSourceSwitch />
             <a href="https://github.com/motoharuinoue/film-coach" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-text" aria-label="GitHub リポジトリ">
               <IconBrandGithub size={14} aria-hidden />
               GitHub

@@ -29,7 +29,11 @@ export function viewOf(practice: Practice, entries: PracticeEntry[]): PracticeVi
 
 /** 練習の映像と投球の解析結果を、まとめた順に読む */
 export async function loadPractice(lib: FootageLibrary, id: string): Promise<PracticeView> {
-  const practice = await lib.practice(id);
+  return viewFor(lib, await lib.practice(id));
+}
+
+/** 読んだ練習の、映像と投球の解析結果を読む */
+export async function viewFor(lib: FootageLibrary, practice: Practice): Promise<PracticeView> {
   const entries = await Promise.all(
     practice.videoIds.map(async (vid): Promise<PracticeEntry> => {
       const footage = await lib.get(vid);

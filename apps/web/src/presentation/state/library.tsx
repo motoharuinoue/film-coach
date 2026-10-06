@@ -1,9 +1,9 @@
 // お手本ライブラリの画面が使う一式：お手本・重み・手動調整・分布に重ねる自分の値。
 // デモ（合成データ、手動調整はブラウザに保存）と、手元のお手本（解析サービス、手動調整も解析サービスに保存）の 2 つがある。
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { loadLocalReferences, type LocalLibrary } from "../../application/localReferences";
-import { NEUTRAL_MANUAL, weighByApproach, weighReferences, zoneSetOf, type ReferenceWeights } from "../../application/references";
+import { useMemo } from "react";
+import type { LocalLibrary } from "../../application/localReferences";
+import { NEUTRAL_MANUAL, zoneSetOf, type ReferenceWeights } from "../../application/references";
 import type { Reference } from "../../domain/entities";
 import { EMPTY_ZONE_SET, type ZoneSet, type Zones } from "../../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, type MetricKey, type MetricValues } from "../../domain/metrics";
@@ -11,7 +11,8 @@ import type { LocalReference } from "../../domain/reference";
 import type { ApproachGroup } from "../../domain/throws";
 import type { ManualAdjust } from "../../domain/weighting";
 import { useAnalyzer } from "./analyzer";
-import { useBenchmarks, useCoach } from "./benchmarks";
+import { useBenchmarks, useDemoCoach } from "./benchmarks";
+import { useLocalData } from "./local";
 
 export type LibraryView = {
   source: "demo" | "local";
@@ -33,7 +34,7 @@ export type LibraryView = {
 };
 
 export function useDemoLibrary(): LibraryView {
-  const { coach, bench } = useCoach();
+  const { coach, bench } = useDemoCoach();
   const { manual, update, reset, changed } = useBenchmarks();
   const { session, rep } = coach.focus();
   return {
@@ -59,74 +60,36 @@ export function useReferenceZones(): { zoneSet: ZoneSet; refCount: number; loadi
   return { zoneSet, refCount: view?.refs.length ?? 0, loading, view };
 }
 
-/** 手元のお手本。解析サービスにつながっていなければ view は undefined */
+/** 手元のお手本（LocalDataProvider が読んだもの）。解析サービスにつながっていなければ view は undefined */
 export function useLocalLibrary(): { view?: LibraryView; loading: boolean; error?: string; library?: LocalLibrary } {
-  const { lib, status } = useAnalyzer();
-  const [library, setLibrary] = useState<LocalLibrary>();
-  const [error, setError] = useState<string>();
-  const [manual, setManual] = useState<Record<string, ManualAdjust>>({});
-  // 続けて変えても、最新の値に重ねて送る
-  const latest = useRef(manual);
-  latest.current = manual;
-
-  const load = useCallback(async () => {
-    if (!lib) return;
-    try {
-      const l = await loadLocalReferences(lib);
-      setLibrary(l);
-      setManual(Object.fromEntries(l.records.map((r) => [r.id, r.manual])));
-      setError(undefined);
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [lib]);
-
-  useEffect(() => {
-    if (status === "online") void load();
-  }, [status, load]);
-
-  const weights = useMemo(() => (library ? weighReferences(library.refs, manual) : undefined), [library, manual]);
-  const byApproach = useMemo(() => (library ? weighByApproach(library.refs, manual) : undefined), [library, manual]);
-
-  const update = useCallback(
-    (id: string, patch: Partial<ManualAdjust>) => {
-      const next = { ...(latest.current[id] ?? NEUTRAL_MANUAL), ...patch };
-      latest.current = { ...latest.current, [id]: next };
-      setManual(latest.current);
-      void lib?.updateReference(id, { manual: next }).catch((e: Error) => setError(e.message));
-    },
-    [lib],
-  );
-
-  const reset = useCallback(() => {
-    for (const [id, m] of Object.entries(manual)) if (!same(m, NEUTRAL_MANUAL)) update(id, NEUTRAL_MANUAL);
-  }, [manual, update]);
-
-  if (!library || !weights || !byApproach) return { loading: status === "online" && !error, error };
-  const records = Object.fromEntries(library.records.map((r) => [r.id, r]));
-  const view: LibraryView = {
-    source: "local",
-    refs: library.refs,
-    weights,
-    zones: weights.zones,
-    byApproach,
-    manual,
-    update,
-    reset,
-    changed: Object.values(manual).some((m) => !same(m, NEUTRAL_MANUAL)),
-    // 自分の映像の値は、次の段階（M2-3）でこの分布と比べる
-    you: () => undefined,
-    local: {
-      records,
-      refresh: async (id) => {
-        await lib!.refreshReference(id);
-        await load();
+  const { lib } = useAnalyzer();
+  const { library, manual, weights, byApproach, update, reset, reload, loading, error } = useLocalData();
+  const view = useMemo((): LibraryView | undefined => {
+    if (!library || !weights || !byApproach) return undefined;
+    return {
+      source: "local",
+      refs: library.refs,
+      weights,
+      zones: weights.zones,
+      byApproach,
+      manual,
+      update,
+      reset,
+      changed: Object.values(manual).some((m) => !same(m, NEUTRAL_MANUAL)),
+      // 自分の映像の値は、「見る」・練習の画面でこの分布と比べる
+      you: () => undefined,
+      local: {
+        records: Object.fromEntries(library.records.map((r) => [r.id, r])),
+        refresh: async (id) => {
+          await lib!.refreshReference(id);
+          await reload();
+        },
+        remove: async (id) => {
+          await lib!.deleteReference(id);
+          await reload();
+        },
       },
-      remove: async (id) => {
-        await lib!.deleteReference(id);
-        await load();
-      },
-    },
-  };
-  return { view, loading: false, error, library };
+    };
+  }, [library, weights, byApproach, manual, update, reset, reload, lib]);
+  return { view, loading: !view && loading, error, library };
 }

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzedRep, Session } from "../domain/entities";
-import type { Zones } from "../domain/judgement";
+import type { ZoneSet, Zones } from "../domain/judgement";
 import { evaluateRep, radarScores, repScore, selectBestRep, sessionScore } from "./evaluation";
 
-const zones: Zones = {
+const zoneValues: Zones = {
   strideRatio: { p10: 0.46, p25: 0.5, p50: 0.52, p75: 0.54, p90: 0.58 },
   hipShoulderSep: { p10: 38, p25: 42, p50: 44, p75: 46, p90: 50 },
 };
+// 投げ始めで分けない指標だけなので、全部のお手本のゾーンで判定される
+const zones: ZoneSet = { all: zoneValues, byApproach: { drop: {}, standing: {} } };
 const rep = (id: string, strideRatio: number, extra: Partial<AnalyzedRep["metrics"]> = {}) => ({ id, index: 0, metrics: { strideRatio, ...extra } }) as AnalyzedRep;
 const session = (id: string, camera: Session["camera"], reps: AnalyzedRep[]) => ({ id, date: `2026-09-0${id.slice(1)}`, camera, reps }) as Session;
 

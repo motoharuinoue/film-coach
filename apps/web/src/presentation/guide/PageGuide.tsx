@@ -3,12 +3,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { Link } from "react-router";
 import { cx } from "../components/ui";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { useServices } from "../services";
+import { useCoach } from "../state/benchmarks";
 import { GUIDES, STEPS, type GuideId } from "./content";
 
 /** 画面の上に出す「この画面でできること」。閉じると「使い方」ボタンだけになる */
 export function PageGuide({ id, sessionId, className }: { id: GuideId; sessionId?: string; className?: string }) {
-  const { coach } = useServices();
+  const { coach } = useCoach();
   const [closed, setClosed] = usePersistentState(`film-coach:guide-closed:${id}`, false);
   const g = GUIDES[id];
   const step = STEPS.find((s) => s.key === g.step);

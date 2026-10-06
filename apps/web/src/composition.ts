@@ -8,15 +8,13 @@ import { BrowserVideoMetadataReader } from "./infrastructure/browser/videoMetada
 import { DemoReferenceRepository, DemoSessionRepository } from "./infrastructure/demo/repositories";
 import { SimulatedAnalysisGateway } from "./infrastructure/demo/simulatedAnalysisGateway";
 import { HttpFootageLibrary } from "./infrastructure/http/httpFootageLibrary";
+import { MemoryReferenceRepository, MemorySessionRepository } from "./infrastructure/memory/repositories";
 import { TemplateFindingWriter } from "./infrastructure/writer/templateFindingWriter";
 
 export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL): Services {
   const sessions = new DemoSessionRepository();
-  const coach = new CoachService({
-    sessions,
-    references: new DemoReferenceRepository(),
-    writer: new TemplateFindingWriter(),
-  });
+  const writer = new TemplateFindingWriter();
+  const coach = new CoachService({ sessions, references: new DemoReferenceRepository(), writer });
   return {
     coach,
     manualStore: new LocalStorageManualStore(),
@@ -24,5 +22,6 @@ export function createServices(analyzerUrl = import.meta.env.VITE_ANALYZER_URL):
     videoMeta: new BrowserVideoMetadataReader(),
     footage: analyzerUrl ? new HttpFootageLibrary(analyzerUrl) : undefined,
     profile: new LocalStorageProfileStore(),
+    localCoach: (data) => new CoachService({ sessions: new MemorySessionRepository(data), references: new MemoryReferenceRepository(data), writer }),
   };
 }

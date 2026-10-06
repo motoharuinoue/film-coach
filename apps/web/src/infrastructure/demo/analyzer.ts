@@ -34,5 +34,7 @@ export function analyzeSynthetic(input: {
     phases: toPhases(events),
     metrics,
     rotation: rotationVelocity(seq, events.release / seq.fps, timingFor(input.gap)),
+    // 合成データはどれもドロップしてから投げる
+    approach: "drop",
   };
 }

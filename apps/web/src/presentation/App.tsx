@@ -5,6 +5,7 @@ import { Home } from "./pages/Home";
 import { NotFound } from "./pages/NotFound";
 import { AnalyzerProvider } from "./state/analyzer";
 import { BenchmarksProvider } from "./state/benchmarks";
+import { LocalDataProvider } from "./state/local";
 
 // ホーム以外の画面は、開いたときに読み込む（最初の表示を軽くするため）
 const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) => ({
@@ -46,7 +47,9 @@ export function App() {
     <MotionConfig reducedMotion="user">
       <AnalyzerProvider>
         <BenchmarksProvider>
-          <RouterProvider router={router} />
+          <LocalDataProvider>
+            <RouterProvider router={router} />
+          </LocalDataProvider>
         </BenchmarksProvider>
       </AnalyzerProvider>
     </MotionConfig>

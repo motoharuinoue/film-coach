@@ -1,9 +1,9 @@
 import { useParams, useSearchParams } from "react-router";
-import { useServices } from "../services";
+import { useCoach } from "./benchmarks";
 
 /** URL の :id と ?rep=（1 始まり）から、表示するセッションとレップを決める */
 export function useSessionRep() {
-  const { coach } = useServices();
+  const { coach } = useCoach();
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
   const focus = coach.focus();
