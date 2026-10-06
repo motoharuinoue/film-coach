@@ -5,6 +5,7 @@ import type { AnalyzedRep, BestRep, Session } from "../domain/entities";
 import { evaluateMetric, zonesFor, type MetricEvaluation, type ZoneSet } from "../domain/judgement";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey, type RadarAxis } from "../domain/metrics";
 import { releasePoint, releaseSpread } from "../domain/practice";
+import { judgeMetrics } from "./judgeThrows";
 
 // お手本ゾーンは、レップの投げ始めに合うものを使う（投げ始めで意味が変わる指標は、投げ始めが同じお手本だけ。zonesFor）
 
@@ -14,19 +15,22 @@ export function evaluateRep(rep: AnalyzedRep, camera: CameraAngle, set: ZoneSet,
   return METRICS.map((d) => evaluateMetric(d.key, isValidFor(d, camera) ? rep.metrics[d.key] : undefined, best?.metrics[d.key], zones[d.key], rep.uncertainty?.[d.key]));
 }
 
-/** レップのスコア：判定できた指標のスコアの平均 */
-export function repScore(rep: AnalyzedRep, set: ZoneSet) {
-  const zones = zonesFor(set, rep.approach);
-  const scores = METRICS.map((d) => evaluateMetric(d.key, rep.metrics[d.key], undefined, zones[d.key], rep.uncertainty?.[d.key]).score).filter((v): v is number => v !== undefined);
-  return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+/**
+ * レップのスコア：判定できた指標のスコアの平均。「見る」・練習の画面の「お手本との一致」と同じ規則（judgeMetrics）で、
+ * 判定できた指標が少ない（お手本が足りない など）ときは出さない（0 点にはしない）
+ */
+export function repScore(rep: AnalyzedRep, set: ZoneSet): number | undefined {
+  return judgeMetrics(rep.metrics, zonesFor(set, rep.approach), rep.uncertainty).score;
 }
 
 /** 判定できる指標がこれより少ないセッション（試合映像など）はスコアを出さない */
 export const MIN_METRICS_FOR_SCORE = 5;
 
+/** セッションのスコア：スコアを出せたレップの平均。出せたレップがなければ出さない */
 export function sessionScore(s: Session, set: ZoneSet): number | undefined {
-  if (METRICS.filter((d) => isValidFor(d, s.camera)).length < MIN_METRICS_FOR_SCORE || s.reps.length === 0) return undefined;
-  return Math.round(s.reps.reduce((a, r) => a + repScore(r, set), 0) / s.reps.length);
+  if (METRICS.filter((d) => isValidFor(d, s.camera)).length < MIN_METRICS_FOR_SCORE) return undefined;
+  const scores = s.reps.map((r) => repScore(r, set)).filter((v): v is number => v !== undefined);
+  return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : undefined;
 }
 
 /** 自己ベスト：対象セッションより前の、スコアを出せるセッションで最も高いレップ */
@@ -36,7 +40,7 @@ export function selectBestRep(sessions: Session[], excludeSessionId: string, set
     if (s.id === excludeSessionId || sessionScore(s, set) === undefined) continue;
     for (const r of s.reps) {
       const score = repScore(r, set);
-      if (!best || score > best.score) best = { rep: r, s, score };
+      if (score !== undefined && (!best || score > best.score)) best = { rep: r, s, score };
     }
   }
   return best && { ...best.rep, sessionId: best.s.id, date: best.s.date };

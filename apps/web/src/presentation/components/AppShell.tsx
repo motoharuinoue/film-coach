@@ -90,13 +90,12 @@ function Shell() {
   // 手元のデータでは、取り込みは「自分の映像」から（新規セッションの画面はデモのシミュレーション）
   const to: Record<StepKey, string> = { import: source === "local" ? "/footage" : "/sessions/new", watch: `/sessions/${sid}/studio`, fix: `/sessions/${sid}/report`, keep: "/progress" };
 
-  // ほかの画面で解析・登録した結果を映すため、画面を移ったら手元のデータを読み直す（最初は LocalDataProvider が読む）
-  const first = useRef(true);
+  // ほかの画面で解析・登録した結果を映すため、画面を移ったら手元のデータを読み直す（最初は LocalDataProvider が読む）。
+  // reload は解析サービスにつながったときにも作り直されるので、経路が変わったときだけ呼ぶ（つながった直後に 2 回読まないように）
+  const shown = useRef(location.pathname);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (shown.current === location.pathname) return;
+    shown.current = location.pathname;
     void reload();
   }, [location.pathname, reload]);
 

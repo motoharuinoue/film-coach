@@ -10,7 +10,8 @@
     "build": "npm run build -w @film-coach/web",
     "typecheck": "npm run typecheck -w @film-coach/web",
     "preview": "npm run preview -w @film-coach/web",
-    "test": "npm run test -w @film-coach/web"
+    "test": "npm run test -w @film-coach/web",
+    "e2e": "npm run e2e -w @film-coach/web"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -7,6 +7,7 @@ import { fitCamera } from "../components/camera";
 import { AngleArc, FieldScene, PoseThumb, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, CountUp, SectionTitle, StatusPill, cx } from "../components/ui";
 import type { Finding } from "../../application/coaching";
+import { MIN_JUDGED_FOR_SCORE } from "../../application/judgeThrows";
 import { DrillLink } from "../components/drill";
 import { NarrationSource, useNarration, useNarrator } from "../state/narration";
 import { PageGuide } from "../guide/PageGuide";
@@ -35,6 +36,8 @@ export function Report() {
   const player = coach.player();
   const findings = coach.findings(rep, session.camera, bench);
   const goods = coach.strengths(rep, session.camera, bench);
+  // お手本ゾーンで判定できた指標があるか（ないときに「大きな崩れはありません」とは言えない）
+  const judged = coach.evaluate(rep, session.camera, bench).some((e) => e.status !== "na");
   const score = coach.repScore(rep, bench);
   const radar = coach.radar(rep, session, bench);
   const best = bench.best;
@@ -77,7 +80,7 @@ export function Report() {
           </FieldScene>
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/80 to-transparent px-8 pt-24 pb-7">
             <div className="font-display text-sm tracking-[0.3em] text-turf">COACHING REPORT</div>
-            <h1 className="mt-2 text-3xl leading-tight font-semibold md:text-4xl">{hero ? `${hero.title}。ここを直せば動きがつながる` : "大きな崩れはありません"}</h1>
+            <h1 className="mt-2 text-3xl leading-tight font-semibold md:text-4xl">{hero ? `${hero.title}。ここを直せば動きがつながる` : judged ? "大きな崩れはありません" : "お手本ゾーンがまだなく、判定できていません"}</h1>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
               <span>
                 {player.name ?? "あなた"}
@@ -95,11 +98,13 @@ export function Report() {
           {/* スコア */}
           <section className="grid items-center gap-8 md:grid-cols-[auto_1fr]">
             <div className="flex flex-col items-center gap-3">
-              <ScoreRing value={score} size={170}>
-                <CountUp value={score} className="font-display text-6xl" />
+              <ScoreRing value={score ?? 0} size={170}>
+                {score === undefined ? <span className="font-display text-6xl text-muted">—</span> : <CountUp value={score} className="font-display text-6xl" />}
                 <span className="text-xs text-muted">メカニクス スコア</span>
               </ScoreRing>
-              <div className="text-xs text-muted">お手本ゾーンを満点とした、判定できた指標の平均</div>
+              <div className="text-xs text-muted">
+                {score === undefined ? `判定できた指標が ${MIN_JUDGED_FOR_SCORE} 個に満たないため、スコアを出していません` : "お手本ゾーンを満点とした、判定できた指標の平均"}
+              </div>
             </div>
             <div className="grid items-center gap-4 sm:grid-cols-[1fr_200px]">
               <div className="mx-auto w-full max-w-[340px]">
@@ -129,7 +134,12 @@ export function Report() {
 
           {/* 改善点 */}
           <section data-tour="report-findings">
-            <SectionTitle>改善点トップ {findings.length}</SectionTitle>
+            <SectionTitle>{findings.length ? `改善点トップ ${findings.length}` : "改善点"}</SectionTitle>
+            {findings.length === 0 && (
+              <p className="text-sm text-muted">
+                {judged ? "お手本ゾーンから外れた指標はありません。" : "判定に使うお手本ゾーンがないため、改善点を出せません。お手本ライブラリで、同じ角度で撮ったお手本を増やしてください。"}
+              </p>
+            )}
             <div className="space-y-4">
               {findings.map((f, i) => (
                 <motion.div key={f.key} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.08 }} className="grid gap-5 rounded-2xl border border-line bg-white/[0.02] p-5 md:grid-cols-[220px_1fr]">

@@ -4,6 +4,7 @@ node_modules/
 # ---- ビルド・テストで生成されるもの（フロントエンド） ----
 dist/
 dist-ssr/
+dist-e2e/
 coverage/
 *.tsbuildinfo
 .vite/

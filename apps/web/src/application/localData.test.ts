@@ -34,7 +34,8 @@ const rep = (index: number, strideRatio: number, approach?: ThrowRep["approach"]
   transform: { mPerPx: 0.003, originX: 0, groundY: 1000, direction: 1, ankleM: 0.07 },
   events,
   phases: toPhases(events),
-  metrics: { strideRatio },
+  // 前膝角度と肘の高さは、下のお手本ゾーンの中（スコアを出せる 3 指標にする）
+  metrics: { strideRatio, frontKnee: 158, elbowHeight: 10 },
   approach,
   sequence: seq,
 });
@@ -91,7 +92,8 @@ describe("手元の練習を読む", () => {
 
 describe("ホームで取り上げるレップと選手", () => {
   const zone = { p10: 0.4, p25: 0.44, p50: 0.46, p75: 0.48, p90: 0.52 };
-  const set: ZoneSet = { all: { strideRatio: zone }, byApproach: { drop: {}, standing: {} } };
+  const all = { strideRatio: zone, frontKnee: { p10: 150, p25: 155, p50: 158, p75: 161, p90: 166 }, elbowHeight: { p10: 5, p25: 8, p50: 10, p75: 12, p90: 15 } };
+  const set: ZoneSet = { all, byApproach: { drop: {}, standing: {} } };
   const session = (id: string, values: number[]) => toSession(viewOf(practice(id, "2026-10-05", ["a"]), [{ footage: footage("a"), analysis: analysis(values.map((v, i) => rep(i + 1, v))) }]))!;
 
   it("最新のセッション（最後）の、スコアがいちばん低い投球", () => {
@@ -99,6 +101,11 @@ describe("ホームで取り上げるレップと選手", () => {
     expect(f.session.id).toBe("new");
     expect(f.rep.id).toBe("a#2");
     expect(focusOf([], set)).toBeUndefined();
+  });
+
+  it("スコアを出せない投球（判定できる指標が足りない）は比べず、どれも出せなければ最初の投球", () => {
+    const fewer: ZoneSet = { all: { strideRatio: zone }, byApproach: { drop: {}, standing: {} } };
+    expect(focusOf([session("new", [0.46, 0.6, 0.47])], fewer)!.rep.id).toBe("a#1");
   });
 
   it("名前・背番号は持たず、身長と投げる腕だけ", () => {

@@ -15,8 +15,10 @@ export function Reps() {
   const { coach, bench, source } = useCoach();
   const sessions = coach.sessions();
   const focus = coach.focus().rep;
+  // 判定できる指標が少ないレップには、スコアを出さない
   const scores = session.reps.map((r) => coach.repScore(r, bench));
-  const best = Math.max(...scores);
+  const known = scores.filter((s): s is number => s !== undefined);
+  const best = known.length ? Math.max(...known) : undefined;
 
   return (
     <div className="space-y-6">
@@ -47,10 +49,12 @@ export function Reps() {
                   <PoseThumb frame={r.seq.frames[r.events.release]!} className="block aspect-video w-full" />
                   <div className="absolute top-2 left-2 flex gap-1">
                     <Badge>{repLabel(i)}</Badge>
-                    {scores[i] === best && <Badge tone="turf">ベスト</Badge>}
+                    {best !== undefined && scores[i] === best && <Badge tone="turf">ベスト</Badge>}
                     {isFocus && <Badge tone="pylon">注目</Badge>}
                   </div>
-                  <div className="absolute right-2 bottom-1 font-display text-3xl text-text/90">{scores[i]}</div>
+                  <div className="absolute right-2 bottom-1 font-display text-3xl text-text/90" title={scores[i] === undefined ? "判定できる指標が少ないため、スコアを出していません" : undefined}>
+                    {scores[i] ?? "—"}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2.5">
                   <span className="truncate text-xs text-muted">{f ? METRIC_BY_KEY[f.key].short : "大きな崩れなし"}</span>

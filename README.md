@@ -180,7 +180,7 @@
 
 - **クリーンアーキテクチャ**：両方の言語とも、domain / application / infrastructure / adapters（presentation）の 4 層に分け、層の依存の向きをテストで検査しています（画面は Vitest、解析サービスは import-linter）。
 - **JSON Schema で、画面と解析サービスのデータ形式をそろえる**
-  - 解析サービスの応答の見本を Python 側で生成し、画面側のテストで、JSON Schema に合っていることと正しく読み込めることを確認します。
+  - 解析サービスの応答の見本を Python 側で生成し、画面側のテストで、JSON Schema に合っていることと正しく読み込めることを確認します。ブラウザでの操作の確認（e2e）でも、この見本を解析サービスの応答として使います。
   - フェーズと指標の共通テストデータは TypeScript 側で生成し、Python 側で同じ結果になることを確認します。
 
 ## 解析の流れ
@@ -231,8 +231,8 @@
 | 本人の追跡と骨格の推定 | 1080p・30 fps・4.7 秒の動画（140 フレーム、映っている人は 34 人）で約 20 秒（Apple M4 の CPU） |
 | 投球の解析（フェーズと指標） | 0.3 秒 |
 | 改善点の文章の作成（gemma3:12b） | 1 件あたり 15〜25 秒。作成した文章はブラウザに保存し、判定が同じなら再利用する |
-| テスト | 画面 296 件（Vitest）、解析サービス 214 件（pytest）。型検査（TypeScript・mypy strict）、ruff、層の依存の向きの検査 |
-| CI | Pull Request ごとに、画面の型検査・テスト・ビルドと、解析サービスの ruff・mypy・import-linter・pytest を実行 |
+| テスト | 画面 300 件（Vitest）、ブラウザでの操作 105 件（Playwright）、解析サービス 214 件（pytest）。型検査（TypeScript・mypy strict）、ruff、層の依存の向きの検査 |
+| CI | Pull Request ごとに、画面の型検査・テスト・ビルドと、ブラウザでの操作の確認、解析サービスの ruff・mypy・import-linter・pytest を実行 |
 
 ## プライバシーと YouTube の規約
 
@@ -258,8 +258,16 @@ Node 22.12 以上と npm 11 以上が必要です（npm 10 では、依存関係
 npm install
 npm run dev      # http://localhost:5173（解析サービスが動いていなければ、合成データのデモが開く）
 npm test         # ユニットテストと、層の依存の向きの検査
+npm run e2e      # ブラウザで主な操作の流れを確かめる（Playwright）
 npm run build
 ```
+
+`npm run e2e` は、画面を 2 通りにビルドし、ブラウザを動かして確かめます（`apps/web/e2e/`）。
+
+- 公開デモと同じ、解析サービスなしの画面：ホーム・分析スタジオ・レポート・お手本ライブラリ・推移・使い方ツアーの操作と、すべての画面・スマホの幅での表示
+- 手元の解析サービスにつなぐ設定の画面：自分の映像・練習・精度の評価・お手本の検索などの操作。解析サービスは動かさず、API の見本（`packages/schema/fixtures/api-samples.v1.json`）で応答します
+
+どのテストでも、画面のエラー（console.error、捕まえていない例外、失敗したリクエスト）が 1 つもないことを確かめます。手元ではインストール済みの Google Chrome を、CI では Playwright の Chromium を使います。失敗したときは `npx playwright show-report apps/web/playwright-report` で、画面の記録（トレース）を見られます。
 
 `master` にマージされると、GitHub Actions がテストとビルドを実行したうえで、GitHub Pages にデモを公開します。
 

@@ -91,6 +91,8 @@ function Workspace() {
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   /** まだ保存していない正解（映像ごと） */
   const pending = useRef<Record<string, AnnotationInput>>({});
+  /** 送っている途中の保存（映像ごと）。順に送り、前の保存が後から届いて新しい正解を上書きしないようにする */
+  const queue = useRef<Record<string, Promise<void>>>({});
   /** 映像ごとの、最後に正解を変えた時刻 */
   const edited = useRef<Record<string, number>>({});
   const loads = useRef(0);
@@ -127,26 +129,34 @@ function Workspace() {
     void load();
   }, [load]);
 
-  const save = async (videoId: string) => {
+  const save = (videoId: string): Promise<void> => {
     const next = pending.current[videoId];
-    if (!next) return;
+    if (!next) return queue.current[videoId] ?? Promise.resolve();
     delete pending.current[videoId];
     setSaving(true);
-    try {
-      await lib!.saveAnnotation(videoId, next);
-      setError(undefined);
-    } catch (err) {
-      setError(`保存できませんでした：${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSaving(false);
-    }
+    const job = (queue.current[videoId] ?? Promise.resolve()).then(async () => {
+      try {
+        await lib!.saveAnnotation(videoId, next);
+        setError(undefined);
+      } catch (err) {
+        setError(`保存できませんでした：${err instanceof Error ? err.message : String(err)}`);
+      }
+    });
+    queue.current[videoId] = job;
+    void job.then(() => {
+      if (queue.current[videoId] !== job) return;
+      delete queue.current[videoId];
+      if (Object.keys(queue.current).length === 0) setSaving(false);
+    });
+    return job;
   };
 
-  /** 待っている保存をすぐに済ませる */
+  /** 待っている保存をすぐに送り、送っている途中の保存とあわせて、終わるまで待つ */
   const flush = async () => {
     for (const t of Object.values(timers.current)) clearTimeout(t);
     timers.current = {};
-    await Promise.all(Object.keys(pending.current).map(save));
+    for (const v of Object.keys(pending.current)) void save(v);
+    await Promise.all(Object.values(queue.current));
   };
 
   // 付けた正解は、少し待ってからまとめて保存する（クリックのたびに送らない）

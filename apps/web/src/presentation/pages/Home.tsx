@@ -1,6 +1,7 @@
 import { IconArrowRight, IconBrandYoutube, IconDeviceMobile, IconFlame, IconPlus, IconTrendingUp } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { Link } from "react-router";
+import { MIN_JUDGED_FOR_SCORE } from "../../application/judgeThrows";
 import { CAMERA_LABEL } from "../../domain/camera";
 import type { Session } from "../../domain/entities";
 import { formatMetric, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
@@ -29,9 +30,10 @@ export function Home() {
   const { session: current, rep } = coach.focus();
   const scored = sessions.filter((s) => coach.sessionScore(s, bench) !== undefined);
   const scoreOf = (s: Session) => coach.sessionScore(s, bench) ?? 0;
-  const score = scoreOf(current);
-  const prev = scored[scored.indexOf(current) - 1];
-  const delta = prev ? score - scoreOf(prev) : 0;
+  // 判定できる指標が少ない（お手本が足りない など）と、スコアは出さない
+  const score = coach.sessionScore(current, bench);
+  const prev = score === undefined ? undefined : scored[scored.indexOf(current) - 1];
+  const delta = prev && score !== undefined ? score - scoreOf(prev) : 0;
   const peak = scored.filter((s) => s.id !== current.id).sort((a, b) => scoreOf(b) - scoreOf(a))[0];
   const top = coach.findings(rep, current.camera, bench)[0];
   const topText = useNarration(top);
@@ -63,8 +65,8 @@ export function Home() {
           <div className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full bg-turf/10 blur-3xl" />
           <SectionTitle right={<Badge>{formatDate(current.date)} · {current.title}</Badge>}>最新セッションのスコア</SectionTitle>
           <div className="flex items-center gap-6">
-            <ScoreRing value={score}>
-              <CountUp value={score} className="font-display text-5xl" />
+            <ScoreRing value={score ?? 0}>
+              {score === undefined ? <span className="font-display text-5xl text-muted">—</span> : <CountUp value={score} className="font-display text-5xl" />}
               <span className="text-[11px] text-muted">/ 100</span>
             </ScoreRing>
             <div className="space-y-3">
@@ -87,7 +89,9 @@ export function Home() {
                   </div>
                 </div>
               )}
-              {peak && scoreOf(peak) > score ? (
+              {score === undefined ? (
+                <div className="text-xs leading-relaxed text-muted">判定できた指標が {MIN_JUDGED_FOR_SCORE} 個に満たないため、スコアを出していません。同じ角度で撮ったお手本を増やすと表示されます</div>
+              ) : peak && scoreOf(peak) > score ? (
                 <div className="flex items-center gap-1.5 text-xs text-caution">
                   <IconFlame size={14} aria-hidden />
                   {formatDate(peak.date)}（{scoreOf(peak)} 点）から {scoreOf(peak) - score} 点下がっています
@@ -114,7 +118,7 @@ export function Home() {
         {/* 次に直すこと */}
         {top && (
           <Card className="grid overflow-hidden sm:grid-cols-[1fr_1.1fr]" data-tour="home-next">
-            <Link to={`/sessions/${current.id}/studio?rep=${rep.index + 1}`} className="group relative block overflow-hidden bg-ink" aria-label="根拠のフレームを分析スタジオで見る">
+            <Link to={`/sessions/${current.id}/studio?rep=${rep.index + 1}&frame=${top.frame}`} className="group relative block overflow-hidden bg-ink" aria-label="根拠のフレームを分析スタジオで見る">
               <PoseThumb frame={rep.seq.frames[top.frame]!} className="h-full w-full transition-transform duration-500 group-hover:scale-[1.03]" />
               <div className="absolute top-3 left-3">
                 <Badge tone="pylon">

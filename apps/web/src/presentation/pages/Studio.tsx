@@ -29,7 +29,7 @@ import { CompareView } from "./studio/CompareView";
 
 type GhostTarget = "none" | "best" | string;
 
-function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) {
+function AnalysisView({ session, rep, startFrame }: { session: Session; rep: AnalyzedRep; startFrame?: number }) {
   const { coach, bench, source } = useCoach();
   // 投げ始めで意味が変わる指標は、投げ始めが同じお手本のゾーン
   const zones = coach.zonesOf(rep, bench);
@@ -45,11 +45,11 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
     return ref && { ...ref.reps[0]!, label: ref.channel };
   }, [ghostTarget, bench.best, coach]);
 
-  // レップを切り替えたら、ステップの始まりから見せる
+  // レップを切り替えたら、ステップの始まりから見せる（根拠の場面を指定して開いたときは、その場面から）
   const { seek, toggle, step } = pb;
   useEffect(() => {
-    seek(rep.events.strideStart);
-  }, [rep.id, rep.events.strideStart, seek]);
+    seek(startFrame ?? rep.events.strideStart);
+  }, [rep.id, rep.events.strideStart, startFrame, seek]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -327,7 +327,7 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
 type View = "analysis" | "compare";
 
 export function Studio() {
-  const { session, rep, setRep } = useSessionRep();
+  const { session, rep, frame, setRep } = useSessionRep();
   const [params, setParams] = useSearchParams();
   const view: View = params.get("view") === "compare" ? "compare" : "analysis";
   const setView = (v: View) =>
@@ -371,7 +371,7 @@ export function Studio() {
         </div>
       </div>
       <PageGuide id="studio" sessionId={session.id} />
-      {view === "compare" ? <CompareView key={rep.id} session={session} rep={rep} /> : <AnalysisView key={rep.id} session={session} rep={rep} />}
+      {view === "compare" ? <CompareView key={rep.id} session={session} rep={rep} /> : <AnalysisView key={rep.id} session={session} rep={rep} startFrame={frame} />}
     </div>
   );
 }
