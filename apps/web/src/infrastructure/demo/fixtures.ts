@@ -4,8 +4,9 @@
 import type { CameraAngle } from "../../domain/camera";
 import type { Player, Reference, Session } from "../../domain/entities";
 import type { MetricKey } from "../../domain/metrics";
+import { rng } from "../../domain/random";
 import { analyzeSynthetic } from "./analyzer";
-import { rng, type ThrowParams } from "./synth";
+import type { ThrowParams } from "./synth";
 
 export const demoPlayer: Player = {
   name: "森 海斗",

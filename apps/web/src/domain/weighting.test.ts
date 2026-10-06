@@ -71,8 +71,11 @@ describe("consensus", () => {
     expect(Math.min(...k.slice(0, 5))).toBeGreaterThan(0.5);
   });
 
-  it("比べる相手が 3 つ未満なら下げない", () => {
+  it("異なる値が 4 つ未満なら下げない（3 つでは、中央と近いほうの差だけで尺度が決まる）", () => {
     expect(consensus([0.5, 0.9], [1, 1])).toEqual([1, 1]);
+    expect(consensus([0.5, 0.52, 0.9], [1, 1, 1])).toEqual([1, 1, 1]);
+    // 同じ値の重複は、異なる値として数えない
+    expect(consensus([0.5, 0.5, 0.52, 0.9], [1, 1, 1, 1])).toEqual([1, 1, 1, 1]);
   });
 });
 
@@ -97,6 +100,13 @@ describe("computeWeights", () => {
     const zone = computeWeights(refs).zones.strideRatio!;
     expect(zone.p50).toBeGreaterThan(0.5);
     expect(zone.p50).toBeLessThan(0.56);
+  });
+
+  it("人気の高い外れ値が 2 本あっても、一致度の基準を引き寄せない", () => {
+    const viral2 = { ...refs[3]!, id: "viral2", metrics: { strideRatio: 0.82 } };
+    const r = computeWeights([...refs, viral2]);
+    const w = (id: string) => r.parts[id]!.strideRatio!.w;
+    expect(Math.max(w("viral"), w("viral2"))).toBeLessThan(Math.min(w("a"), w("b"), w("c")));
   });
 
   it("除外したお手本の重みは 0 になる", () => {

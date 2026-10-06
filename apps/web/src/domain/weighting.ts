@@ -80,10 +80,13 @@ export function weightedQuantile(values: number[], weights: number[], q: number)
   return pairs[pairs.length - 1]!.v;
 }
 
-/** 一致度（他のお手本との一致）：重み付き中央値と MAD によるロバスト z。z が大きいほどコーシー型で重みを下げる */
+/**
+ * 一致度（他のお手本との一致）：重み付き中央値と MAD によるロバスト z。z が大きいほどコーシー型で重みを下げる。
+ * 異なる値が 4 つ未満なら下げない。3 つでは、中央の値と近いほうの値の差だけで尺度が決まり、残りの 1 つが必ず外れ値になるため
+ */
 export function consensus(values: (number | undefined)[], baseWeights: number[]): number[] {
   const idx = values.map((v, i) => (v === undefined || baseWeights[i] === 0 ? -1 : i)).filter((i) => i >= 0);
-  if (idx.length < 3) return values.map(() => 1);
+  if (new Set(idx.map((i) => values[i])).size < 4) return values.map(() => 1);
   const vs = idx.map((i) => values[i]!);
   const ws = idx.map((i) => baseWeights[i]!);
   const med = weightedQuantile(vs, ws, 0.5)!;
@@ -126,9 +129,10 @@ export function computeWeights(refs: WeightedReference[]): WeightResult {
       return { P, C, Q, M, pre: r.metrics[def.key] === undefined ? 0 : P * C * Q * M };
     });
     const values = refs.map((r) => r.metrics[def.key]);
+    // 一致度の基準（中央値と MAD）は、人気度とチャンネルを掛けない重みで求める。人気の高い外れ値が基準を引き寄せないように
     const K = consensus(
       values,
-      base.map((b) => b.pre),
+      base.map((b) => (b.pre > 0 ? b.Q * b.M : 0)),
     );
     const ws = base.map((b, i) => b.pre * K[i]!);
     refs.forEach((r, i) => {
