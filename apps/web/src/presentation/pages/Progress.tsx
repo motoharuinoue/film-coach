@@ -29,7 +29,8 @@ export function Progress() {
     target === "score"
       ? sessions.map((s) => {
           const sc = coach.sessionScore(s, bench);
-          const reps = s.reps.map((r) => coach.repScore(r, bench));
+          // 幅は、スコアを出せたレップだけで決める
+          const reps = s.reps.map((r) => coach.repScore(r, bench)).filter((v): v is number => v !== undefined);
           return { label: formatDate(s.date), mean: sc, min: sc === undefined ? undefined : Math.min(...reps), max: sc === undefined ? undefined : Math.max(...reps), note: "スコアなし" };
         })
       : sessions.map((s) => {

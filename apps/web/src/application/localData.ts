@@ -57,11 +57,21 @@ export function localPlayer(heightCm: number | undefined, hand: ThrowHand | unde
   return { position: "QB", heightCm, throws: hand === "left" ? "左投げ" : hand === "right" ? "右投げ" : "—" };
 }
 
-/** ホームで取り上げるレップ：最新のセッション（最後）の、スコアがいちばん低い投球（同じなら先のもの） */
+/**
+ * ホームで取り上げるレップ：最新のセッション（最後）の、スコアがいちばん低い投球（同じなら先のもの）。
+ * スコアを出せない投球（判定できる指標が足りない）は比べられないので、どれも出せなければ最初の投球
+ */
 export function focusOf(sessions: Session[], set: ZoneSet): { session: Session; rep: AnalyzedRep } | undefined {
   const session = sessions[sessions.length - 1];
   if (!session) return undefined;
   let rep = session.reps[0]!;
-  for (const r of session.reps) if (repScore(r, set) < repScore(rep, set)) rep = r;
+  let low = repScore(rep, set);
+  for (const r of session.reps) {
+    const s = repScore(r, set);
+    if (s !== undefined && (low === undefined || s < low)) {
+      rep = r;
+      low = s;
+    }
+  }
   return { session, rep };
 }

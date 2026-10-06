@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -19,5 +20,9 @@ export default defineConfig({
         },
       },
     },
+  },
+  test: {
+    // ブラウザを動かすテスト（e2e/、Playwright）は Vitest では動かさない
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

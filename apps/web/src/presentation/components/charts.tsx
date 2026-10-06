@@ -440,9 +440,12 @@ export function TrendChart({
   const H = 260;
   const pad = { l: 56, r: 20, t: 20, b: 34 };
   const vals = points.flatMap((p) => [p.min, p.max, p.mean]).concat(band ? [band.p10, band.p90] : []).filter((v): v is number => v !== undefined);
-  const span = Math.max(...vals) - Math.min(...vals) || 1;
-  const lo = Math.min(...vals) - span * 0.12;
-  const hi = Math.max(...vals) + span * 0.12;
+  // 値がひとつもない（どのセッションもスコアを出せない など）ときは、目盛りを出さず、日付と理由だけを出す
+  const empty = vals.length === 0;
+  const [min, max] = empty ? [0, 1] : [Math.min(...vals), Math.max(...vals)];
+  const span = max - min || 1;
+  const lo = min - span * 0.12;
+  const hi = max + span * 0.12;
   const x = lin(0, points.length - 1, pad.l + 20, W - pad.r - 20);
   const y = lin(lo, hi, H - pad.b, pad.t);
   const valid = points.map((p, i) => ({ ...p, i })).filter((p) => p.mean !== undefined);
@@ -458,11 +461,12 @@ export function TrendChart({
           </text>
         </g>
       )}
-      {[lo + span * 0.12, (lo + hi) / 2, hi - span * 0.12].map((t) => (
-        <text key={t} x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill={COLORS.muted} fontFamily="var(--font-mono)">
-          {t.toFixed(digits)}
-        </text>
-      ))}
+      {!empty &&
+        [lo + span * 0.12, (lo + hi) / 2, hi - span * 0.12].map((t) => (
+          <text key={t} x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize={11} fill={COLORS.muted} fontFamily="var(--font-mono)">
+            {t.toFixed(digits)}
+          </text>
+        ))}
       {points.map((p, i) => (
         <g key={p.label}>
           <text x={x(i)} y={H - 10} textAnchor="middle" fontSize={11} fill={COLORS.muted}>
@@ -476,7 +480,7 @@ export function TrendChart({
           )}
         </g>
       ))}
-      <motion.path d={d} fill="none" stroke={color} strokeWidth={2.5} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1 }} className="glow-turf" />
+      {valid.length > 0 && <motion.path d={d} fill="none" stroke={color} strokeWidth={2.5} initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1 }} className="glow-turf" />}
       {valid.map((p) => (
         <circle key={p.label} cx={x(p.i)} cy={y(p.mean!)} r={5} fill="#07090D" stroke={color} strokeWidth={2.5} />
       ))}

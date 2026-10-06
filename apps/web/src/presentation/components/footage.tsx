@@ -181,6 +181,8 @@ export function VideoFootagePlayer({ src, track, label, layers, onTime, seekTo, 
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(0.5);
+  // このブラウザで再生できない映像（HEVC に対応していない など）。骨格の重ね表示と投球の解析は、再生位置を動かして見られる
+  const [unplayable, setUnplayable] = useState(false);
   const duration = track.frames.length / track.video.fps;
   const onTimeRef = useRef(onTime);
   onTimeRef.current = onTime;
@@ -217,6 +219,18 @@ export function VideoFootagePlayer({ src, track, label, layers, onTime, seekTo, 
     setT(seekTo.t);
   }, [seekTo]);
   const frame = frameAt(track, t);
+  const toggle = () => {
+    const v = video.current;
+    if (!v) return;
+    if (!v.paused) {
+      v.pause();
+      return;
+    }
+    // 再生を始められないと Promise が拒否される（途中で止めたときの AbortError は、再生できないのではない）
+    v.play().catch((e: unknown) => {
+      if (!(e instanceof DOMException && e.name === "AbortError")) setUnplayable(true);
+    });
+  };
 
   return (
     <div className="space-y-3">
@@ -230,9 +244,11 @@ export function VideoFootagePlayer({ src, track, label, layers, onTime, seekTo, 
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onSeeked={() => setT(video.current?.currentTime ?? 0)}
+          onError={() => setUnplayable(true)}
         />
       </Stage>
-      <Transport playing={playing} onToggle={() => (video.current?.paused ? video.current.play() : video.current?.pause())} t={t} duration={duration} onSeek={seek} rate={rate} onRate={setRate} />
+      {unplayable && <p className="text-xs leading-relaxed text-caution">この映像は、このブラウザでは再生できません（HEVC の映像に対応していない など）。骨格の重ね表示と投球の解析は、再生位置を動かして見られます。</p>}
+      <Transport playing={playing} onToggle={toggle} t={t} duration={duration} onSeek={seek} rate={rate} onRate={setRate} />
       <TrackTimeline track={track} t={t} onSeek={seek} throws={throws} />
     </div>
   );
