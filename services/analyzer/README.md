@@ -98,7 +98,7 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | GET | `/api/jobs/{jobId}/events` | 進み具合（SSE：`state` → `progress` → `done` / `failed`） |
 | GET | `/api/videos/{id}/track` | 追跡結果（`target-track.v1.schema.json`） |
 | GET | `/api/videos/{id}/outputs/{preview,focus}.mp4` | 確認用の動画 |
-| POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera}`）。追跡した骨格だけを使うので、YouTube の区間でも動く |
+| POST | `/api/videos/{id}/throws` | 投球の解析（`{heightCm, camera, slowmo}`）。追跡した骨格だけを使うので、YouTube の区間でも動く。`slowmo` はスロー再生の倍率（YouTube のお手本はスロー再生が多い。速さと時間を実際の時間に直す） |
 | GET | `/api/videos/{id}/throws` | 投球の解析結果（`throw-analysis.v1.schema.json`） |
 | GET | `/api/youtube/status` | YouTube Data API のキーがあるか（キーそのものは返さない）と、今日の無料枠 |
 | GET | `/api/youtube/search?q=&cc=&max=` | お手本の候補を探す（`youtube-search.v1.schema.json`）。1 回 102 ユニット。キーがなければ 503、無料枠を超えたら 429 |

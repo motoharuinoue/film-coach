@@ -88,6 +88,7 @@ def build_parser() -> argparse.ArgumentParser:
     w.add_argument("track", type=Path, help="track の書き出した track.json（target-track.v1.schema.json）")
     w.add_argument("--height", type=float, required=True, help="選手の身長（cm）。縮尺と身長比の指標に使う")
     w.add_argument("--camera", choices=CAMERA_ANGLES, default="side", help="撮影の角度（測れる指標が変わる）")
+    w.add_argument("--slowmo", type=float, default=1.0, help="スロー再生の倍率（例：4 は 4 倍のスロー）。既定は等速")
     w.add_argument("--out", type=Path, help="書き出し先（既定は track.json と同じフォルダの throws.json）")
 
     s = sub.add_parser("serve", help="画面から使う HTTP の解析サービスを起動する（127.0.0.1 だけで待ち受ける）")
@@ -167,7 +168,7 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
 
     if args.command == "throws":
         try:
-            ta = analyze_throws(deps.read_track(args.track), args.height / 100, args.camera)
+            ta = analyze_throws(deps.read_track(args.track), args.height / 100, args.camera, args.slowmo)
         except NotEnoughPoseError as e:
             out.write(f"{e}\n")
             return 1

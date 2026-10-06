@@ -83,13 +83,13 @@ function Viewer() {
     setSelected(r.index);
     seekFrame(releaseFrame(r));
   };
-  const analyze = async (cm: number, camera: CameraAngle) => {
+  const analyze = async (cm: number, camera: CameraAngle, slowmo: number) => {
     setThrowsBusy(true);
     setThrowsError(undefined);
     try {
       // YouTube のお手本の映像では、お手本の選手の身長なので、自分の身長としては保存しない
       if (footage.source === "upload") profile.saveHeightCm(cm);
-      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera });
+      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera, slowmo });
       setThrows(a);
       setSelected(a.reps[0]?.index ?? 1);
       if (a.reps[0]) seekFrame(releaseFrame(a.reps[0]));

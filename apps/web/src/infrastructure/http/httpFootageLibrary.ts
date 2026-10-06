@@ -74,6 +74,8 @@ export function parseThrows(j: Json): ThrowAnalysis {
     camera: j.camera as ThrowAnalysis["camera"],
     hand: j.hand === "left" ? "left" : "right",
     warnings: (j.warnings as string[]) ?? [],
+    // スロー再生の倍率を入れる前に書き出した結果にはないので、等速とみなす
+    slowmo: Number(j.slowmo ?? 1),
     reps: (j.reps as Json[]).map(
       (r): ThrowRep => ({
         index: Number(r.index),

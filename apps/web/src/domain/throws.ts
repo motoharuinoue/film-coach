@@ -34,9 +34,14 @@ export type ThrowAnalysis = {
   reps: ThrowRep[];
   /** 結果を読むときの注意（本人が小さく映っている、投球が見つからない など） */
   warnings: string[];
+  /** スロー再生の倍率（1 は等速）。速さと時間は実際の時間に直して計算している */
+  slowmo: number;
 };
 
-export type ThrowsRequest = { heightCm: number; camera: CameraAngle };
+export type ThrowsRequest = { heightCm: number; camera: CameraAngle; slowmo?: number };
+
+/** 選べるスロー再生の倍率（YouTube のお手本はスロー再生が多い） */
+export const SLOWMO_OPTIONS = [1, 2, 4, 8] as const;
 
 /** 解析サービスが受け付ける身長の範囲（cm） */
 export const HEIGHT_CM = { min: 120, max: 230 } as const;

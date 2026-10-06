@@ -4185,7 +4185,8 @@
     }
    }
   ],
-  "warnings": []
+  "warnings": [],
+  "slowmo": 1
  },
  "uploadWithThrows": {
   "schemaVersion": 1,

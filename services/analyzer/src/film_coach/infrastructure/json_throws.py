@@ -66,6 +66,7 @@ def throws_to_json(ta: ThrowAnalysis) -> dict[str, Any]:
             for r in ta.reps
         ],
         "warnings": list(ta.warnings),
+        "slowmo": ta.slowmo,
     }
     validate(THROWS_SCHEMA, data)
     return data
@@ -101,6 +102,7 @@ def throws_from_json(data: dict[str, Any]) -> ThrowAnalysis:
         data["hand"],
         reps,
         list(data["warnings"]),
+        float(data.get("slowmo", 1.0)),
     )
 
 
