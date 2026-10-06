@@ -70,6 +70,11 @@ describe("手元のお手本をデモと同じ形に写す", () => {
     expect(r.reps.map((x) => x.id)).toEqual(["r1#1", "r1#2"]);
     expect(r.reps[0]!.rotation).toEqual([]);
     expect(r.reps.map((x) => x.approach)).toEqual(["drop", "unknown"]);
+    // 元の映像の中の位置（「お手本の映像でこの瞬間を見る」に使う）
+    expect(r.reps.map((x) => x.clip)).toEqual([
+      { videoId: "v1", frame0: 100, videoFps: 59.94 },
+      { videoId: "v1", frame0: 200, videoFps: 59.94 },
+    ]);
   });
 
   it("写したお手本は、デモと同じ重み付けで分布になる", () => {

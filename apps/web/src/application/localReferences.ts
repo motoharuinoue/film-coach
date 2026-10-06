@@ -28,6 +28,7 @@ export function toReference(r: LocalReference, footage: Footage, throws: ThrowAn
     // 回転の速さは 3D の骨格（M5）で測る。2D の映像からは出さない
     rotation: [],
     approach: rep.approach?.kind ?? "unknown",
+    clip: { videoId: footage.id, frame0: rep.start, videoFps: footage.info.fps },
   }));
   return {
     id: r.id,
