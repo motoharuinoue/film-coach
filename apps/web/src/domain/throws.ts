@@ -45,6 +45,8 @@ export type ThrowRep = {
   events: Events;
   phases: Phase[];
   metrics: MetricValues;
+  /** 接地・リリースの瞬間で測った指標の、瞬間の時刻が半コマずれたときの変わり幅（入れる前に解析した結果にはない） */
+  uncertainty?: MetricValues;
   /** 投げ始め（投げ始めを入れる前に解析した結果にはない） */
   approach?: ApproachInfo;
   /** 平滑化した骨格（ワールド 2D、時刻は区間の最初が 0） */

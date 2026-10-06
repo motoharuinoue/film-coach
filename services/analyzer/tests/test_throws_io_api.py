@@ -20,7 +20,7 @@ from film_coach.application.throws import analyze_throws
 from film_coach.application.track_target import TargetTrack
 from film_coach.bootstrap import cli_deps
 from film_coach.domain.pose import PoseSequence
-from film_coach.infrastructure.json_throws import throws_to_json
+from film_coach.infrastructure.json_throws import throws_from_json, throws_to_json
 from film_coach.infrastructure.json_track import read_track, track_from_json, track_to_json, write_track
 from film_coach.infrastructure.library_fs import FilePracticeStore, FileVideoStore
 from film_coach.infrastructure.schema import validate
@@ -52,6 +52,17 @@ def test_投球の解析はスキーマに合うJSONになる(base_sequence: Pos
     assert data["hand"] == "right" and rep["transform"]["direction"] == -1
     assert abs(rep["start"] - 60) <= 2 and set(rep["metrics"]) >= {"strideRatio", "frontKnee", "elbowAngle"}
     assert rep["sequence"]["space"] == "world-2d"
+    # 接地・リリースの瞬間で測った指標には、瞬間の時刻が半コマずれたときの変わり幅を添える
+    assert set(rep["uncertainty"]) == set(rep["metrics"]) & {
+        "strideRatio",
+        "frontKnee",
+        "elbowHeight",
+        "elbowAngle",
+        "releaseHeight",
+        "trunkTilt",
+    }
+    old = {**data, "reps": [{k: v for k, v in r.items() if k != "uncertainty"} for r in data["reps"]]}
+    assert throws_from_json(old).reps[0].analysis.uncertainty == {}
 
 
 def test_追跡をやり直したら_前の投球の解析は消す(tmp_path: Path, base_sequence: PoseSequence) -> None:

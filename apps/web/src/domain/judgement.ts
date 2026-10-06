@@ -1,6 +1,6 @@
 // お手本ゾーン（重み付き分布）に対する判定とスコア。
 
-import { METRICS, type MetricKey } from "./metrics";
+import { isImprecise, METRICS, type MetricKey } from "./metrics";
 import { isApproachGroup, type Approach, type ApproachGroup } from "./throws";
 
 export type Zone = { p10: number; p25: number; p50: number; p75: number; p90: number };
@@ -69,8 +69,13 @@ export type MetricEvaluation = {
   zone?: Zone;
   status: Status;
   score?: number;
+  /** 接地・リリースの瞬間の時刻が半コマずれたときの値の変わり幅 */
+  uncertainty?: number;
+  /** 変わり幅が判定に影響しない上限を超えたので、判定しない（値は見せる） */
+  imprecise?: true;
 };
 
-export function evaluateMetric(key: MetricKey, value: number | undefined, best: number | undefined, zone: Zone | undefined): MetricEvaluation {
-  return { key, value, best, zone, status: judge(value, zone), score: metricScore(value, zone) };
+export function evaluateMetric(key: MetricKey, value: number | undefined, best: number | undefined, zone: Zone | undefined, uncertainty?: number): MetricEvaluation {
+  if (value !== undefined && isImprecise(key, uncertainty)) return { key, value, best, zone, status: "na", uncertainty, imprecise: true };
+  return { key, value, best, zone, status: judge(value, zone), score: metricScore(value, zone), uncertainty };
 }

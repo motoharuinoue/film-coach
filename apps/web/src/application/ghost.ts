@@ -3,7 +3,7 @@
 // 投げ始めが同じお手本を先に、その中で重み（P×C×Q×K×M の代表値）の高い順に並べ、先頭を自動で選ぶ。
 
 import type { AnalyzedRep, Reference } from "../domain/entities";
-import { judge, type Status, type Zones } from "../domain/judgement";
+import { evaluateMetric, type Status, type Zones } from "../domain/judgement";
 import { METRICS, type MetricKey, type MetricValues } from "../domain/metrics";
 import { isApproachGroup, type Approach } from "../domain/throws";
 import type { ManualAdjust } from "../domain/weighting";
@@ -29,11 +29,11 @@ export function ghostCandidates(refs: Reference[], overall: Record<string, numbe
 
 export type MetricRow = { key: MetricKey; self?: number; other?: number; diff?: number; status: Status };
 
-/** 自分とお手本の指標を並べる。差は良し悪しではなく、判定は自分の値のお手本ゾーンでの位置で決める */
-export function compareMetrics(self: MetricValues, other: MetricValues, zones: Zones): MetricRow[] {
+/** 自分とお手本の指標を並べる。差は良し悪しではなく、判定は自分の値のお手本ゾーンでの位置で決める（瞬間の時刻のずれで大きく変わる値は判定しない） */
+export function compareMetrics(self: MetricValues, other: MetricValues, zones: Zones, selfUncertainty?: MetricValues): MetricRow[] {
   return METRICS.filter((d) => self[d.key] !== undefined || other[d.key] !== undefined).map((d) => {
     const s = self[d.key];
     const o = other[d.key];
-    return { key: d.key, self: s, other: o, diff: s !== undefined && o !== undefined ? s - o : undefined, status: judge(s, zones[d.key]) };
+    return { key: d.key, self: s, other: o, diff: s !== undefined && o !== undefined ? s - o : undefined, status: evaluateMetric(d.key, s, undefined, zones[d.key], selfUncertainty?.[d.key]).status };
   });
 }

@@ -3,7 +3,7 @@
 
 import type { Reference } from "../domain/entities";
 import type { ZoneSet, Zones } from "../domain/judgement";
-import { METRICS, type MetricKey } from "../domain/metrics";
+import { METRICS, preciseOnly, type MetricKey } from "../domain/metrics";
 import { APPROACH_GROUPS, type ApproachGroup } from "../domain/throws";
 import { computeWeights, type ManualAdjust, type WeightParts } from "../domain/weighting";
 
@@ -32,7 +32,8 @@ export function weighReferences(refs: Reference[], manual: Record<string, Manual
         id: rep.id,
         stats: r.stats,
         manual: manual[r.id] ?? NEUTRAL_MANUAL,
-        metrics: rep.metrics,
+        // 瞬間の時刻のずれで大きく変わる値（関節の取り違えなど）は、お手本ゾーンに入れない
+        metrics: preciseOnly(rep.metrics, rep.uncertainty),
       })),
     ),
   );

@@ -13,7 +13,8 @@ import { Link, useSearchParams } from "react-router";
 import { alignedFrame, applyFit, fitTo, type Alignable } from "../../domain/align";
 import { CAMERA_LABEL } from "../../domain/camera";
 import type { AnalyzedRep, Session } from "../../domain/entities";
-import { formatMetric, invalidReason, METRIC_BY_KEY } from "../../domain/metrics";
+import { formatMetric, invalidReason, isValidFor, METRIC_BY_KEY } from "../../domain/metrics";
+import { impreciseReason, noZoneReason } from "../../application/judgeThrows";
 import { PHASE_LABEL, phaseAt } from "../../domain/phases";
 import { jointAngle, kp, speedSeries } from "../../domain/pose";
 import { PhaseBar, TimeChart, ZoneBar } from "../components/charts";
@@ -256,7 +257,14 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
                   <StatusIcon status={r.status} />
                 </div>
                 {na ? (
-                  <p className="mt-1.5 text-xs leading-relaxed text-faint">{invalidReason(def, session.camera)}</p>
+                  r.imprecise ? (
+                    <>
+                      <div className="mt-1 font-display text-2xl text-text/70">{formatMetric(r.key, r.value)}</div>
+                      <p className="mt-1 text-[11px] leading-relaxed text-caution">{impreciseReason(r.key, r.uncertainty!, rep.seq.fps)}</p>
+                    </>
+                  ) : (
+                    <p className="mt-1.5 text-xs leading-relaxed text-faint">{!isValidFor(def, session.camera) ? invalidReason(def, session.camera) : r.value === undefined ? "この投球では測れていません" : noZoneReason(def, rep.approach)}</p>
+                  )
                 ) : (
                   <>
                     <div className="mt-1 flex items-baseline justify-between gap-2">

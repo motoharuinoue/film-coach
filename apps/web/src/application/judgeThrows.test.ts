@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ZoneSet, Zones } from "../domain/judgement";
 import { METRIC_BY_KEY } from "../domain/metrics";
-import { judgeMetrics, judgeRep, MIN_JUDGED_FOR_SCORE, noZoneReason, statusOf } from "./judgeThrows";
+import { impreciseReason, judgeMetrics, judgeRep, MIN_JUDGED_FOR_SCORE, noZoneReason, statusOf } from "./judgeThrows";
 
 const zones: Zones = {
   strideRatio: { p10: 0.38, p25: 0.42, p50: 0.45, p75: 0.48, p90: 0.52 },
@@ -56,5 +56,20 @@ describe("投げ始めをそろえて判定する", () => {
     expect(noZoneReason(METRIC_BY_KEY.strideRatio, "drop")).toBe("この指標を測れるお手本が 2 本以上必要です");
     expect(noZoneReason(METRIC_BY_KEY.headStability, "unknown")).toContain("投げ始め（ドロップの有無）が分からない");
     expect(noZoneReason(METRIC_BY_KEY.headStability, "standing")).toContain("投げ始めが同じ（その場から）お手本");
+  });
+});
+
+describe("瞬間の時刻のずれで大きく変わる値", () => {
+  it("判定せず、判定できた指標の数にも入れない", () => {
+    const j = judgeMetrics({ strideRatio: 0.45, frontKnee: 150, elbowAngle: 160 }, zones, { strideRatio: 0.001, elbowAngle: 46 });
+    expect(j.evals.find((e) => e.key === "elbowAngle")).toMatchObject({ status: "na", imprecise: true });
+    expect(j.judged).toBe(2);
+    expect(statusOf("elbowAngle", 160, zones, 46)).toBe("na");
+  });
+
+  it("理由に、変わり幅と、測れる fps の目安を添える", () => {
+    expect(impreciseReason("elbowAngle", 46, 30)).toBe("リリースの瞬間の前後で ±46° 変わるため、判定しません（240 fps 以上で撮ると測れることがあります）");
+    expect(impreciseReason("strideRatio", 0.05, 30)).toContain("接地の瞬間の前後で ±0.05 変わる");
+    expect(impreciseReason("elbowAngle", 30, 240)).toContain("240 fps でも足りません");
   });
 });

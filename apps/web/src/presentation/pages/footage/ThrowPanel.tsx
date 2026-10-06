@@ -18,8 +18,8 @@ import {
   type ThrowRep,
   type ThrowsRequest,
 } from "../../../domain/throws";
-import { judgeMetrics, MIN_JUDGED_FOR_SCORE, noZoneReason, type ThrowJudgement } from "../../../application/judgeThrows";
-import { EMPTY_ZONE_SET, judge, zonesFor, type ZoneSet, type Zones } from "../../../domain/judgement";
+import { impreciseReason, judgeMetrics, MIN_JUDGED_FOR_SCORE, noZoneReason, type ThrowJudgement } from "../../../application/judgeThrows";
+import { EMPTY_ZONE_SET, evaluateMetric, zonesFor, type ZoneSet, type Zones } from "../../../domain/judgement";
 import { PhaseBar, ZoneBar } from "../../components/charts";
 import { Link } from "react-router";
 import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, StatusPill, cx } from "../../components/ui";
@@ -166,15 +166,18 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
         {measured.map((d) => {
           const s = spread(analysis, d.key);
           const zone = zones[d.key];
-          const status = judge(rep.metrics[d.key], zone);
+          const ev = evaluateMetric(d.key, rep.metrics[d.key], undefined, zone, rep.uncertainty?.[d.key]);
+          const status = ev.status;
           return (
             <div key={d.key} className={cx("rounded-xl border bg-white/[0.02] p-3", status === "flag" ? "border-flag/30" : status === "caution" ? "border-caution/25" : "border-line")}>
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[11px] text-muted">{d.label}</div>
-                {zone && <StatusPill status={status} className="shrink-0" />}
+                {zone && !ev.imprecise && <StatusPill status={status} className="shrink-0" />}
               </div>
               <div className="mt-1 font-display text-2xl leading-none">{formatMetric(d.key, rep.metrics[d.key])}</div>
-              {zone ? (
+              {ev.imprecise ? (
+                <p className="mt-2 text-[10px] leading-relaxed text-caution">{impreciseReason(d.key, ev.uncertainty!, rep.sequence.fps)}</p>
+              ) : zone ? (
                 <div className="mt-2 space-y-1">
                   <ZoneBar zone={zone} value={rep.metrics[d.key]} />
                   <div className="font-mono text-[10px] text-ice">
@@ -314,7 +317,7 @@ export function ThrowPanel({
               onSeek={(f) => onSeekFrame(rep.start + f)}
             />
           </div>
-          {refCount > 0 && <ScoreLine judgement={judgeMetrics(rep.metrics, zones)} refCount={refCount} />}
+          {refCount > 0 && <ScoreLine judgement={judgeMetrics(rep.metrics, zones, rep.uncertainty)} refCount={refCount} />}
           <MetricGrid analysis={analysis} rep={rep} zones={zones} />
         </>
       )}

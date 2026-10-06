@@ -11,13 +11,13 @@ import { releasePoint, releaseSpread } from "../domain/practice";
 /** 各指標を、自分の値・自己ベスト・お手本ゾーンで評価する。カメラ角度で測れない指標は判定不可 */
 export function evaluateRep(rep: AnalyzedRep, camera: CameraAngle, set: ZoneSet, best?: AnalyzedRep): MetricEvaluation[] {
   const zones = zonesFor(set, rep.approach);
-  return METRICS.map((d) => evaluateMetric(d.key, isValidFor(d, camera) ? rep.metrics[d.key] : undefined, best?.metrics[d.key], zones[d.key]));
+  return METRICS.map((d) => evaluateMetric(d.key, isValidFor(d, camera) ? rep.metrics[d.key] : undefined, best?.metrics[d.key], zones[d.key], rep.uncertainty?.[d.key]));
 }
 
 /** レップのスコア：判定できた指標のスコアの平均 */
 export function repScore(rep: AnalyzedRep, set: ZoneSet) {
   const zones = zonesFor(set, rep.approach);
-  const scores = METRICS.map((d) => evaluateMetric(d.key, rep.metrics[d.key], undefined, zones[d.key]).score).filter((v): v is number => v !== undefined);
+  const scores = METRICS.map((d) => evaluateMetric(d.key, rep.metrics[d.key], undefined, zones[d.key], rep.uncertainty?.[d.key]).score).filter((v): v is number => v !== undefined);
   return scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
 }
 

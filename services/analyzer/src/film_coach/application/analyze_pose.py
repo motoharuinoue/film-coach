@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..domain.camera import CameraAngle
-from ..domain.metrics import AnalysisExtras, MetricValues, compute_metrics, only_valid
+from ..domain.metrics import AnalysisExtras, MetricValues, compute_metrics, metric_uncertainty, only_valid
 from ..domain.phases import Events, Phase, detect_events, to_phases
 from ..domain.pose import PoseSequence, smooth_sequence
 
@@ -22,10 +22,13 @@ class RepAnalysis:
     events: Events
     phases: list[Phase]
     metrics: MetricValues
+    uncertainty: MetricValues
+    """接地・リリースの瞬間で測った指標の、瞬間の時刻が半コマずれたときの変わり幅"""
 
 
 def analyze_pose(seq: PoseSequence, camera: CameraAngle, extras: AnalysisExtras | None = None) -> RepAnalysis:
     smoothed = smooth_sequence(seq)
     events = detect_events(smoothed)
     metrics = only_valid(compute_metrics(smoothed, events, extras), camera)
-    return RepAnalysis(camera, smoothed, events, to_phases(events), metrics)
+    uncertainty = metric_uncertainty(smoothed, events, metrics)
+    return RepAnalysis(camera, smoothed, events, to_phases(events), metrics, uncertainty)

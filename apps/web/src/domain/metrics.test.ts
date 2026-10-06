@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { synthesizeThrow } from "../infrastructure/demo/synth";
-import { computeMetrics, formatMetric, invalidReason, METRIC_BY_KEY, MIN_SET_S, onlyValid } from "./metrics";
+import { computeMetrics, formatMetric, fpsNeeded, invalidReason, isImprecise, METRIC_BY_KEY, metricUncertainty, MIN_SET_S, onlyValid, preciseOnly } from "./metrics";
 import { detectEvents, strideFound, strideSeen } from "./phases";
 import { smoothSequence, type PoseSequence } from "./pose";
 
@@ -78,5 +78,45 @@ describe("formatMetric", () => {
     expect(formatMetric("releaseTime", 0.3333)).toBe("0.33 s");
     expect(formatMetric("strideRatio", 0.5)).toBe("0.50");
     expect(formatMetric("frontKnee", undefined)).toBe("—");
+  });
+});
+
+describe("接地・リリースの瞬間の時刻のずれでの変わり幅", () => {
+  const at = (fps: number) => {
+    const seq = smoothSequence(synthesizeThrow({}, fps));
+    const e = detectEvents(seq);
+    const m = computeMetrics(seq, e);
+    return { seq, e, m, u: metricUncertainty(seq, e, m) };
+  };
+
+  it("前後のコマの値の差の半分。瞬間で測る指標だけに付ける", () => {
+    const { seq, e, m, u } = at(60);
+    const wrist = (i: number) => seq.frames[i]!.kp[10]!.y / seq.heightM;
+    expect(u.releaseHeight).toBeCloseTo(Math.abs(wrist(e.release + 1) - wrist(e.release - 1)) / 2, 12);
+    expect(Object.keys(u).sort()).toEqual(["elbowAngle", "elbowHeight", "frontKnee", "releaseHeight", "strideRatio", "trunkTilt"]);
+    expect(m.releaseTime).toBeDefined();
+    expect(u.releaseTime).toBeUndefined();
+  });
+
+  it("fps を上げると小さくなる（腕が速く動くリリースの瞬間ほど、低い fps では大きく変わる）", () => {
+    const low = at(30).u;
+    const high = at(240).u;
+    // 合成データにはコマごとの揺らぎがあるので、反比例まではいかない
+    expect(high.releaseHeight!).toBeLessThan(low.releaseHeight!);
+    expect(high.elbowHeight!).toBeLessThan(low.elbowHeight!);
+  });
+
+  it("上限を超えたら判定しない値とし、お手本ゾーンに入れる値からは除く", () => {
+    expect(isImprecise("releaseHeight", 0.05)).toBe(true);
+    expect(isImprecise("releaseHeight", 0.02)).toBe(false);
+    expect(isImprecise("releaseTime", 99)).toBe(false); // 瞬間で測る指標ではない
+    expect(isImprecise("elbowAngle", undefined)).toBe(false); // 変わり幅を入れる前の結果
+    expect(preciseOnly({ releaseHeight: 0.9, trunkTilt: 4, releaseTime: 0.5 }, { releaseHeight: 0.05, trunkTilt: 1 })).toEqual({ trunkTilt: 4, releaseTime: 0.5 });
+  });
+
+  it("上限に収めるのに要る fps の目安（変わり幅は fps にほぼ反比例する）", () => {
+    expect(fpsNeeded("elbowAngle", 30, 30)).toBe(120); // 30 × 30 / 10 = 90
+    expect(fpsNeeded("elbowAngle", 46, 30)).toBe(240); // 138
+    expect(fpsNeeded("elbowAngle", 20, 240)).toBeUndefined(); // 480：240 でも足りない
   });
 });
