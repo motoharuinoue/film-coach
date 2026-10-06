@@ -1,11 +1,13 @@
 // 練習：まとめた映像の投球を並べて比べる。指標の平均・幅・ばらつき、リリース点の散らばり、リリースの骨格の重ね表示。
-// 判定（良好・要改善）は、お手本の分布ができる M2 で出す。いまは自分の投球どうしの比較だけ。
+// 手元のお手本があれば、その分布（お手本ゾーン）で値を色分けし、お手本との一致の点数を出す（M2-3）。
 
 import { IconAlertTriangle, IconArrowRight, IconLoader2, IconTarget, IconTrash } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
+import { judgeMetrics, statusOf } from "../../../application/judgeThrows";
 import { analyzeUnanalyzed, loadPractice, type PracticeView } from "../../../application/practice";
+import { STATUS_LABEL, type Zones } from "../../../domain/judgement";
 import { CAMERA_LABEL } from "../../../domain/camera";
 import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
 import { metricSpreads, PRACTICE_KIND_LABEL, releasePoint, releaseSpread, type PracticeThrow } from "../../../domain/practice";
@@ -13,10 +15,11 @@ import { mid, kp } from "../../../domain/pose";
 import { isValidHeightCm, releaseFrame } from "../../../domain/throws";
 import { Scatter } from "../../components/charts";
 import { FieldScene, Skeleton, type Camera } from "../../components/scene";
-import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, cx } from "../../components/ui";
+import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, STATUS_TEXT, cx } from "../../components/ui";
 import { PageGuide } from "../../guide/PageGuide";
 import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
+import { useReferenceZones } from "../../state/library";
 import { AnalyzerGate } from "./AnalyzerGate";
 
 const GHOST_CAM: Camera = { x0: -2.0, x1: 2.0, y0: -0.15, y1: 2.1 };
@@ -24,16 +27,23 @@ const GHOST_CAM: Camera = { x0: -2.0, x1: 2.0, y0: -0.15, y1: 2.1 };
 /** その投球のリリースの瞬間を開く URL */
 const releaseLink = (t: PracticeThrow) => `/footage/${t.footageId}?t=${(releaseFrame(t.rep) / t.fps).toFixed(2)}`;
 
-function Summary({ view }: { view: PracticeView }) {
+function Summary({ view, zones, refCount }: { view: PracticeView; zones: Zones; refCount: number }) {
   const points = view.throws.map((t) => releasePoint(t.rep.sequence, t.rep.events));
   const spread = releaseSpread(points);
+  const scores = view.throws.map((t) => judgeMetrics(t.rep.metrics, zones).score).filter((s): s is number => s !== undefined);
   const items = [
+    {
+      label: "お手本との一致",
+      value: scores.length ? `${Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)}` : "—",
+      unit: scores.length ? "点" : "",
+      note: refCount === 0 ? "お手本を登録すると出します" : scores.length ? `${scores.length} 球の平均（お手本 ${refCount} 本の分布で判定）` : "判定できる指標が足りません",
+    },
     { label: "投球", value: `${view.throws.length}`, unit: "球" },
     { label: "映像", value: `${view.entries.length}`, unit: "本" },
     { label: "リリース点のばらつき", value: spread ? spread.spread.toFixed(1) : "—", unit: spread ? "cm" : "", note: spread ? `一貫性スコア ${spread.score}（4 cm 以下で満点）` : "2 球以上で出します" },
   ];
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((x) => (
         <Card key={x.label} className="p-4">
           <div className="text-[11px] text-muted">{x.label}</div>
@@ -96,7 +106,7 @@ function Pending({ view, heightCm, busy, error, onAnalyze }: { view: PracticeVie
   );
 }
 
-function MetricTable({ view, selected, onSelect }: { view: PracticeView; selected: number; onSelect: (order: number) => void }) {
+function MetricTable({ view, selected, onSelect, zones }: { view: PracticeView; selected: number; onSelect: (order: number) => void; zones: Zones }) {
   const spreads = metricSpreads(view.throws);
   return (
     <div className="overflow-x-auto">
@@ -113,7 +123,8 @@ function MetricTable({ view, selected, onSelect }: { view: PracticeView; selecte
             ))}
             <th className="px-2 py-2 text-right font-normal">平均</th>
             <th className="px-2 py-2 text-right font-normal">幅</th>
-            <th className="py-2 pl-2 text-right font-normal">標準偏差</th>
+            <th className="px-2 py-2 text-right font-normal">標準偏差</th>
+            <th className="py-2 pl-2 text-right font-normal">お手本ゾーン</th>
           </tr>
         </thead>
         <tbody>
@@ -125,14 +136,18 @@ function MetricTable({ view, selected, onSelect }: { view: PracticeView; selecte
                   <div>{d.short}</div>
                   <div className="text-[10px] text-faint">{d.unit || "比"}</div>
                 </td>
-                {s.values.map((v, i) => (
-                  <td key={i} className={cx("px-2 py-2 text-right font-mono text-xs", view.throws[i]!.order === selected ? "text-turf" : "text-text/85")}>
-                    {v === undefined ? "—" : v.toFixed(d.digits)}
-                  </td>
-                ))}
+                {s.values.map((v, i) => {
+                  const status = statusOf(s.key, v, zones);
+                  return (
+                    <td key={i} className={cx("px-2 py-2 text-right font-mono text-xs", view.throws[i]!.order === selected && "bg-white/[0.04]", status === "na" ? "text-text/85" : STATUS_TEXT[status])} title={status === "na" ? undefined : STATUS_LABEL[status]}>
+                      {v === undefined ? "—" : v.toFixed(d.digits)}
+                    </td>
+                  );
+                })}
                 <td className="px-2 py-2 text-right font-mono text-xs">{formatMetric(s.key, s.mean)}</td>
                 <td className="px-2 py-2 text-right font-mono text-xs text-muted">{s.n > 1 ? `${s.min.toFixed(d.digits)}〜${s.max.toFixed(d.digits)}` : "—"}</td>
-                <td className="py-2 pl-2 text-right font-mono text-xs text-muted">{s.n > 1 ? s.sd.toFixed(d.digits + 1) : "—"}</td>
+                <td className="px-2 py-2 text-right font-mono text-xs text-muted">{s.n > 1 ? s.sd.toFixed(d.digits + 1) : "—"}</td>
+                <td className="py-2 pl-2 text-right font-mono text-xs text-ice">{zones[s.key] ? `${zones[s.key]!.p25.toFixed(d.digits)}〜${zones[s.key]!.p75.toFixed(d.digits)}` : "—"}</td>
               </tr>
             );
           })}
@@ -163,6 +178,7 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
   const { id = "" } = useParams();
   const { lib } = useAnalyzer();
   const { profile } = useServices();
+  const refZones = useReferenceZones();
   const navigate = useNavigate();
   const [view, setView] = useState<PracticeView>();
   const [error, setError] = useState<string>();
@@ -217,14 +233,15 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
         </Button>
       </div>
 
-      <Summary view={view} />
+      <Summary view={view} zones={refZones.zones} refCount={refZones.refCount} />
       <Pending view={view} heightCm={profile.heightCm()} busy={busy} error={analyzeError} onAnalyze={analyze} />
 
       {view.throws.length > 0 && current && (
         <>
           <Card className="space-y-3 p-5">
             <SectionTitle right={<span className="text-[11px] text-faint">列の番号を押すと、その投球を選べます</span>}>投球ごとの指標</SectionTitle>
-            <MetricTable view={view} selected={current.order} onSelect={setSelected} />
+            <MetricTable view={view} selected={current.order} onSelect={setSelected} zones={refZones.zones} />
+            {refZones.refCount > 0 && <p className="text-[11px] text-faint">値の色は、お手本ゾーン（重み付き四分位）での判定です：緑＝良好、黄＝注意、赤＝要改善。「—」はこの指標を測れるお手本が足りないものです。</p>}
           </Card>
 
           <div className="grid gap-5 xl:grid-cols-2">
@@ -271,7 +288,7 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
         </>
       )}
 
-      <DemoNote>お手本との比較と判定（良好・要改善）は、お手本ライブラリ（M2）でお手本の分布ができたら出します。いまは自分の投球どうしを比べています。</DemoNote>
+      {refZones.refCount === 0 && <DemoNote>お手本ライブラリにお手本を登録すると、お手本の分布で「良好・注意・要改善」を判定します。いまは自分の投球どうしを比べています。</DemoNote>}
     </div>
   );
 }
