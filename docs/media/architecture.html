@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- README の構成図。apps/web/scripts/render-diagram.ts で docs/media/architecture.png に書き出す -->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { width: 1280px; height: 836px; background: transparent; font-family: "Hiragino Sans", "Noto Sans JP", sans-serif; color: #e8edf2; }
+  .canvas { position: relative; width: 1280px; height: 836px; background: #0b0f15; border-radius: 28px; overflow: hidden; }
+  .title { position: absolute; left: 44px; top: 30px; font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+  .title small { margin-left: 14px; font-size: 14px; font-weight: 400; color: #8a96a3; }
+  .zone { position: absolute; border-radius: 22px; }
+  .zone .label { position: absolute; left: 22px; top: 14px; font-size: 14px; font-weight: 600; }
+  .mac { left: 40px; top: 84px; width: 900px; height: 490px; border: 2px dashed rgba(46, 229, 157, 0.45); background: rgba(46, 229, 157, 0.03); }
+  .mac .label { color: #2ee59d; }
+  .box { position: absolute; padding: 18px 20px; border-radius: 16px; background: #121922; border: 1px solid rgba(255, 255, 255, 0.1); }
+  .box h3 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .box .tech { margin-top: 4px; font-size: 13px; color: #8a96a3; font-family: "SF Mono", Menlo, monospace; }
+  .box ul { margin-top: 12px; padding-left: 0; list-style: none; font-size: 15px; line-height: 1.7; color: #c9d1da; }
+  .box li::before { content: "・"; color: #5a6675; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .ui { left: 80px; top: 130px; width: 340px; height: 186px; border-color: rgba(46, 229, 157, 0.5); }
+  .api { left: 560px; top: 130px; width: 350px; height: 186px; border-color: rgba(90, 200, 250, 0.5); }
+  .llm { left: 80px; top: 392px; width: 340px; height: 156px; border-color: rgba(255, 122, 26, 0.5); }
+  .model { left: 560px; top: 392px; width: 168px; height: 156px; }
+  .data { left: 742px; top: 392px; width: 168px; height: 156px; }
+  .model h3, .data h3 { font-size: 17px; }
+  .model ul, .data ul { font-size: 13px; line-height: 1.55; margin-top: 8px; }
+  .model li::before { content: none; }
+  .model li { padding-left: 0.6em; }
+  .yt { left: 990px; top: 130px; width: 250px; height: 186px; border-color: rgba(255, 77, 94, 0.5); }
+  .ytzone { left: 970px; top: 84px; width: 290px; height: 490px; border: 2px dashed rgba(255, 255, 255, 0.12); }
+  .ytzone .label { color: #8a96a3; }
+  .ytnote { position: absolute; left: 990px; top: 340px; width: 250px; font-size: 13px; line-height: 1.7; color: #8a96a3; }
+  svg.arrows { position: absolute; inset: 0; pointer-events: none; }
+  .tag { position: absolute; font-size: 13px; color: #c9d1da; background: #0b0f15; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+  .flow { position: absolute; left: 40px; top: 606px; width: 1200px; height: 196px; border-radius: 22px; background: #121922; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .flow .label { position: absolute; left: 22px; top: 16px; font-size: 14px; font-weight: 600; color: #5ac8fa; }
+  .steps { position: absolute; left: 22px; right: 22px; top: 52px; display: flex; align-items: stretch; gap: 0; }
+  .step { flex: 1; padding: 14px 12px; border-radius: 14px; background: #0b0f15; border: 1px solid rgba(255, 255, 255, 0.08); }
+  .step b { display: block; font-size: 15px; }
+  .step span { display: block; margin-top: 6px; font-size: 12px; line-height: 1.6; color: #8a96a3; }
+  .step .n { font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: #2ee59d; }
+  .chev { width: 22px; flex: none; display: flex; align-items: center; justify-content: center; color: #5a6675; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="title">Film Coach の構成<small>解析も文章の作成も、すべて手元の Mac で行います</small></div>
+
+  <div class="zone mac"><div class="label">あなたの Mac</div></div>
+  <div class="zone ytzone"><div class="label">インターネット</div></div>
+
+  <div class="box ui">
+    <h3><span class="dot" style="background:#2ee59d"></span>画面（ブラウザ）</h3>
+    <div class="tech">React 19 · TypeScript · Vite</div>
+    <ul><li>映像と骨格の再生、比較</li><li>判定・重み付け・レポート</li><li>公開デモは合成データで動作</li></ul>
+  </div>
+
+  <div class="box api">
+    <h3><span class="dot" style="background:#5ac8fa"></span>解析サービス</h3>
+    <div class="tech">Python 3.13 · FastAPI · OpenCV</div>
+    <ul><li>動画の取り込み、本人の追跡</li><li>骨格の推定、投球の解析</li><li>お手本・ドリル動画の登録</li></ul>
+  </div>
+
+  <div class="box llm">
+    <h3><span class="dot" style="background:#ff7a1a"></span>Ollama（ローカル LLM）</h3>
+    <div class="tech">gemma3:12b</div>
+    <ul><li>判定結果から改善点の文章を作成</li><li>数値とドリル動画は自動で検査</li></ul>
+  </div>
+
+  <div class="box model">
+    <h3>AI モデル</h3>
+    <div class="tech">ONNX Runtime</div>
+    <ul><li>YOLOX</li><li>（人の検出）</li><li>RTMPose</li><li>（骨格の推定）</li></ul>
+  </div>
+
+  <div class="box data">
+    <h3>データ</h3>
+    <div class="tech">JSON（data/）</div>
+    <ul><li>骨格・指標</li><li>練習・お手本</li><li>ドリル動画</li></ul>
+  </div>
+
+  <div class="box yt">
+    <h3><span class="dot" style="background:#ff4d5e"></span>YouTube</h3>
+    <div class="tech">Data API · yt-dlp</div>
+    <ul><li>お手本・ドリル動画の検索</li><li>再生数などの統計</li><li>指定した区間の取り込み</li></ul>
+  </div>
+  <div class="ytnote">取り込んだお手本の動画は、骨格と指標を計算したあとに削除します。画面では公式の埋め込みプレイヤーで表示します。</div>
+
+  <svg class="arrows" viewBox="0 0 1280 836">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a96a3"/></marker>
+    </defs>
+    <g stroke="#8a96a3" stroke-width="2" fill="none" marker-end="url(#a)">
+      <path d="M424 196 H554"/>
+      <path d="M554 252 H424"/>
+      <path d="M250 320 V386"/>
+      <path d="M644 320 V386"/>
+      <path d="M826 320 V386"/>
+      <path d="M914 222 H984"/>
+    </g>
+  </svg>
+  <div class="tag" style="left:436px;top:172px">動画・操作</div>
+  <div class="tag" style="left:428px;top:258px">骨格・指標・進み具合</div>
+  <div class="tag" style="left:262px;top:340px">判定結果 → 文章</div>
+  <div class="tag" style="left:913px;top:196px">検索</div>
+
+  <div class="flow">
+    <div class="label">解析の流れ</div>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><b>取り込み</b><span>動画ファイルか YouTube の区間</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">2</span><b>本人の追跡</b><span>クリックした 1 人を追い続け、骨格を推定</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">3</span><b>補正</b><span>カメラの動き・関節の誤検出を補正し、メートル単位に変換</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">4</span><b>投球の検出</b><span>手首の速さから投球を切り出し、フェーズに分割</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">5</span><b>指標の計算</b><span>10 種類の QB 指標と投げ始め</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">6</span><b>お手本と比較</b><span>重み付きの分布で判定し、骨格を重ねる</span></div>
+      <div class="chev">›</div>
+      <div class="step"><span class="n">7</span><b>レポート</b><span>改善点の文章とドリル動画</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

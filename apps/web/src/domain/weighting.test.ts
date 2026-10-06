@@ -86,7 +86,7 @@ describe("computeWeights", () => {
     { id: "viral", stats: stats({ views: 5_000_000, likes: 200_000, subscribers: 2_000_000 }), manual: ok, metrics: { strideRatio: 0.8 } },
   ];
 
-  it("人気の高い外れ値より、合意の取れたお手本の重みが大きくなる", () => {
+  it("人気の高い外れ値より、他のお手本と一致するお手本の重みが大きくなる", () => {
     const r = computeWeights(refs);
     const w = (id: string) => r.parts[id]!.strideRatio!.w;
     expect(w("viral")).toBeLessThan(w("a"));

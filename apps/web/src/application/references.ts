@@ -54,7 +54,7 @@ export function weighReferences(refs: Reference[], manual: Record<string, Manual
 }
 
 /**
- * 投げ始めごとの重みと分布。投げ始めが同じレップだけで重み付けする（合意度 K も、同じ投げ始めの中で見る）。
+ * 投げ始めごとの重みと分布。投げ始めが同じレップだけで重み付けする（一致度 K も、同じ投げ始めの中で見る）。
  * 投げ始めの分からないレップと、デモの合成データ（投げ始めを持たない）は入らない
  */
 export function weighByApproach(refs: Reference[], manual: Record<string, ManualAdjust>): Record<ApproachGroup, ReferenceWeights> {

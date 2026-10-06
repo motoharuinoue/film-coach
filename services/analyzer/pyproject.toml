@@ -3,6 +3,7 @@ name = "film-coach-analyzer"
 version = "0.1.0"
 description = "Film Coach の解析サービス：骨格の時系列からフェーズと QB 指標を出す"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi>=0.142.2",
