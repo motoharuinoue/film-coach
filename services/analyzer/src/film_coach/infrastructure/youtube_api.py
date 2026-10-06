@@ -103,7 +103,7 @@ class YouTubeDataApi:
                 raise QuotaExceeded("YouTube Data API の今日の無料枠を使い切りました") from None
             if e.code in (400, 403):
                 raise YouTubeApiError(
-                    "YouTube Data API に断られました。キーが正しいか、"
+                    "YouTube Data API がリクエストを拒否しました。キーが正しいか、"
                     "YouTube Data API v3 が有効になっているかを確かめてください"
                     f"（{e.code} {reason or 'エラー'}）"
                 ) from None

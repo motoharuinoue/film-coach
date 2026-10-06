@@ -38,6 +38,14 @@ function Logo() {
   );
 }
 
+/** サイドバーの「自分の映像」に添える、解析サービスとの接続の状態 */
+const CONNECTION_LABEL = {
+  none: "解析サービスはありません",
+  checking: "解析サービスへの接続を確かめています",
+  online: "解析サービスにつながっています",
+  offline: "解析サービスにつながっていません",
+} as const;
+
 function SideLink({ to, end, children, active }: { to: string; end?: boolean; children: React.ReactNode; active?: boolean }) {
   return (
     <NavLink to={to} end={end} className={({ isActive }) => cx("relative flex shrink-0 items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors", isActive || active ? "text-text" : "text-muted hover:bg-white/[0.04] hover:text-text")}>
@@ -109,8 +117,8 @@ function Shell() {
             {analyzer.status !== "none" && (
               <span
                 className={cx("relative ml-auto h-2 w-2 rounded-full", analyzer.status === "online" ? "bg-turf" : analyzer.status === "checking" ? "bg-caution" : "bg-flag")}
-                title={analyzer.status === "online" ? "解析サービスにつながっています" : "解析サービスにつながっていません"}
-                aria-label={analyzer.status === "online" ? "解析サービスにつながっています" : "解析サービスにつながっていません"}
+                title={CONNECTION_LABEL[analyzer.status]}
+                aria-label={CONNECTION_LABEL[analyzer.status]}
               />
             )}
           </SideLink>

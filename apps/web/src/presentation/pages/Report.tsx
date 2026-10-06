@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { formatMetric, METRIC_BY_KEY, RADAR_LABEL, type RadarAxis } from "../../domain/metrics";
 import { Radar, ScoreRing, Scatter } from "../components/charts";
+import { fitCamera } from "../components/camera";
 import { AngleArc, FieldScene, PoseThumb, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, CountUp, SectionTitle, StatusPill, cx } from "../components/ui";
 import type { Finding } from "../../application/coaching";
@@ -69,14 +70,14 @@ export function Report() {
       <article className="print-light card overflow-hidden">
         {/* 表紙 */}
         <header className="relative">
-          <FieldScene className="block w-full">
+          <FieldScene className="block w-full" cam={fitCamera(rep.seq.frames, 4)}>
             <Trail frames={rep.seq.frames} joint="rWrist" from={rep.events.strideStart} to={rep.events.followStart} />
             <Skeleton frame={heroFrame} />
             <AngleArc frame={heroFrame} a="rShoulder" b="rElbow" c="rWrist" label="肘" />
           </FieldScene>
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/80 to-transparent px-8 pt-24 pb-7">
             <div className="font-display text-sm tracking-[0.3em] text-turf">COACHING REPORT</div>
-            <h1 className="mt-2 text-3xl leading-tight font-semibold md:text-4xl">{hero ? `${hero.title}。ここを直せば投球がつながる` : "大きな崩れはありません"}</h1>
+            <h1 className="mt-2 text-3xl leading-tight font-semibold md:text-4xl">{hero ? `${hero.title}。ここを直せば動きがつながる` : "大きな崩れはありません"}</h1>
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
               <span>
                 {player.name ?? "あなた"}
@@ -214,7 +215,7 @@ export function Report() {
 
           <footer className="border-t border-line pt-5 text-[11px] leading-relaxed text-faint">
             判定はルールエンジンが行い、
-            {narrator.ok && narrator.narrator ? `改善点の文章は手元の LLM（${narrator.narrator.model}）が判定結果をもとに書いています。文章に出る数値とドリル動画が判定結果と登録のものだけかを確かめ、合わなければテンプレートの文章にします。` : "文章はテンプレートで作成しています（数値は判定結果からだけ取ります）。"}単眼 2D 映像による推定のため、角度・距離には誤差があります。
+            {narrator.ok && narrator.narrator ? `改善点の文章は手元の LLM（${narrator.narrator.model}）が判定結果をもとに書いています。文章中の数値は判定結果と、ドリル動画は登録済みのものと照合し、合わなければテンプレートの文章に切り替えます。` : "文章はテンプレートで作成しています（数値は判定結果のものだけを使います）。"}単眼 2D 映像による推定のため、角度・距離には誤差があります。
             {source === "demo" ? "チャンネル・動画・選手はすべて架空のデモデータです。" : "お手本は YouTube から取り込んだ区間で、元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。"}
           </footer>
         </div>

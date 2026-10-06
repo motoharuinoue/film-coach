@@ -33,7 +33,7 @@ def test_名前の前後の空白を除いて受け付ける() -> None:
         ("Qb7Drill_01", "ドリル", -1, STRIDE, "開始位置"),
         ("Qb7Drill_01", "ドリル", 0, [], "指標"),
         ("Qb7Drill_01", "ドリル", 0, [DrillTarget("strideRatio", "any")] * (MAX_TARGETS + 1), "指標"),
-        ("Qb7Drill_01", "ドリル", 0, [DrillTarget("stride", "low")], "知らない指標"),  # type: ignore[arg-type]
+        ("Qb7Drill_01", "ドリル", 0, [DrillTarget("stride", "low")], "対応していない指標"),  # type: ignore[arg-type]
         ("Qb7Drill_01", "ドリル", 0, [DrillTarget("strideRatio", "low"), DrillTarget("strideRatio", "high")], "2 回"),
     ],
 )

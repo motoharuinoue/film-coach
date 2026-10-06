@@ -22,7 +22,7 @@ describe("改善点の文章は、お手本の範囲のどちら側に外れた�
   it("ほかの指標は、範囲より大きいか小さいかを書き、範囲に入るかを見ていると添える", () => {
     const z: Zone = { p10: 0.9, p25: 0.95, p50: 1.0, p75: 1.05, p90: 1.1 };
     const high = writer.write(evaluateMetric("releaseHeight", 1.2, undefined, z));
-    expect(high.title).toBe("リリース高がお手本の範囲より大きい");
+    expect(high.title).toBe("リリース高がお手本の範囲より高い");
     expect(high.body).toContain("この範囲に入るか");
   });
 });

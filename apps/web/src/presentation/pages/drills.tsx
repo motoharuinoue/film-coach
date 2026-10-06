@@ -29,7 +29,7 @@ export function DrillForm({ c, start, onStart }: { c: YouTubeCandidate; start: s
       : startSec === undefined
         ? "開始位置は 1:35 のような形で入れてください"
         : c.durationSec > 0 && startSec >= c.durationSec
-          ? `動画の長さ（${formatTime(c.durationSec)}）より前にしてください`
+          ? `開始位置は動画の長さ（${formatTime(c.durationSec)}）より前にしてください`
           : targets.length === 0
             ? "直す指標を 1 つ以上選んでください"
             : undefined;
@@ -88,7 +88,7 @@ export function DrillForm({ c, start, onStart }: { c: YouTubeCandidate; start: s
               <select
                 value={sides[m.key] ?? ""}
                 onChange={(e) => setSides((s) => ({ ...s, [m.key]: (e.target.value || undefined) as DrillSide | undefined }))}
-                aria-label={`${m.label} のドリルか`}
+                aria-label={`${m.label}：どちら側に外れたときのドリルか`}
                 disabled={busy}
                 className="rounded-md border border-line bg-panel px-2 py-1 text-xs"
               >

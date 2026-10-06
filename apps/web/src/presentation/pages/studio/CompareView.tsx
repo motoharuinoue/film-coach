@@ -2,9 +2,10 @@ import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
 import { alignedFrame, applyFit, fitTo } from "../../../domain/align";
 import type { AnalyzedRep, Session } from "../../../domain/entities";
-import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
+import { formatMetric, METRIC_BY_KEY, unitSuffix } from "../../../domain/metrics";
 import { PHASE_LABEL, phaseAt } from "../../../domain/phases";
 import { PhaseBar } from "../../components/charts";
+import { fitCamera } from "../../components/camera";
 import { FieldScene, Hud, Skeleton } from "../../components/scene";
 import { Badge, Button, Card, SectionTitle, Segmented, StatusIcon, cx } from "../../components/ui";
 import { usePlayback } from "../../hooks/usePlayback";
@@ -28,6 +29,8 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
   }, [targetId, bench.best, coach]);
 
   const self = rep.seq.frames[pb.frame]!;
+  // 比べる相手は自分の投球に合わせて重ねるので、自分の投球の区間に合わせて描く
+  const cam = useMemo(() => fitCamera(rep.seq.frames, 4), [rep]);
   const other = target ? applyFit(target.seq.frames[alignedFrame(rep, target, pb.frame)]!, fitTo(rep, target)) : undefined;
   const evals = coach.evaluate(rep, session.camera, bench);
   const phase = PHASE_LABEL[phaseAt(rep.phases, pb.frame)];
@@ -35,7 +38,7 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">フェーズの区切りで時間を合わせ、身長をそろえ、接地時の後ろ足で位置を合わせて比べます</p>
+        <p className="text-sm text-muted">フェーズの区切りで時間を、身長で大きさを、接地時の後ろ足で位置をそろえて比べます</p>
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             label="比較の表示"
@@ -59,7 +62,7 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
 
       {mode === "overlay" ? (
         <Card className="overflow-hidden">
-          <FieldScene className="block w-full" hud={<Hud tl={[`今回 ${repLabel(rep.index)}`, target ? `比較：${target.label}` : ""]} tr={[phase]} bl={[`${self.t.toFixed(3)}s`]} />}>
+          <FieldScene className="block w-full" cam={cam} hud={<Hud tl={[`今回 ${repLabel(rep.index)}`, target ? `比較：${target.label}` : ""]} tr={[phase]} bl={[`${self.t.toFixed(3)}s`]} />}>
             {other && <Skeleton frame={other} variant="ref" />}
             <Skeleton frame={self} />
           </FieldScene>
@@ -67,12 +70,12 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="overflow-hidden">
-            <FieldScene className="block w-full" hud={<Hud tl={[`今回 ${repLabel(rep.index)}`]} tr={[phase]} />}>
+            <FieldScene className="block w-full" cam={cam} hud={<Hud tl={[`今回 ${repLabel(rep.index)}`]} tr={[phase]} />}>
               <Skeleton frame={self} />
             </FieldScene>
           </Card>
           <Card className="overflow-hidden">
-            <FieldScene className="block w-full" hud={<Hud tl={[target?.label ?? "—"]} tr={[phase]} />}>
+            <FieldScene className="block w-full" cam={cam} hud={<Hud tl={[target?.label ?? "—"]} tr={[phase]} />}>
               {other && <Skeleton frame={other} variant="ref" />}
             </FieldScene>
           </Card>
@@ -121,7 +124,7 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
                     <td className="py-2.5 text-right font-mono">{formatMetric(e.key, e.value)}</td>
                     <td className="py-2.5 text-right font-mono text-ice">{formatMetric(e.key, o)}</td>
                     <td className={cx("py-2.5 text-right font-mono", diff === undefined ? "text-faint" : Math.abs(diff) < 10 ** -def.digits ? "text-muted" : "text-text")}>
-                      {diff === undefined ? "—" : `${diff > 0 ? "+" : ""}${diff.toFixed(def.digits)}${def.unit}`}
+                      {diff === undefined ? "—" : `${diff > 0 ? "+" : ""}${diff.toFixed(def.digits)}${unitSuffix(def.unit)}`}
                     </td>
                     <td className="py-2.5 pl-4">
                       <StatusIcon status={e.status} />

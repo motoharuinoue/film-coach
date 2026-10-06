@@ -4,7 +4,7 @@ import { OllamaNarrator, userPrompt } from "./ollamaNarrator";
 
 const input: NarrationInput = {
   metric: "リリース時の体幹の前傾",
-  hint: "腰から肩のラインと鉛直線の角度",
+  hint: "腰と肩を結ぶ線と、鉛直線のなす角度",
   unit: "°",
   value: "-2°",
   zone: { low: "5°", high: "9°" },

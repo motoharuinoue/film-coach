@@ -196,7 +196,7 @@ function Viewer() {
               <div className="col-span-2">
                 <dt className="text-[11px] text-muted">場面の切り替わり</dt>
                 <dd className="text-xs">
-                  <span className="font-mono">{track.cuts.length}</span> か所。切り替わりの向こうへは追跡をつながないので、別の場面に映る本人は追いません。
+                  <span className="font-mono">{track.cuts.length}</span> か所。切り替わりをまたいで追跡はつながないため、別の場面に映る本人は追いません。
                 </dd>
               </div>
             )}
@@ -228,7 +228,7 @@ function Viewer() {
                 </span>
               </span>
             </a>
-            <p className="mt-3 text-[11px] leading-relaxed text-faint">元の動画は解析のあとに消し、公式の埋め込みプレイヤーに骨格を重ねています（ADR-0005）。</p>
+            <p className="mt-3 text-[11px] leading-relaxed text-faint">規約と著作権に配慮して元の動画は解析のあとに消し、公式の埋め込みプレイヤーに骨格を重ねています。</p>
           </Card>
         )}
 

@@ -53,15 +53,15 @@ const ALL: CameraAngle[] = ["side", "behind", "front", "endzone", "sideline"];
 
 export const METRICS: MetricDef[] = [
   { key: "releaseTime", label: "始動からリリース", short: "リリース時間", unit: "s", digits: 2, validAngles: ALL, axis: "release", at: "release", hint: "ステップ開始からボールが離れるまで" },
-  { key: "strideRatio", label: "ステップ幅（身長比）", short: "ステップ幅", unit: "", digits: 2, validAngles: ["side"], axis: "footwork", at: "plant", hint: "前足の接地時の両足首の距離 ÷ 身長", tolerance: 0.03 },
-  { key: "frontKnee", label: "接地時の前膝角度", short: "前膝角度", unit: "°", digits: 0, validAngles: ["side"], axis: "footwork", at: "plant", hint: "ブロックの強さ。伸びすぎも曲がりすぎも力が逃げる", tolerance: 8 },
+  { key: "strideRatio", label: "ステップ幅（身長比）", short: "ステップ幅", unit: "", digits: 2, validAngles: ["side"], axis: "footwork", at: "plant", hint: "前足が接地したときの両足首の距離 ÷ 身長", tolerance: 0.03 },
+  { key: "frontKnee", label: "接地時の前膝角度", short: "前膝角度", unit: "°", digits: 0, validAngles: ["side"], axis: "footwork", at: "plant", hint: "ブロックの強さ。伸びすぎても曲がりすぎても力が逃げる", tolerance: 8 },
   { key: "hipShoulderSep", label: "腰と肩の捻り差", short: "捻り差", unit: "°", digits: 0, validAngles: ["behind", "front"], axis: "rotation", at: "plant", hint: "接地時の骨盤と肩のラインの角度差の最大値" },
   { key: "sequenceGap", label: "骨盤→体幹のピーク間隔", short: "回転の間", unit: "ms", digits: 0, validAngles: ["side", "behind"], axis: "rotation", at: "release", hint: "キネマティックシーケンス。骨盤が先に回り、体幹が続くのが理想" },
   { key: "elbowHeight", label: "リリース時の肘の高さ", short: "肘の高さ", unit: "cm", digits: 0, validAngles: ["side", "behind"], axis: "armPath", at: "release", hint: "肩のラインからの高さ。マイナスは肩より下", tolerance: 4 },
-  { key: "elbowAngle", label: "リリース時の肘角度", short: "肘角度", unit: "°", digits: 0, validAngles: ["side"], axis: "armPath", at: "release", hint: "肩・肘・手首の角度", tolerance: 10 },
+  { key: "elbowAngle", label: "リリース時の肘角度", short: "肘角度", unit: "°", digits: 0, validAngles: ["side"], axis: "armPath", at: "release", hint: "肩・肘・手首がなす肘の角度", tolerance: 10 },
   { key: "releaseHeight", label: "リリース点の高さ（身長比）", short: "リリース高", unit: "", digits: 2, validAngles: ["side"], axis: "release", at: "release", hint: "手首の高さ ÷ 身長", tolerance: 0.03 },
-  { key: "trunkTilt", label: "リリース時の体幹の前傾", short: "前傾", unit: "°", digits: 0, validAngles: ["side"], axis: "posture", at: "release", hint: "腰から肩のラインと鉛直線の角度", tolerance: 3 },
-  { key: "headStability", label: "頭の上下動", short: "頭の安定", unit: "cm", digits: 1, validAngles: ALL, axis: "base", at: "range", hint: "ドロップとセットの間の頭の高さの標準偏差", byApproach: true },
+  { key: "trunkTilt", label: "リリース時の体幹の前傾", short: "前傾", unit: "°", digits: 0, validAngles: ["side"], axis: "posture", at: "release", hint: "腰と肩を結ぶ線と、鉛直線のなす角度", tolerance: 3 },
+  { key: "headStability", label: "頭の上下動", short: "頭の安定", unit: "cm", digits: 1, validAngles: ALL, axis: "base", at: "range", hint: "ドロップからセットまでの、頭の高さの標準偏差", byApproach: true },
 ];
 
 export const METRIC_BY_KEY = Object.fromEntries(METRICS.map((m) => [m.key, m])) as Record<MetricKey, MetricDef>;
@@ -179,9 +179,11 @@ export function invalidReason(def: MetricDef, angle: CameraAngle) {
   return `${CAMERA_LABEL[angle]}の映像では測れません（${ok}の映像が必要）`;
 }
 
+/** 値の後ろに付ける単位。英字の単位（cm・ms・s）の前には半角スペースを入れ、° は詰める */
+export const unitSuffix = (unit: string) => (/^[A-Za-z]/.test(unit) ? ` ${unit}` : unit);
+
 export function formatMetric(key: MetricKey, value: number | undefined) {
   if (value === undefined) return "—";
   const def = METRIC_BY_KEY[key];
-  const v = value.toFixed(def.digits);
-  return def.unit ? `${v} ${def.unit}` : v;
+  return `${value.toFixed(def.digits)}${unitSuffix(def.unit)}`;
 }

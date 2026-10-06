@@ -69,7 +69,7 @@ export function Home() {
             </ScoreRing>
             <div className="space-y-3">
               <div>
-                <div className="text-xs text-muted">前回のドリル比</div>
+                <div className="text-xs text-muted">前回のドリルとの差</div>
                 {prev ? (
                   <div className={delta >= 0 ? "font-display text-2xl text-turf" : "font-display text-2xl text-flag"}>
                     {delta >= 0 ? "+" : ""}
@@ -98,7 +98,7 @@ export function Home() {
                   これまでで最も高いスコアです
                 </div>
               ) : (
-                <div className="text-xs text-muted">最初のセッションです。次の練習から推移を出します</div>
+                <div className="text-xs text-muted">最初のセッションです。次の練習から推移を表示します</div>
               )}
             </div>
           </div>
@@ -203,7 +203,7 @@ export function Home() {
                 <div className="hidden text-right text-xs text-muted sm:block">{s.source === "youtube" ? "YouTube URL" : "ファイル"}</div>
                 <div className="text-right font-display text-2xl">
                   {sc ?? (
-                    <span className="text-sm text-faint" title="判定できる指標が少ないため">
+                    <span className="text-sm text-faint" title="判定できる指標が少ないため、スコアを出していません">
                       —
                     </span>
                   )}

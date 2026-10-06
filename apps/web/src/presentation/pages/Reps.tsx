@@ -67,7 +67,7 @@ export function Reps() {
         <TargetLock />
       ) : (
         <DemoNote>
-          この練習の投球は、「自分の映像」で本人を選んで追跡した骨格から切り出しています。試合映像で対象選手を 1 回押してロックする機能（SAM 2）は M4 で追加します。
+          この練習の投球は、「自分の映像」で本人を選んで追跡した骨格から切り出しています。試合映像の中で対象選手を一度クリックしてロックする機能（SAM 2）は、今後追加する予定です。
           <Link to={`/footage/practices/${session.id}`} className="ml-1 text-ice underline">
             練習の画面で見る
           </Link>
@@ -110,7 +110,7 @@ function TargetLock() {
   return (
     <Card className="grid gap-0 overflow-hidden lg:grid-cols-[1.6fr_1fr]">
       <div className="relative bg-[#0a1a12]">
-        <svg viewBox="0 0 1600 720" className="block w-full" role="img" aria-label="試合映像のフレーム。選手を押すと対象としてロックする">
+        <svg viewBox="0 0 1600 720" className="block w-full" role="img" aria-label="試合映像のフレーム。選手をクリックすると、追跡の対象としてロックします">
           <defs>
             <linearGradient id="tl-turf" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor="#0b2016" />
@@ -147,7 +147,7 @@ function TargetLock() {
         {!target && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-ink/80 px-3 py-1.5 text-xs text-muted backdrop-blur">
-              <IconPointer size={14} aria-hidden /> 追跡したい選手を押してください
+              <IconPointer size={14} aria-hidden /> 追跡したい選手をクリックしてください
             </span>
           </div>
         )}
@@ -155,7 +155,7 @@ function TargetLock() {
       <div className="flex flex-col p-5">
         <SectionTitle right={<Badge tone="pylon">試合映像</Badge>}>対象選手のロック</SectionTitle>
         <p className="text-sm leading-relaxed text-muted">
-          試合映像では 22 人が映ります。1 回押した選手を、SAM 2 のマスクでプレー中ずっと追い続けます。{game && `サンプル：${formatDate(game.date)} ${game.title}`}
+          試合映像には 22 人が映ります。一度クリックした選手を、SAM 2 のマスクでプレー中ずっと追跡します。{game && `サンプル：${formatDate(game.date)} ${game.title}`}
         </p>
         <div className="mt-4 rounded-xl border border-line bg-white/[0.03] p-4">
           {target ? (
@@ -173,7 +173,7 @@ function TargetLock() {
           )}
         </div>
         <div className="mt-auto pt-4">
-          <DemoNote>M4 で SAM 2（Apache-2.0）の動画セグメンテーションと ByteTrack による追跡に置き換えます。背番号の自動認識は M5 の予定です。</DemoNote>
+          <DemoNote>今後、SAM 2（Apache-2.0）の動画セグメンテーションと ByteTrack による追跡に置き換える予定です。背番号の自動認識も予定しています。</DemoNote>
         </div>
       </div>
     </Card>

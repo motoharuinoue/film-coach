@@ -108,7 +108,7 @@ export function NewSession() {
       ? [
           { ok: file?.height ? file.height >= 720 : undefined, label: file?.height ? `解像度 ${file.width}×${file.height}（720p 以上）` : "解像度 720p 以上" },
           { ok: file?.durationSec ? file.durationSec <= 180 : undefined, label: file?.durationSec ? `長さ ${formatTime(file.durationSec)}（3 分以内）` : "長さ 3 分以内" },
-          { ok: undefined, label: "fps（60fps 以上を推奨）は解析時に確認" },
+          { ok: undefined, label: "fps（60 fps 以上を推奨）は解析時に確認" },
         ]
       : [
           { ok: videoId ? true : undefined, label: "URL から動画 ID を取得" },
@@ -162,7 +162,7 @@ export function NewSession() {
                     >
                       <IconFileUpload size={36} stroke={1.5} className="text-turf" aria-hidden />
                       <div className="mt-3 text-sm">動画をドラッグ&ドロップ、またはクリックして選択</div>
-                      <div className="mt-1 text-xs text-muted">mp4 / mov（iPhone の HEVC も可）· 30〜240fps</div>
+                      <div className="mt-1 text-xs text-muted">mp4 / mov（iPhone の HEVC も可）· 30〜240 fps</div>
                     </button>
                     <input ref={inputRef} type="file" accept="video/*" className="hidden" onChange={(e) => e.target.files?.[0] && readFile(e.target.files[0])} />
                     {fileError && <p className="mt-2 text-xs text-flag">{fileError}</p>}
@@ -176,7 +176,7 @@ export function NewSession() {
                         </button>
                       </div>
                     )}
-                    {file && !file.height && <p className="mt-2 text-xs text-muted">このブラウザでは動画の情報を読めませんでした。解析サービス（M1）では読めます。</p>}
+                    {file && !file.height && <p className="mt-2 text-xs text-muted">このブラウザでは動画の情報を読めませんでした。解析サービスに取り込めば読めます。</p>}
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -225,7 +225,7 @@ export function NewSession() {
                           ))}
                         </div>
                         {!segment.ok && <p className="text-xs text-flag">{segment.error}</p>}
-                        <p className="text-xs leading-relaxed text-muted">指定した区間だけを取得し、骨格と指標を出したら元の動画は削除します。残すのは派生データと出典だけです（ADR-0005）。</p>
+                        <p className="text-xs leading-relaxed text-muted">指定した区間だけを取得し、骨格と指標を出したら元の動画は削除します。YouTube の規約と著作権に配慮して、残すのは骨格・指標と出典だけにしています。</p>
                       </motion.div>
                     )}
                   </div>
@@ -287,7 +287,7 @@ export function NewSession() {
                     );
                   })}
                 </ul>
-                {camera !== "side" && <p className="mt-3 text-xs text-muted">QB の投球フォームは、投げる腕の側の真横から撮ると最も多くの指標を測れます。</p>}
+                {camera !== "side" && <p className="mt-3 text-xs text-muted">QB の投球フォームは、投げる腕側の真横から撮ると、最も多くの指標を測れます。</p>}
               </Card>
 
               <Button variant="primary" className="w-full py-2.5" disabled={!ready || !!importing || (live && source === "file" && !rawFile)} onClick={startAnalysis}>

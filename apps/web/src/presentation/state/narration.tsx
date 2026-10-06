@@ -89,7 +89,7 @@ export function NarrationSource({ narration, pending, className }: { narration?:
   const text = pending
     ? `文章を書いています…（${narrator.model}）`
     : narration?.source === "llm"
-      ? `文章：手元の LLM（${narration.model}）。数値とドリル動画が、判定結果と登録のものだけか確かめています`
+      ? `文章：手元の LLM（${narration.model}）。数値は判定結果と、ドリル動画は登録済みのものと照合済みです`
       : (narration?.reason ?? "文章：テンプレート");
   return <p className={className ?? "no-print mt-1.5 text-[10px] text-faint"}>{text}</p>;
 }

@@ -4,7 +4,7 @@
 // - 数値が、判定結果の値（自分の値・お手本ゾーン・自己ベスト）だけか
 // - ドリル動画を渡していないのに、ドリルや動画に触れていないか（存在しないドリル動画を挙げない）
 
-import { METRIC_BY_KEY } from "../domain/metrics";
+import { METRIC_BY_KEY, unitSuffix } from "../domain/metrics";
 import { outside } from "../domain/judgement";
 import type { Finding } from "./coaching";
 import type { FindingNarrator, NarrationInput } from "./ports";
@@ -25,7 +25,7 @@ export type Narration = {
 export function narrationInput(f: Finding): NarrationInput {
   const d = METRIC_BY_KEY[f.key];
   const e = f.evaluation;
-  const fmt = (v: number) => `${v.toFixed(d.digits)}${d.unit}`;
+  const fmt = (v: number) => `${v.toFixed(d.digits)}${unitSuffix(d.unit)}`;
   return {
     metric: d.label,
     hint: d.hint,
@@ -69,7 +69,7 @@ export async function narrate(narrator: FindingNarrator | undefined, f: Finding,
     const out = await narrator.write(input, signal);
     const bad = unexpectedNumbers(`${out.title} ${out.body}`, input);
     if (bad.length) return { ...template(`判定結果にない数値（${bad.join("、")}）が入っていたため、テンプレートの文章にしました`), checked: true };
-    if (unexpectedMentions(`${out.title} ${out.body}`, input).length) return { ...template("材料にないドリル動画に触れていたため、テンプレートの文章にしました"), checked: true };
+    if (unexpectedMentions(`${out.title} ${out.body}`, input).length) return { ...template("登録されていないドリル動画に触れていたため、テンプレートの文章にしました"), checked: true };
     if (!out.title.trim() || !out.body.trim()) return template("文章が空だったため、テンプレートの文章にしました");
     return { title: out.title.trim(), body: out.body.trim(), source: "llm", model: narrator.model };
   } catch (e) {
