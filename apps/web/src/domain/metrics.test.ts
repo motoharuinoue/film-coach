@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { synthesizeThrow } from "../infrastructure/demo/synth";
-import { computeMetrics, formatMetric, invalidReason, METRIC_BY_KEY, onlyValid } from "./metrics";
-import { detectEvents } from "./phases";
-import { smoothSequence } from "./pose";
+import { computeMetrics, formatMetric, invalidReason, METRIC_BY_KEY, MIN_SET_S, onlyValid } from "./metrics";
+import { detectEvents, strideFound, strideSeen } from "./phases";
+import { smoothSequence, type PoseSequence } from "./pose";
 
 const analyze = (params: Parameters<typeof synthesizeThrow>[0] = {}) => {
   const seq = smoothSequence(synthesizeThrow(params));
@@ -23,6 +23,42 @@ describe("computeMetrics", () => {
 
   it("横からの 2D では測れない値は、外から渡されない限り undefined のまま", () => {
     expect(analyze().hipShoulderSep).toBeUndefined();
+  });
+});
+
+/** start 以降の骨格（時刻は 0 から） */
+const from = (seq: PoseSequence, start: number): PoseSequence => ({ ...seq, frames: seq.frames.slice(start).map((f, i) => ({ ...f, t: i / seq.fps })) });
+
+describe("映っていない区間・見つからないイベントからは測らない", () => {
+  const seq = smoothSequence(synthesizeThrow());
+  const e = detectEvents(seq);
+
+  it("前足が動かずステップが見つからなければ、ステップと接地をリリースにそろえ、足の指標と時間を出さない", () => {
+    const frozen = { ...seq, frames: seq.frames.map((f) => ({ ...f, kp: f.kp.map((p, i) => (i === 15 ? { ...seq.frames[0]!.kp[15]!, c: p.c } : p)) })) };
+    const fe = detectEvents(frozen);
+    expect([fe.strideStart, fe.plant]).toEqual([fe.release, fe.release]);
+    expect(strideFound(fe)).toBe(false);
+    const m = computeMetrics(frozen, fe);
+    expect([m.releaseTime, m.strideRatio, m.frontKnee, m.headStability]).toEqual([undefined, undefined, undefined, undefined]);
+    expect(m.elbowAngle).toBeDefined();
+  });
+
+  it("ステップの途中から映っていれば、始動からリリースだけ出さない", () => {
+    const cut = from(seq, e.strideStart + 2);
+    const ce = detectEvents(cut);
+    expect(ce.strideStart).toBe(0);
+    expect([strideFound(ce), strideSeen(ce)]).toEqual([true, false]);
+    const m = computeMetrics(cut, ce);
+    expect(m.releaseTime).toBeUndefined();
+    expect(m.strideRatio).toBeCloseTo(computeMetrics(seq, e).strideRatio!, 9);
+  });
+
+  it(`頭の上下動は、ステップの前が ${MIN_SET_S} 秒より短ければ出さない`, () => {
+    const need = Math.round(MIN_SET_S * seq.fps);
+    const short = from(seq, e.strideStart - (need - 2));
+    const long = from(seq, e.strideStart - (need + 2));
+    expect(computeMetrics(short, detectEvents(short)).headStability).toBeUndefined();
+    expect(computeMetrics(long, detectEvents(long)).headStability).toBeDefined();
   });
 });
 

@@ -1,9 +1,28 @@
 // お手本ゾーン（重み付き分布）に対する判定とスコア。
 
-import type { MetricKey } from "./metrics";
+import { METRICS, type MetricKey } from "./metrics";
+import { isApproachGroup, type Approach, type ApproachGroup } from "./throws";
 
 export type Zone = { p10: number; p25: number; p50: number; p75: number; p90: number };
 export type Zones = Partial<Record<MetricKey, Zone>>;
+
+/** お手本のゾーン一式：全部のお手本から作ったものと、投げ始めごとに作ったもの */
+export type ZoneSet = { all: Zones; byApproach: Record<ApproachGroup, Zones> };
+
+export const EMPTY_ZONE_SET: ZoneSet = { all: {}, byApproach: { drop: {}, standing: {} } };
+
+/**
+ * 投球の判定に使うゾーン。投げ始めで値の意味が変わる指標（byApproach）は、投げ始めが同じお手本のゾーンを使い、
+ * 投げ始めが分からなければ判定しない。ほかの指標は全部のお手本のゾーンを使う
+ */
+export function zonesFor(set: ZoneSet, approach: Approach | undefined): Zones {
+  const out: Zones = {};
+  for (const d of METRICS) {
+    const z = d.byApproach ? (isApproachGroup(approach) ? set.byApproach[approach][d.key] : undefined) : set.all[d.key];
+    if (z) out[d.key] = z;
+  }
+  return out;
+}
 export type Status = "good" | "caution" | "flag" | "na";
 
 export const STATUS_LABEL: Record<Status, string> = {

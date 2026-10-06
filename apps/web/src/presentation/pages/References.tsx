@@ -5,6 +5,7 @@ import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import { KIND_LABEL, type Reference, type ReferenceKind } from "../../domain/entities";
 import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
+import { APPROACH_GROUPS, APPROACH_LABEL, type Approach, type ApproachGroup } from "../../domain/throws";
 import { popularity, weightedQuantile } from "../../domain/weighting";
 import { FactorBars, Histogram } from "../components/charts";
 import { FieldScene, Skeleton } from "../components/scene";
@@ -15,6 +16,9 @@ import { useAnalyzer } from "../state/analyzer";
 import { useDemoLibrary, useLocalLibrary, type LibraryView } from "../state/library";
 
 const compact = (n: number) => new Intl.NumberFormat("ja-JP", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+
+/** お手本の投げ始め（レップごとの重なりを除く）。デモの合成データは持たない */
+const approachesOf = (r: Reference): Approach[] => [...new Set(r.reps.map((x) => x.approach).filter((a): a is Approach => a !== undefined))];
 
 export function References() {
   const analyzer = useAnalyzer();
@@ -143,6 +147,11 @@ export function References() {
                     <div className="mt-1 truncate text-xs text-muted">{r.channel}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-1">
                       <Badge>{CAMERA_LABEL[r.stats.camera]}</Badge>
+                      {approachesOf(r).map((a) => (
+                        <Badge key={a} tone={a === "unknown" ? undefined : "ice"}>
+                          {APPROACH_LABEL[a]}
+                        </Badge>
+                      ))}
                       {r.creativeCommons && <Badge tone="ice">CC</Badge>}
                       {m.pinned && (
                         <Badge tone="pylon">
@@ -218,6 +227,7 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
   const pop = popularity(r.stats);
   const def = METRIC_BY_KEY[metric];
   const valid = isValidFor(def, r.stats.camera);
+  const measured = r.reps.some((x) => x.metrics[metric] !== undefined);
   const metricOptions = METRICS.filter((m) => m.key !== "headStability" && m.key !== "releaseTime").slice(0, 6);
 
   return (
@@ -289,7 +299,9 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
         <p className="mt-3 text-xs leading-relaxed text-muted">
           {!valid
             ? `${CAMERA_LABEL[r.stats.camera]}の映像なので、「${def.short}」には使いません（Q = 0）。`
-            : parts && parts.K < 0.35
+            : !measured
+              ? `この映像では「${def.short}」を測れていないため、使っていません（ステップの前が映っていない など）。`
+              : parts && parts.K < 0.35
               ? `「${def.short}」の値が他のお手本から大きく外れているため、合意度 K で重みを下げています。`
               : `${CAMERA_LABEL[r.stats.camera]}の映像で、「${def.short}」の判定に使っています。`}
         </p>
@@ -319,18 +331,25 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
 
 function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: MetricKey; setMetric: (k: MetricKey) => void }) {
   const [popularityOnly, setPopularityOnly] = useState(false);
+  const [group, setGroup] = useState<ApproachGroup>("drop");
   const def = METRIC_BY_KEY[metric];
+  // 投げ始めで意味が変わる指標は、投げ始めが同じお手本だけで分布を作る（判定と同じ）
+  const split = def.byApproach && view.byApproach ? group : undefined;
+  const weights = split ? view.byApproach![split] : view.weights;
   const refs = view.refs;
+  const unknown = split ? refs.flatMap((r) => r.reps).filter((x) => x.approach === "unknown" && x.metrics[metric] !== undefined).length : 0;
 
   const samples = useMemo(
     () =>
       refs.flatMap((r) =>
         r.reps
-          .map((x) => ({ value: x.metrics[metric], weight: view.weights.samples[x.id]?.[metric]?.w ?? 0, P: view.weights.samples[x.id]?.[metric]?.P ?? 0, Q: view.weights.samples[x.id]?.[metric]?.Q ?? 0 }))
-          .filter((s): s is { value: number; weight: number; P: number; Q: number } => s.value !== undefined),
+          .filter((x) => !split || x.approach === split)
+          .map((x) => ({ ref: r.id, value: x.metrics[metric], weight: weights.samples[x.id]?.[metric]?.w ?? 0, P: weights.samples[x.id]?.[metric]?.P ?? 0, Q: weights.samples[x.id]?.[metric]?.Q ?? 0 }))
+          .filter((s): s is { ref: string; value: number; weight: number; P: number; Q: number } => s.value !== undefined),
       ),
-    [refs, view, metric],
+    [refs, weights, metric, split],
   );
+  const videos = new Set(samples.map((s) => s.ref)).size;
   // 比較用：人気度だけで重み付けした場合のゾーン（撮影角度が合わないものは同じく除く）
   const popZone = useMemo(() => {
     const vs = samples.map((s) => s.value);
@@ -338,7 +357,7 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
     const q = (p: number) => weightedQuantile(vs, ws, p)!;
     return ws.some((w) => w > 0) ? { p10: q(0.1), p25: q(0.25), p50: q(0.5), p75: q(0.75), p90: q(0.9) } : undefined;
   }, [samples]);
-  const zone = view.zones[metric];
+  const zone = weights.zones[metric];
   const you = view.you(metric);
   const used = samples.filter((s) => s.weight > 0).length;
 
@@ -360,6 +379,15 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
           </button>
         ))}
       </div>
+      {split && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-white/[0.02] px-3 py-2">
+          <Segmented label="投げ始め" size="sm" value={group} onChange={setGroup} options={APPROACH_GROUPS.map((g) => ({ value: g, label: APPROACH_LABEL[g] }))} />
+          <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">
+            「{def.short}」はドロップの有無で値の意味が変わるため、投げ始めが同じお手本だけで分布を作り、自分の投球も投げ始めが同じものとだけ比べます。
+            {unknown > 0 && `投げ始めの分からないお手本（${unknown} レップ）は入れていません。`}
+          </p>
+        </div>
+      )}
       {samples.length ? (
         <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
           <Histogram samples={samples} zone={zone} you={you} best={view.best?.[metric]} digits={def.digits} compareZone={popularityOnly ? popZone : undefined} />
@@ -377,7 +405,7 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
             <div>
               <dt className="text-xs text-muted">使った標本</dt>
               <dd>
-                {used} / {samples.length} レップ（{refs.length} 本の動画）
+                {used} / {samples.length} レップ（{videos} 本の動画）
               </dd>
             </div>
             <div>
@@ -387,7 +415,7 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
           </dl>
         </div>
       ) : (
-        <p className="text-sm text-muted">この指標を測れるお手本がありません。</p>
+        <p className="text-sm text-muted">{split ? `投げ始めが「${APPROACH_LABEL[split]}」のお手本で、この指標を測れたものがありません。` : "この指標を測れるお手本がありません。"}</p>
       )}
     </Card>
   );

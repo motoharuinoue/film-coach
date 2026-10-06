@@ -1666,6 +1666,10 @@
      "trunkTilt": 6.9015,
      "headStability": 0.8667
     },
+    "approach": {
+     "kind": "drop",
+     "dropM": 1.393
+    },
     "sequence": {
      "schemaVersion": 1,
      "keypointLayout": "coco17",
@@ -4186,7 +4190,8 @@
    }
   ],
   "warnings": [],
-  "slowmo": 1
+  "slowmo": 1,
+  "approachMode": "auto"
  },
  "uploadWithThrows": {
   "schemaVersion": 1,

@@ -6,7 +6,7 @@ import type { ThrowAnalysis } from "../domain/throws";
 import { synthesizeThrow } from "../infrastructure/demo/synth";
 import { loadLocalReferences, meanConfidence, toReference } from "./localReferences";
 import type { FootageLibrary } from "./ports";
-import { weighReferences } from "./references";
+import { NEUTRAL_MANUAL, weighByApproach, weighReferences, zoneSetOf } from "./references";
 
 const seq = synthesizeThrow();
 
@@ -47,6 +47,7 @@ const analysis: ThrowAnalysis = {
   hand: "right",
   warnings: [],
   slowmo: 1,
+  approachMode: "auto",
   reps: [1, 2].map((index) => ({
     index,
     start: 100 * index,
@@ -55,6 +56,7 @@ const analysis: ThrowAnalysis = {
     events: { setStart: 35, strideStart: 50, plant: 65, release: 69, followStart: 74, last: seq.frames.length - 1 },
     phases: [],
     metrics: { strideRatio: 0.5 + index / 100, frontKnee: 160 },
+    approach: index === 1 ? { kind: "drop" as const, dropM: 1.2 } : { kind: "unknown" as const, dropM: null },
     sequence: seq,
   })),
 };
@@ -67,6 +69,7 @@ describe("手元のお手本をデモと同じ形に写す", () => {
     expect(r.stats.confidence).toBeCloseTo(meanConfidence(analysis));
     expect(r.reps.map((x) => x.id)).toEqual(["r1#1", "r1#2"]);
     expect(r.reps[0]!.rotation).toEqual([]);
+    expect(r.reps.map((x) => x.approach)).toEqual(["drop", "unknown"]);
   });
 
   it("写したお手本は、デモと同じ重み付けで分布になる", () => {
@@ -74,6 +77,19 @@ describe("手元のお手本をデモと同じ形に写す", () => {
     const w = weighReferences(refs, { r1: { pinned: false, excluded: false, stars: 3 } });
     expect(w.zones.strideRatio).toBeDefined();
     expect(w.overall.r1).toBeGreaterThan(0);
+  });
+
+  it("投げ始めごとの分布は、投げ始めが同じレップだけで作る", () => {
+    const refs = [toReference(record("r1", "v1"), footage("v1", true), analysis), toReference(record("r2", "v2"), footage("v2", true), analysis)];
+    const manual = { r1: NEUTRAL_MANUAL, r2: NEUTRAL_MANUAL };
+    const by = weighByApproach(refs, manual);
+    // 各お手本のレップ 1 だけがドロップから。2 本あるのでゾーンができる
+    expect(Object.keys(by.drop.samples).sort()).toEqual(["r1#1", "r2#1"]);
+    expect(by.drop.zones.strideRatio!.p50).toBeCloseTo(0.51);
+    expect(Object.keys(by.standing.samples)).toEqual([]);
+    const set = zoneSetOf(weighReferences(refs, manual), by);
+    expect(set.byApproach.drop).toBe(by.drop.zones);
+    expect(set.all.strideRatio!.p50).toBeCloseTo(0.515);
   });
 
   it("解像度は短い辺で区分する（縦長の Shorts でも高さで決めない）", () => {

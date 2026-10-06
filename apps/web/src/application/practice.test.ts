@@ -26,6 +26,7 @@ const analysis = (n: number): ThrowAnalysis => ({
   hand: "right",
   warnings: [],
   slowmo: 1,
+  approachMode: "auto",
   reps: Array.from({ length: n }, (_, i) => ({
     index: i + 1,
     start: 0,
@@ -34,6 +35,7 @@ const analysis = (n: number): ThrowAnalysis => ({
     events: { setStart: 0, strideStart: 10, plant: 20, release: 25, followStart: 30, last: 50 },
     phases: [],
     metrics: {},
+    approach: { kind: "unknown" as const, dropM: null },
     sequence: { fps: 30, heightM: 1.8, frames: [] },
   })),
 });

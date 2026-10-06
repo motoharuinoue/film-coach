@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deviation, evaluateMetric, judge, metricScore, type Zone } from "./judgement";
+import { deviation, evaluateMetric, judge, metricScore, zonesFor, type Zone, type ZoneSet } from "./judgement";
 
 const zone: Zone = { p10: 0.46, p25: 0.5, p50: 0.52, p75: 0.54, p90: 0.58 };
 
@@ -29,5 +29,25 @@ describe("deviation / metricScore", () => {
 describe("evaluateMetric", () => {
   it("値・自己ベスト・ゾーン・判定・スコアをまとめる", () => {
     expect(evaluateMetric("strideRatio", 0.52, 0.53, zone)).toEqual({ key: "strideRatio", value: 0.52, best: 0.53, zone, status: "good", score: 100 });
+  });
+});
+
+describe("zonesFor", () => {
+  const z = (p50: number): Zone => ({ p10: p50 - 2, p25: p50 - 1, p50, p75: p50 + 1, p90: p50 + 2 });
+  const set: ZoneSet = {
+    all: { strideRatio: z(0.5), headStability: z(3) },
+    byApproach: { drop: { strideRatio: z(0.9), headStability: z(6) }, standing: { headStability: z(1) } },
+  };
+
+  it("投げ始めで意味が変わる指標（頭の上下動）は、投げ始めが同じお手本のゾーンを使う", () => {
+    expect(zonesFor(set, "drop").headStability!.p50).toBe(6);
+    expect(zonesFor(set, "standing").headStability!.p50).toBe(1);
+  });
+
+  it("投げ始めが分からなければ、その指標は判定しない。ほかの指標は全部のお手本のゾーンを使う", () => {
+    expect(zonesFor(set, "unknown").headStability).toBeUndefined();
+    expect(zonesFor(set, undefined).headStability).toBeUndefined();
+    expect(zonesFor(set, "drop").strideRatio!.p50).toBe(0.5);
+    expect(zonesFor(set, "unknown").strideRatio!.p50).toBe(0.5);
   });
 });

@@ -2,10 +2,9 @@ import { IconBrandYoutube, IconDownload, IconFocusCentered, IconTarget } from "@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { coverage, type Footage, type TargetTrack } from "../../../domain/footage";
-import type { CameraAngle } from "../../../domain/camera";
 import { PHASE_LABEL } from "../../../domain/phases";
 import { DEFAULT_PLAYER_HEIGHT_CM } from "../../../domain/reference";
-import { releaseFrame, throwAt, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
+import { releaseFrame, throwAt, type ThrowAnalysis, type ThrowRep, type ThrowsRequest } from "../../../domain/throws";
 import { VideoFootagePlayer, YouTubeFootagePlayer, type Layers, type SeekRequest, type ThrowMark } from "../../components/footage";
 import { Badge, Button, Card, PageHeader, SectionTitle, Toggle } from "../../components/ui";
 import { PageGuide } from "../../guide/PageGuide";
@@ -83,13 +82,13 @@ function Viewer() {
     setSelected(r.index);
     seekFrame(releaseFrame(r));
   };
-  const analyze = async (cm: number, camera: CameraAngle, slowmo: number) => {
+  const analyze = async (req: ThrowsRequest) => {
     setThrowsBusy(true);
     setThrowsError(undefined);
     try {
       // YouTube のお手本の映像では、お手本の選手の身長なので、自分の身長としては保存しない
-      if (footage.source === "upload") profile.saveHeightCm(cm);
-      const a = await lib.analyzeThrows(footage.id, { heightCm: cm, camera, slowmo });
+      if (footage.source === "upload") profile.saveHeightCm(req.heightCm);
+      const a = await lib.analyzeThrows(footage.id, req);
       setThrows(a);
       setSelected(a.reps[0]?.index ?? 1);
       if (a.reps[0]) seekFrame(releaseFrame(a.reps[0]));
@@ -154,7 +153,7 @@ function Viewer() {
           analysis={throws}
           heightCm={footage.source === "youtube" ? Math.round((throws?.heightM ?? DEFAULT_PLAYER_HEIGHT_CM / 100) * 100) : profile.heightCm()}
           forReference={footage.source === "youtube"}
-          zones={footage.source === "youtube" ? undefined : refZones.zones}
+          zoneSet={footage.source === "youtube" ? undefined : refZones.zoneSet}
           refCount={footage.source === "youtube" ? 0 : refZones.refCount}
           busy={throwsBusy}
           error={throwsError}

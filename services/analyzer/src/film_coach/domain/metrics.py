@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from typing import Literal, get_args
 
 from .camera import CAMERA_LABEL, CameraAngle
-from .phases import Events
-from .pose import PoseSequence, head_center, joint_angle, kp, mid
+from .phases import Events, stride_found, stride_seen
+from .pose import PoseSequence, head_center, joint_angle, js_round, kp, mid
 
 MetricKey = Literal[
     "releaseTime",
@@ -55,6 +55,9 @@ METRIC_BY_KEY: dict[MetricKey, MetricDef] = {m.key: m for m in METRICS}
 
 MetricValues = dict[MetricKey, float]
 
+MIN_SET_S = 0.3
+"""頭の上下動を測るのに要る、ステップの前に映っている長さ（秒）。短いと、標準偏差が意味を持たない"""
+
 
 @dataclass(frozen=True, slots=True)
 class AnalysisExtras:
@@ -74,21 +77,22 @@ def compute_metrics(seq: PoseSequence, e: Events, extras: AnalysisExtras | None 
     hip_mid = mid(kp(rel, "lHip"), kp(rel, "rHip"))
     tilt = math.atan2(shoulder_mid.x - hip_mid.x, shoulder_mid.y - hip_mid.y) * 180 / math.pi
 
-    heads = [head_center(f).y for f in seq.frames[: e.stride_start]]
-    count = max(1, len(heads))
-    mean = sum(heads) / count
-    sd = math.sqrt(sum((v - mean) ** 2 for v in heads) / count)
-
     values: MetricValues = {
-        "releaseTime": (e.release - e.stride_start) / seq.fps,
-        "strideRatio": abs(kp(plant, "lAnkle").x - kp(plant, "rAnkle").x) / h,
-        "frontKnee": joint_angle(kp(plant, "lHip"), kp(plant, "lKnee"), kp(plant, "lAnkle")),
         "elbowHeight": (kp(rel, "rElbow").y - kp(rel, "rShoulder").y) * 100,
         "elbowAngle": joint_angle(kp(rel, "rShoulder"), kp(rel, "rElbow"), kp(rel, "rWrist")),
         "releaseHeight": kp(rel, "rWrist").y / h,
         "trunkTilt": tilt,
-        "headStability": sd * 100,
     }
+    # 映っていない区間・見つからなかったイベントからは測らない
+    if stride_seen(e):
+        values["releaseTime"] = (e.release - e.stride_start) / seq.fps
+    if stride_found(e):
+        values["strideRatio"] = abs(kp(plant, "lAnkle").x - kp(plant, "rAnkle").x) / h
+        values["frontKnee"] = joint_angle(kp(plant, "lHip"), kp(plant, "lKnee"), kp(plant, "lAnkle"))
+    if stride_found(e) and e.stride_start >= max(1, js_round(MIN_SET_S * seq.fps)):
+        heads = [head_center(f).y for f in seq.frames[: e.stride_start]]
+        mean = sum(heads) / len(heads)
+        values["headStability"] = math.sqrt(sum((v - mean) ** 2 for v in heads) / len(heads)) * 100
     if ex.hip_shoulder_sep is not None:
         values["hipShoulderSep"] = ex.hip_shoulder_sep
     if ex.sequence_gap_s is not None:

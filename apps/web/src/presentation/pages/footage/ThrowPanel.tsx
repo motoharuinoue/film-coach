@@ -4,10 +4,22 @@
 import { IconAlertTriangle, IconLoader2, IconRefresh, IconRulerMeasure, IconTarget } from "@tabler/icons-react";
 import { useState } from "react";
 import { CAMERA_LABEL, type CameraAngle } from "../../../domain/camera";
-import { formatMetric, invalidReason, isValidFor, METRICS } from "../../../domain/metrics";
-import { HEIGHT_CM, isValidHeightCm, releaseFrame, SLOWMO_OPTIONS, spread, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
-import { judgeMetrics, MIN_JUDGED_FOR_SCORE, type ThrowJudgement } from "../../../application/judgeThrows";
-import { judge, type Zones } from "../../../domain/judgement";
+import { formatMetric, invalidReason, isValidFor, METRICS, MIN_SET_S, type MetricKey } from "../../../domain/metrics";
+import {
+  APPROACH_LABEL,
+  APPROACH_MODE_LABEL,
+  HEIGHT_CM,
+  isValidHeightCm,
+  releaseFrame,
+  SLOWMO_OPTIONS,
+  spread,
+  type ApproachMode,
+  type ThrowAnalysis,
+  type ThrowRep,
+  type ThrowsRequest,
+} from "../../../domain/throws";
+import { judgeMetrics, MIN_JUDGED_FOR_SCORE, noZoneReason, type ThrowJudgement } from "../../../application/judgeThrows";
+import { EMPTY_ZONE_SET, judge, zonesFor, type ZoneSet, type Zones } from "../../../domain/judgement";
 import { PhaseBar, ZoneBar } from "../../components/charts";
 import { Link } from "react-router";
 import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, StatusPill, cx } from "../../components/ui";
@@ -15,10 +27,21 @@ import { Badge, Button, Card, DemoNote, SectionTitle, Segmented, StatusPill, cx 
 /** 投球を測れる角度。エンドゾーン・サイドラインからの試合映像は M4 で扱う */
 const ANGLES: CameraAngle[] = ["side", "behind", "front"];
 
+/** 測れる角度なのに値がないときの理由（映っていない区間・見つからなかったイベントからは測らない） */
+const UNMEASURED: Partial<Record<MetricKey, string>> = {
+  releaseTime: "ステップの始まりが映っていないか、ステップが見つからないため測っていません",
+  strideRatio: "ステップが見つからないため測っていません",
+  frontKnee: "ステップが見つからないため測っていません",
+  headStability: `ステップの前の構えが映っている長さが足りないため測っていません（${MIN_SET_S} 秒以上必要）`,
+};
+
+const APPROACH_MODES: ApproachMode[] = ["auto", "drop", "standing"];
+
 function HeightForm({
   initial,
   initialCamera = "side",
   initialSlowmo = 1,
+  initialApproach = "auto",
   busy,
   label,
   heightLabel = "身長（cm）",
@@ -27,14 +50,16 @@ function HeightForm({
   initial?: number;
   initialCamera?: CameraAngle;
   initialSlowmo?: number;
+  initialApproach?: ApproachMode;
   busy: boolean;
   label: string;
   heightLabel?: string;
-  onSubmit: (cm: number, camera: CameraAngle, slowmo: number) => void;
+  onSubmit: (req: ThrowsRequest) => void;
 }) {
   const [text, setText] = useState(initial ? String(initial) : "");
   const [camera, setCamera] = useState<CameraAngle>(initialCamera);
   const [slowmo, setSlowmo] = useState(String(initialSlowmo));
+  const [approach, setApproach] = useState<ApproachMode>(initialApproach);
   const cm = Number(text);
   const ok = isValidHeightCm(cm);
   return (
@@ -42,7 +67,7 @@ function HeightForm({
       className="flex flex-wrap items-end gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ok && !busy) onSubmit(cm, camera, Number(slowmo));
+        if (ok && !busy) onSubmit({ heightCm: cm, camera, slowmo: Number(slowmo), approach });
       }}
     >
       <div>
@@ -69,6 +94,10 @@ function HeightForm({
       <div>
         <span className="mb-1 block text-xs text-muted">スロー再生</span>
         <Segmented label="スロー再生の倍率" size="sm" value={slowmo} onChange={setSlowmo} options={SLOWMO_OPTIONS.map((k) => ({ value: String(k), label: k === 1 ? "等速" : `${k} 倍` }))} />
+      </div>
+      <div>
+        <span className="mb-1 block text-xs text-muted">投げ始め</span>
+        <Segmented label="投げ始め" size="sm" value={approach} onChange={setApproach} options={APPROACH_MODES.map((m) => ({ value: m, label: APPROACH_MODE_LABEL[m] }))} />
       </div>
       <Button type="submit" variant="primary" disabled={!ok || busy}>
         {busy ? <IconLoader2 size={16} className="animate-spin" aria-hidden /> : <IconTarget size={16} aria-hidden />}
@@ -106,6 +135,28 @@ function RepPicker({ analysis, selected, fps, onPick }: { analysis: ThrowAnalysi
   );
 }
 
+/** 投げ始めと、その根拠（骨盤が下がった距離） */
+function ApproachLine({ rep, analysis }: { rep: ThrowRep; analysis: ThrowAnalysis }) {
+  const a = rep.approach;
+  const how = analysis.approachMode === "auto" ? "骨格から見分けました" : "指定した投げ始めです";
+  const why = !a
+    ? "投げ始めを見分ける前に解析した結果です。計算し直すと見分けます"
+    : a.kind === "unknown"
+      ? a.dropM === null
+        ? "横から撮った映像でないと、ドロップの有無を測れません"
+        : "ステップの前の構えが映っていないため、見分けられませんでした"
+      : a.dropM !== null
+        ? `ステップの前に骨盤が ${a.dropM.toFixed(1)} m 下がっています（${how}）`
+        : how;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+      <span>投げ始め</span>
+      <Badge tone={a && a.kind !== "unknown" ? "ice" : undefined}>{APPROACH_LABEL[a?.kind ?? "unknown"]}</Badge>
+      <span className="text-faint">{why}</span>
+    </div>
+  );
+}
+
 function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: ThrowRep; zones: Zones }) {
   const measured = METRICS.filter((d) => rep.metrics[d.key] !== undefined);
   const unmeasured = METRICS.filter((d) => rep.metrics[d.key] === undefined);
@@ -132,7 +183,7 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
                   </div>
                 </div>
               ) : (
-                <p className="mt-2 text-[10px] text-faint">判定不可：この指標を測れるお手本が 2 本以上必要です</p>
+                <p className="mt-2 text-[10px] text-faint">判定不可：{noZoneReason(d, rep.approach?.kind)}</p>
               )}
               <p className="mt-2 text-[11px] leading-relaxed text-faint">{d.hint}</p>
               {s && (
@@ -148,7 +199,7 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
         <ul className="space-y-1 text-[11px] text-faint">
           {unmeasured.map((d) => (
             <li key={d.key}>
-              <span className="text-muted">{d.label}</span>：{isValidFor(d, analysis.camera) ? "まだ測っていません（骨盤と体幹の回転は、3D の骨格（M5）で測ります）" : invalidReason(d, analysis.camera)}
+              <span className="text-muted">{d.label}</span>：{!isValidFor(d, analysis.camera) ? invalidReason(d, analysis.camera) : UNMEASURED[d.key] ?? "まだ測っていません（骨盤と体幹の回転は、3D の骨格（M5）で測ります）"}
             </li>
           ))}
         </ul>
@@ -176,7 +227,7 @@ function ScoreLine({ judgement, refCount }: { judgement: ThrowJudgement; refCoun
 export function ThrowPanel({
   analysis,
   heightCm,
-  zones = {},
+  zoneSet = EMPTY_ZONE_SET,
   refCount = 0,
   forReference = false,
   busy,
@@ -190,8 +241,8 @@ export function ThrowPanel({
 }: {
   analysis?: ThrowAnalysis;
   heightCm?: number;
-  /** 判定に使う、手元のお手本のゾーン */
-  zones?: Zones;
+  /** 判定に使う、手元のお手本のゾーン一式 */
+  zoneSet?: ZoneSet;
   /** 手元のお手本の数 */
   refCount?: number;
   /** YouTube から取り込んだお手本の映像か（身長はお手本の選手のもので、自分の身長としては保存しない） */
@@ -202,12 +253,14 @@ export function ThrowPanel({
   frame: number;
   fps: number;
   selected: number;
-  onAnalyze: (cm: number, camera: CameraAngle, slowmo: number) => void;
+  onAnalyze: (req: ThrowsRequest) => void;
   onPick: (rep: ThrowRep) => void;
   onSeekFrame: (frame: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const rep = analysis?.reps.find((r) => r.index === selected) ?? analysis?.reps[0];
+  // 投げ始めで意味が変わる指標は、投げ始めが同じお手本のゾーンで判定する
+  const zones = zonesFor(zoneSet, rep?.approach?.kind);
 
   if (!analysis) {
     return (
@@ -248,6 +301,7 @@ export function ThrowPanel({
       {rep && (
         <>
           <RepPicker analysis={analysis} selected={rep.index} fps={fps} onPick={onPick} />
+          <ApproachLine rep={rep} analysis={analysis} />
           <div className="pt-1 pb-5">
             <PhaseBar
               phases={rep.phases}
@@ -284,8 +338,9 @@ export function ThrowPanel({
           heightLabel={forReference ? "お手本の選手の身長（cm）" : undefined}
           initialCamera={analysis.camera}
           initialSlowmo={analysis.slowmo}
-          onSubmit={(cm, camera, slowmo) => {
-            onAnalyze(cm, camera, slowmo);
+          initialApproach={analysis.approachMode}
+          onSubmit={(req) => {
+            onAnalyze(req);
             setEditing(false);
           }}
         />

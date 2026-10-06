@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from ..domain.approach import ApproachInfo, ApproachMode, decide_approach
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo
 from ..domain.pose import KP, smooth_sequence
@@ -48,6 +49,8 @@ class ThrowRep:
     """この投球の座標の変換（x の原点は区間の最初の骨盤）。画像の側は、カメラの動きを打ち消した座標
     （場面の最初のフレームの座標）。画面で映像に重ねるときは、追跡結果の camera で各フレームに戻す"""
     analysis: RepAnalysis
+    approach: ApproachInfo
+    """投げ始め（ドロップから／その場から）。ドロップの有無で意味が変わる指標は、同じ投げ始めのお手本とだけ比べる"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +64,8 @@ class ThrowAnalysis:
     """解析の結果を読むときの注意（本人が小さく映っている、投球が見つからない など）"""
     slowmo: float = 1.0
     """スロー再生の倍率（1 は等速）。速さと時間は、実際の時間に直して計算する"""
+    approach_mode: ApproachMode = "auto"
+    """投げ始めの決め方（auto は骨格から見分ける）"""
 
 
 def stabilized(track: TargetTrack) -> list[TargetFrame]:
@@ -101,12 +106,17 @@ def _poses(frames: list[TargetFrame], fps: float) -> list[list[ImagePoint]]:
 
 
 def analyze_throws(
-    track: TargetTrack, height_m: float, camera: CameraAngle = "side", slowmo: float = 1.0
+    track: TargetTrack,
+    height_m: float,
+    camera: CameraAngle = "side",
+    slowmo: float = 1.0,
+    approach: ApproachMode = "auto",
 ) -> ThrowAnalysis:
     """投球を見つけて、1 本ずつ解析する。投球が見つからなければ reps は空。
 
     slowmo はスロー再生の倍率。YouTube のお手本はスロー再生の映像が多いので、時間を実際の時間に直す
     （映像の 1 秒は、実際には 1/slowmo 秒）。フレーム番号は映像のままにする。
+    approach は投げ始めの決め方。auto なら投球ごとに骨格から見分け、指定すればすべての投球をそれにする。
     """
     if not 1 <= slowmo <= MAX_SLOWMO:
         raise ValueError(f"スロー再生の倍率は 1〜{MAX_SLOWMO} にしてください")
@@ -134,7 +144,9 @@ def analyze_throws(
             rep_tf = replace(tf, origin_x=origin)
             t0 = part[0].t
             seq = to_world(part_poses, [(f.t - t0) / slowmo for f in part], fps, height_m, rep_tf, hand)
-            reps.append(ThrowRep(len(reps) + 1, part[0].index, part[-1].index, rep_tf, analyze_pose(seq, camera)))
+            ra = analyze_pose(seq, camera)
+            how = decide_approach(ra.sequence, ra.events, camera, approach)
+            reps.append(ThrowRep(len(reps) + 1, part[0].index, part[-1].index, rep_tf, ra, how))
     warnings: list[str] = []
     body_px = height_m / tf.m_per_px
     if body_px < SMALL_BODY * track.video.height:
@@ -149,4 +161,4 @@ def analyze_throws(
                 f"肩より上で腕を振っていますが、投球にしては遅い動きです（手首の速さ 毎秒 身長の {slow_peak:.1f} 倍）。"
                 "スロー再生の映像なら、スロー再生の倍率を選んで計算し直してください"
             )
-    return ThrowAnalysis(track.video, height_m, camera, hand, reps, warnings, slowmo)
+    return ThrowAnalysis(track.video, height_m, camera, hand, reps, warnings, slowmo, approach)

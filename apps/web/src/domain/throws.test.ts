@@ -18,6 +18,7 @@ const rep = (index: number, start: number, metrics: ThrowRep["metrics"]): ThrowR
   events: { setStart: 10, strideStart: 20, plant: 30, release: 33, followStart: 35, last: 49 },
   phases,
   metrics,
+  approach: { kind: "unknown", dropM: null },
   sequence: { fps: 30, heightM: 1.8, frames: [] },
 });
 
@@ -29,6 +30,7 @@ const analysis = (reps: ThrowRep[]): ThrowAnalysis => ({
   reps,
   warnings: [],
   slowmo: 1,
+  approachMode: "auto",
 });
 
 describe("投球", () => {

@@ -16,6 +16,7 @@ const rep = (index: number, metrics: ThrowRep["metrics"]): ThrowRep => ({
   events,
   phases: [],
   metrics,
+  approach: { kind: "unknown", dropM: null },
   sequence: seq,
 });
 
@@ -27,6 +28,7 @@ const analysis = (reps: ThrowRep[]): ThrowAnalysis => ({
   reps,
   warnings: [],
   slowmo: 1,
+  approachMode: "auto",
 });
 
 describe("練習の投球", () => {
