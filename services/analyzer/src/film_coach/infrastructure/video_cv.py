@@ -302,13 +302,29 @@ class OpenCvFrameGrabber:
             cap.release()
         if not ok:
             raise ValueError(f"{t:.2f} 秒のフレームを読めません")
-        h, w = img.shape[:2]
-        if w > max_width:
-            img = cv2.resize(img, (max_width, int(h * max_width / w)), interpolation=cv2.INTER_AREA)
-        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
-        if not ok:
-            raise ValueError("JPEG にできませんでした")
-        return bytes(buf.tobytes())
+        return _jpeg(img, max_width)
+
+    def jpeg_of_frame(self, path: Path, index: int, max_width: int = 1280) -> bytes:
+        # 時刻やフレーム番号での移動は、動画の形式によって前後のフレームにずれることがあるので、先頭から順に読む
+        cap = cv2.VideoCapture(str(path))
+        try:
+            ok = all(cap.grab() for _ in range(index))
+            ok, img = cap.read() if ok else (False, None)
+        finally:
+            cap.release()
+        if not ok or img is None:
+            raise ValueError(f"{index} 番目のフレームを読めません")
+        return _jpeg(img, max_width)
+
+
+def _jpeg(img: Any, max_width: int) -> bytes:
+    h, w = img.shape[:2]
+    if w > max_width:
+        img = cv2.resize(img, (max_width, int(h * max_width / w)), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ok:
+        raise ValueError("JPEG にできませんでした")
+    return bytes(buf.tobytes())
 
 
 HEAD = (0, 1, 2, 3, 4)

@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from test_evaluation import true_labels
 from test_http import FakeModels, events
 from test_throws_io_api import synth_track
 from test_track_target import FakeDetector, FakeMotion, FakePose, FakeShots, FakeVideo
@@ -24,7 +25,13 @@ from film_coach.adapters.http import HttpDeps, create_app
 from film_coach.application import library
 from film_coach.application.jobs import JobRunner
 from film_coach.domain.pose import PoseSequence
-from film_coach.infrastructure.library_fs import FileDrillStore, FilePracticeStore, FileReferenceStore, FileVideoStore
+from film_coach.infrastructure.library_fs import (
+    FileAnnotationStore,
+    FileDrillStore,
+    FilePracticeStore,
+    FileReferenceStore,
+    FileVideoStore,
+)
 from film_coach.infrastructure.youtube_api import FileQuotaLedger
 
 REPO = Path(__file__).resolve().parents[3]
@@ -66,6 +73,7 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         clock=lambda: NOW,
         references=FileReferenceStore(tmp_path / "references"),
         drills=FileDrillStore(tmp_path / "drills"),
+        annotations=FileAnnotationStore(tmp_path / "annotations"),
     )
     c = TestClient(create_app(deps))
     up = c.post("/api/videos", files={"file": ("IMG_0001.MOV", b"video", "video/quicktime")}).json()
@@ -105,6 +113,14 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "targets": [{"metric": "strideRatio", "side": "low"}, {"metric": "frontKnee", "side": "any"}],
     }
     drill = c.post("/api/drills", json=drill_request).json()
+    # 精度の評価：投球を解析した映像に、正解（関節は追跡の骨格を 4 px ずらしたもの、リリースは 1 フレーム前）を付ける
+    target = c.get("/api/evaluation").json()["targets"][0]["throws"][0]
+    labeled = sorted({*target["frames"], target["plant"], target["release"] - 1})
+    annotation_request = {
+        "throws": [{"rep": target["rep"], "plant": target["plant"], "release": target["release"] - 1}],
+        "frames": true_labels(deps, side["id"], labeled, dx=4),
+    }
+    annotation = c.put(f"/api/videos/{side['id']}/annotation", json=annotation_request).json()
     return {
         "schemaVersion": 1,
         "generatedBy": "services/analyzer/tests/test_api_samples.py",
@@ -130,6 +146,9 @@ def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_sequence: PoseSe
         "drillRequest": drill_request,
         "drill": drill,
         "drills": c.get("/api/drills").json(),
+        "annotationRequest": annotation_request,
+        "annotation": annotation,
+        "evaluation": c.get("/api/evaluation").json(),
         "youtubeStatus": c.get("/api/youtube/status").json(),
         "youtubeSearch": c.get("/api/youtube/search", params={"q": "QB throwing mechanics", "max": 3}).json(),
     }

@@ -134,3 +134,16 @@ def test_許可した画面からだけCORSを許す(client: TestClient) -> None
     ng = client.get("/api/health", headers={"Origin": "https://evil.example"})
     assert ok.headers.get("access-control-allow-origin") == ORIGIN
     assert "access-control-allow-origin" not in ng.headers
+
+
+@pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+def test_画面が使う書き込みのメソッドは_事前確認を通す(client: TestClient, method: str) -> None:
+    res = client.options(
+        "/api/videos/000000000001/annotation",
+        headers={
+            "Origin": ORIGIN,
+            "Access-Control-Request-Method": method,
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res.status_code == 200, res.text

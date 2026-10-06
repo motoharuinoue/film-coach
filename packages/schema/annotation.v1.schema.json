@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "annotation.v1.schema.json",
+  "title": "Annotation",
+  "description": "精度の評価のために、自分で撮った映像に手作業で付けた正解。関節の位置（元の映像のピクセル）と、接地・リリースの瞬間（フレーム番号）。",
+  "type": "object",
+  "required": ["schemaVersion", "videoId", "throws", "frames", "updatedAt"],
+  "additionalProperties": false,
+  "$defs": {
+    "frame": { "type": "integer", "minimum": 0 },
+    "point": {
+      "description": "関節の位置 [x, y]（元の映像のピクセル）。null は「見えない」",
+      "oneOf": [
+        { "type": "array", "prefixItems": [{ "type": "number", "minimum": 0 }, { "type": "number", "minimum": 0 }], "minItems": 2, "maxItems": 2 },
+        { "type": "null" }
+      ]
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "videoId": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "throws": {
+      "type": "array",
+      "description": "投球ごとの、接地・リリースの正解のフレーム（まだ付けていなければ null）",
+      "items": {
+        "type": "object",
+        "required": ["rep", "plant", "release"],
+        "additionalProperties": false,
+        "properties": {
+          "rep": { "type": "integer", "minimum": 1, "description": "投球の番号（投球の解析結果の index）" },
+          "plant": { "oneOf": [{ "$ref": "#/$defs/frame" }, { "type": "null" }], "description": "前足が地面に着いた最初のフレーム" },
+          "release": { "oneOf": [{ "$ref": "#/$defs/frame" }, { "type": "null" }], "description": "ボールが手から離れて見える最初のフレーム" }
+        }
+      }
+    },
+    "frames": {
+      "type": "array",
+      "description": "フレームごとの関節の正解。まだ付けていない関節は含めない",
+      "items": {
+        "type": "object",
+        "required": ["frame", "points"],
+        "additionalProperties": false,
+        "properties": {
+          "frame": { "$ref": "#/$defs/frame" },
+          "points": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "nose": { "$ref": "#/$defs/point" },
+              "lShoulder": { "$ref": "#/$defs/point" },
+              "rShoulder": { "$ref": "#/$defs/point" },
+              "lElbow": { "$ref": "#/$defs/point" },
+              "rElbow": { "$ref": "#/$defs/point" },
+              "lWrist": { "$ref": "#/$defs/point" },
+              "rWrist": { "$ref": "#/$defs/point" },
+              "lHip": { "$ref": "#/$defs/point" },
+              "rHip": { "$ref": "#/$defs/point" },
+              "lKnee": { "$ref": "#/$defs/point" },
+              "rKnee": { "$ref": "#/$defs/point" },
+              "lAnkle": { "$ref": "#/$defs/point" },
+              "rAnkle": { "$ref": "#/$defs/point" }
+            }
+          }
+        }
+      }
+    },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  }
+}

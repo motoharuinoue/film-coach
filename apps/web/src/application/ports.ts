@@ -4,6 +4,7 @@
 import type { CameraAngle } from "../domain/camera";
 import type { AnalyzedRep, Player, Reference, Session, SessionKind } from "../domain/entities";
 import type { Drill, DrillInput } from "../domain/drill";
+import type { Annotation, AnnotationInput, Evaluation } from "../domain/evaluation";
 import type { Footage, TargetTrack, TrackHint } from "../domain/footage";
 import type { MetricEvaluation } from "../domain/judgement";
 import type { MetricKey } from "../domain/metrics";
@@ -160,6 +161,12 @@ export interface FootageLibrary {
   /** ドリル動画を登録する。動画は取り込まない */
   createDrill(input: DrillInput): Promise<Drill>;
   deleteDrill(id: string): Promise<void>;
+  /** 精度の評価：正解を付ける映像と、付けた正解から求めた誤差 */
+  evaluation(): Promise<Evaluation>;
+  /** 映像に付けた正解を、まるごと置き換える */
+  saveAnnotation(videoId: string, annotation: AnnotationInput): Promise<Annotation>;
+  /** フレーム番号で指定した、元の大きさのフレーム（追跡と同じ番号の付け方） */
+  frameAt(videoId: string, index: number): string;
 }
 
 /** 選手の身体の情報。指標の計算に使い、この端末の中にだけ保存する（リポジトリにもサーバーにも置かない） */

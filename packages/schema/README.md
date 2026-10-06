@@ -11,6 +11,8 @@
 | `reference.v1.schema.json` | 手元のお手本の登録（YouTube の統計・信頼チャンネル・手動調整・お手本の選手の身長と、元になった映像の ID） |
 | `youtube-search.v1.schema.json` | YouTube Data API で探したお手本の候補（再生数・高評価数・登録者数・ライセンス）と、今日の無料枠 |
 | `practice.v1.schema.json` | 練習（映像のまとめ）。名前・日付・種別・カメラ角度・メモと、まとめた映像の ID |
+| `annotation.v1.schema.json` | 精度の評価のために手作業で付けた正解（関節の位置と、接地・リリースのフレーム） |
+| `evaluation.v1.schema.json` | 精度の評価の画面に渡すもの（正解を付ける映像と、付けた正解から求めた誤差） |
 | `fixtures/api-samples.v1.json` | API の応答の見本（Python のテストが作り、TypeScript の契約テストが使う） |
 | `fixtures/parity.v1.json` | 両言語の実装が同じ結果を出すことを確かめる共通データ（合成骨格と、フェーズ・指標の期待値） |
 

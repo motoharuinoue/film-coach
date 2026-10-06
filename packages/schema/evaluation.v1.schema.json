@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evaluation.v1.schema.json",
+  "title": "Evaluation",
+  "description": "精度の評価：正解を付ける映像（自分で撮り、投球まで解析した映像）と、付けた正解から求めた誤差。距離は cm、瞬間の差はミリ秒。",
+  "type": "object",
+  "required": ["schemaVersion", "joints", "thresholdsCm", "targets", "report"],
+  "additionalProperties": false,
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[0-9a-f]{12}$" },
+    "frame": { "type": "integer", "minimum": 0 },
+    "joint": { "enum": ["nose", "lShoulder", "rShoulder", "lElbow", "rElbow", "lWrist", "rWrist", "lHip", "rHip", "lKnee", "rKnee", "lAnkle", "rAnkle"] },
+    "metric": { "enum": ["strideRatio", "frontKnee", "elbowHeight", "elbowAngle", "releaseHeight", "trunkTilt"] },
+    "stats": {
+      "description": "誤差（絶対値）の要約。正解がまだなければ null",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["n", "mean", "median", "p90", "within"],
+          "additionalProperties": false,
+          "properties": {
+            "n": { "type": "integer", "minimum": 1 },
+            "mean": { "type": "number", "minimum": 0 },
+            "median": { "type": "number", "minimum": 0 },
+            "p90": { "type": "number", "minimum": 0 },
+            "within": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "description": "thresholdsCm のそれぞれ以内に入った割合（関節の位置のときだけ）" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "rawFinal": {
+      "type": "object",
+      "required": ["raw", "final"],
+      "additionalProperties": false,
+      "properties": {
+        "raw": { "$ref": "#/$defs/stats", "description": "モデルの出力そのもの" },
+        "final": { "$ref": "#/$defs/stats", "description": "補正・平滑化を経て、指標に使う骨格" }
+      }
+    },
+    "optNumber": { "oneOf": [{ "type": "number" }, { "type": "null" }] }
+  },
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "joints": { "type": "array", "items": { "$ref": "#/$defs/joint" }, "description": "正解を付ける関節（付ける順）" },
+    "thresholdsCm": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "description": "関節の位置が正しいとみなす距離（PCK の閾値）" },
+    "targets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["video", "hand", "throws", "annotation"],
+        "additionalProperties": false,
+        "properties": {
+          "video": {
+            "type": "object",
+            "required": ["id", "name", "fps", "width", "height", "frameCount"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "name": { "type": "string" },
+              "fps": { "type": "number", "exclusiveMinimum": 0 },
+              "width": { "type": "integer", "minimum": 1 },
+              "height": { "type": "integer", "minimum": 1 },
+              "frameCount": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "hand": { "enum": ["right", "left"], "description": "投げる腕" },
+          "throws": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["rep", "start", "end", "plant", "release", "frames"],
+              "additionalProperties": false,
+              "properties": {
+                "rep": { "type": "integer", "minimum": 1 },
+                "start": { "$ref": "#/$defs/frame" },
+                "end": { "$ref": "#/$defs/frame" },
+                "plant": { "$ref": "#/$defs/frame", "description": "解析で見つけた接地（映像のフレーム番号）" },
+                "release": { "$ref": "#/$defs/frame", "description": "解析で見つけたリリース（映像のフレーム番号）" },
+                "frames": { "type": "array", "items": { "$ref": "#/$defs/frame" }, "description": "関節の正解を付けるフレーム（区間の 25・50・75% と、正解の接地・リリース）" }
+              }
+            }
+          },
+          "annotation": { "oneOf": [{ "$ref": "annotation.v1.schema.json" }, { "type": "null" }] }
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "required": ["videos", "throws", "frames", "joints", "groups", "events", "metrics", "details"],
+      "additionalProperties": false,
+      "properties": {
+        "videos": { "type": "integer", "minimum": 0, "description": "正解を付けた映像の数" },
+        "throws": { "type": "integer", "minimum": 0, "description": "接地とリリースの正解を付けた投球の数" },
+        "frames": { "type": "integer", "minimum": 0, "description": "すべての関節に正解を付けたフレームの数" },
+        "joints": { "$ref": "#/$defs/rawFinal", "description": "関節の位置の誤差（cm）" },
+        "groups": {
+          "type": "object",
+          "description": "部位ごとの関節の位置の誤差（cm）",
+          "required": ["head", "shoulder", "elbow", "wrist", "hip", "knee", "ankle"],
+          "additionalProperties": false,
+          "properties": {
+            "head": { "$ref": "#/$defs/rawFinal" },
+            "shoulder": { "$ref": "#/$defs/rawFinal" },
+            "elbow": { "$ref": "#/$defs/rawFinal" },
+            "wrist": { "$ref": "#/$defs/rawFinal" },
+            "hip": { "$ref": "#/$defs/rawFinal" },
+            "knee": { "$ref": "#/$defs/rawFinal" },
+            "ankle": { "$ref": "#/$defs/rawFinal" }
+          }
+        },
+        "events": {
+          "type": "object",
+          "description": "接地・リリースの瞬間の差（ミリ秒）",
+          "required": ["plant", "release"],
+          "additionalProperties": false,
+          "properties": { "plant": { "$ref": "#/$defs/stats" }, "release": { "$ref": "#/$defs/stats" } }
+        },
+        "metrics": {
+          "type": "object",
+          "description": "指標の誤差。total は解析の値と手で測った値の差、pose は解析の骨格を正解の瞬間で測った値との差（骨格の誤差による分）",
+          "propertyNames": { "$ref": "#/$defs/metric" },
+          "additionalProperties": {
+            "type": "object",
+            "required": ["total", "pose"],
+            "additionalProperties": false,
+            "properties": { "total": { "$ref": "#/$defs/stats" }, "pose": { "$ref": "#/$defs/stats" } }
+          }
+        },
+        "details": {
+          "type": "object",
+          "required": ["joints", "events", "metrics"],
+          "additionalProperties": false,
+          "properties": {
+            "joints": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["videoId", "frame", "joint", "rawCm", "finalCm", "finalDxCm", "finalDyCm"],
+                "additionalProperties": false,
+                "properties": {
+                  "videoId": { "$ref": "#/$defs/id" },
+                  "frame": { "$ref": "#/$defs/frame" },
+                  "joint": { "$ref": "#/$defs/joint" },
+                  "rawCm": { "$ref": "#/$defs/optNumber" },
+                  "finalCm": { "type": "number", "minimum": 0 },
+                  "finalDxCm": { "type": "number", "description": "指標に使う骨格の点の、正解から見た向き（前が正、cm）" },
+                  "finalDyCm": { "type": "number", "description": "指標に使う骨格の点の、正解から見た向き（上が正、cm）。部位ごとの平均が、点の付け方の違い（かたより）" }
+                }
+              }
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["videoId", "rep", "event", "label", "found", "frames", "ms"],
+                "additionalProperties": false,
+                "properties": {
+                  "videoId": { "$ref": "#/$defs/id" },
+                  "rep": { "type": "integer", "minimum": 1 },
+                  "event": { "enum": ["plant", "release"] },
+                  "label": { "$ref": "#/$defs/frame" },
+                  "found": { "$ref": "#/$defs/frame" },
+                  "frames": { "type": "integer", "description": "found − label（正なら、解析が遅い）" },
+                  "ms": { "type": "number" }
+                }
+              }
+            },
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["videoId", "rep", "metric", "labeled", "analyzed", "analyzedAtLabel", "uncertainty"],
+                "additionalProperties": false,
+                "properties": {
+                  "videoId": { "$ref": "#/$defs/id" },
+                  "rep": { "type": "integer", "minimum": 1 },
+                  "metric": { "$ref": "#/$defs/metric" },
+                  "labeled": { "type": "number", "description": "正解の骨格を、正解の瞬間で測った値（手で測った値）" },
+                  "analyzed": { "$ref": "#/$defs/optNumber", "description": "解析の値" },
+                  "analyzedAtLabel": { "$ref": "#/$defs/optNumber", "description": "解析の骨格を、正解の瞬間で測った値" },
+                  "uncertainty": { "$ref": "#/$defs/optNumber", "description": "解析の値の、瞬間が半コマずれたときの変わり幅" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

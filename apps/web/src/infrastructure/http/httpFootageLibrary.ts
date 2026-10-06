@@ -1,8 +1,9 @@
 // FootageLibrary の HTTP 実装（services/analyzer の API）。
-// API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1 / practice.v1）を、ドメインの型に読み替える。
+// API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1 / practice.v1 / evaluation.v1 など）を、ドメインの型に読み替える。
 
 import type { FootageLibrary, TrackingHandlers, TrackingProgress, TrackingSummary } from "../../application/ports";
 import type { Drill, DrillInput } from "../../domain/drill";
+import type { Annotation, AnnotationInput, Evaluation } from "../../domain/evaluation";
 import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFrame, TrackHint } from "../../domain/footage";
 import type { PoseSequence } from "../../domain/pose";
 import type { Practice, PracticeInput } from "../../domain/practice";
@@ -120,6 +121,20 @@ export function parseDrill(j: Json): Drill {
     targets: (j.targets as Drill["targets"]).map((t) => ({ metric: t.metric, side: t.side })),
     createdAt: String(j.createdAt),
   };
+}
+
+export function parseAnnotation(j: Json): Annotation {
+  return {
+    videoId: String(j.videoId),
+    throws: (j.throws as Annotation["throws"]).map((t) => ({ rep: t.rep, plant: t.plant ?? null, release: t.release ?? null })),
+    frames: (j.frames as Annotation["frames"]).map((f) => ({ frame: f.frame, points: { ...f.points } })),
+    updatedAt: String(j.updatedAt),
+  };
+}
+
+export function parseEvaluation(j: Json): Evaluation {
+  const targets = (j.targets as Json[]).map((t) => ({ ...(t as unknown as Evaluation["targets"][number]), annotation: t.annotation ? parseAnnotation(t.annotation as Json) : null }));
+  return { joints: j.joints as Evaluation["joints"], thresholdsCm: j.thresholdsCm as number[], targets, report: j.report as Evaluation["report"] };
 }
 
 export function parseReference(j: Json): LocalReference {
@@ -279,6 +294,19 @@ export class HttpFootageLibrary implements FootageLibrary {
 
   async deleteReference(id: string) {
     await this.json(`/api/references/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async evaluation() {
+    return parseEvaluation(await this.json("/api/evaluation"));
+  }
+
+  async saveAnnotation(videoId: string, annotation: AnnotationInput) {
+    const body = JSON.stringify({ throws: annotation.throws, frames: annotation.frames });
+    return parseAnnotation(await this.json(`/api/videos/${encodeURIComponent(videoId)}/annotation`, { method: "PUT", headers: { "Content-Type": "application/json" }, body }));
+  }
+
+  frameAt(videoId: string, index: number) {
+    return this.url(`/api/videos/${encodeURIComponent(videoId)}/frame?i=${index}&maxWidth=3840`);
   }
 
   async drills() {

@@ -30,6 +30,7 @@ from .infrastructure.paths import data_dir
 
 if TYPE_CHECKING:  # FastAPI は serve のときだけ読み込む
     from .adapters.http import HttpDeps
+    from .application.evaluation import EvaluationReport
 
 
 def _open_video(path: Path) -> VideoReader:
@@ -97,13 +98,26 @@ def _write_throws(ta: ThrowAnalysis, dest: Path) -> None:
     write_throws(ta, dest)
 
 
+def _evaluate() -> EvaluationReport:
+    from .application.evaluation import evaluate
+    from .infrastructure.library_fs import FileAnnotationStore, FileVideoStore
+
+    return evaluate(FileVideoStore(), FileAnnotationStore())
+
+
 def http_deps() -> HttpDeps:
     """HTTP の解析サービスの依存。モデルは最初に使うときに 1 回だけ読み込む"""
     import os
 
     from .adapters.http import HttpDeps
     from .application.jobs import JobRunner
-    from .infrastructure.library_fs import FileDrillStore, FilePracticeStore, FileReferenceStore, FileVideoStore
+    from .infrastructure.library_fs import (
+        FileAnnotationStore,
+        FileDrillStore,
+        FilePracticeStore,
+        FileReferenceStore,
+        FileVideoStore,
+    )
     from .infrastructure.video_cv import OpenCvFrameGrabber
     from .infrastructure.youtube_api import FileQuotaLedger, YouTubeDataApi
     from .infrastructure.youtube_dlp import YtDlpFetcher
@@ -127,6 +141,7 @@ def http_deps() -> HttpDeps:
         youtube=YouTubeDataApi(),
         quota=FileQuotaLedger(),
         references=FileReferenceStore(),
+        annotations=FileAnnotationStore(),
     )
 
 
@@ -155,6 +170,7 @@ def cli_deps() -> CliDeps:
         anonymizer=_anonymizer,
         shots=_shots,
         motion=_motion,
+        evaluate=_evaluate,
     )
 
 
