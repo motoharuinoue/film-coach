@@ -72,7 +72,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
   const phase = PHASE_LABEL[phaseAt(rep.phases, pb.frame)];
   const title = current.ref.title.length > 28 ? `${current.ref.title.slice(0, 28)}…` : current.ref.title;
   const clip = current.rep.clip;
-  const rows = compareMetrics(rep.metrics, current.rep.metrics, zonesFor(zoneSet, approach));
+  const rows = compareMetrics(rep.metrics, current.rep.metrics, zonesFor(zoneSet, approach), rep.uncertainty);
   const scene = (children: React.ReactNode, tl: string[]) => (
     <FieldScene cam={cam} className="block w-full" hud={<Hud tl={tl} tr={[phase]} bl={[`${selfFrame.t.toFixed(2)}s`]} />}>
       {children}

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import { KIND_LABEL, type Reference, type ReferenceKind } from "../../domain/entities";
-import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
+import { isImprecise, isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
 import { APPROACH_GROUPS, APPROACH_LABEL, type Approach, type ApproachGroup } from "../../domain/throws";
 import { popularity, weightedQuantile } from "../../domain/weighting";
 import { FactorBars, Histogram } from "../components/charts";
@@ -230,6 +230,7 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
   const def = METRIC_BY_KEY[metric];
   const valid = isValidFor(def, r.stats.camera);
   const measured = r.reps.some((x) => x.metrics[metric] !== undefined);
+  const imprecise = r.reps.find((x) => x.metrics[metric] !== undefined && isImprecise(metric, x.uncertainty?.[metric]));
   const metricOptions = METRICS.filter((m) => m.key !== "headStability" && m.key !== "releaseTime").slice(0, 6);
 
   return (
@@ -303,6 +304,8 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
             ? `${CAMERA_LABEL[r.stats.camera]}の映像なので、「${def.short}」には使いません（Q = 0）。`
             : !measured
               ? `この映像では「${def.short}」を測れていないため、使っていません（ステップの前が映っていない など）。`
+              : imprecise && !r.reps.some((x) => x.metrics[metric] !== undefined && !isImprecise(metric, x.uncertainty?.[metric]))
+                ? `${def.at === "plant" ? "接地" : "リリース"}の瞬間の前後で値が ±${imprecise.uncertainty![metric]!.toFixed(def.digits)}${def.unit} 変わる（関節の取り違えや fps の不足）ため、「${def.short}」には使っていません。`
               : parts && parts.K < 0.35
               ? `「${def.short}」の値が他のお手本から大きく外れているため、合意度 K で重みを下げています。`
               : `${CAMERA_LABEL[r.stats.camera]}の映像で、「${def.short}」の判定に使っています。`}

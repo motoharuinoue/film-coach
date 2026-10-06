@@ -6,12 +6,13 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, get_args
 
 from .camera import CAMERA_LABEL, CameraAngle
 from .phases import Events, stride_found, stride_seen
-from .pose import PoseSequence, head_center, joint_angle, js_round, kp, mid
+from .pose import PoseFrame, PoseSequence, head_center, joint_angle, js_round, kp, mid
 
 MetricKey = Literal[
     "releaseTime",
@@ -67,28 +68,54 @@ class AnalysisExtras:
     """骨盤→体幹のピーク間隔（秒）"""
 
 
+def _trunk_tilt(f: PoseFrame, _h: float) -> float:
+    shoulder_mid = mid(kp(f, "lShoulder"), kp(f, "rShoulder"))
+    hip_mid = mid(kp(f, "lHip"), kp(f, "rHip"))
+    return math.atan2(shoulder_mid.x - hip_mid.x, shoulder_mid.y - hip_mid.y) * 180 / math.pi
+
+
+AT_FRAME: dict[MetricKey, Callable[[PoseFrame, float], float]] = {
+    "strideRatio": lambda f, h: abs(kp(f, "lAnkle").x - kp(f, "rAnkle").x) / h,
+    "frontKnee": lambda f, _h: joint_angle(kp(f, "lHip"), kp(f, "lKnee"), kp(f, "lAnkle")),
+    "elbowHeight": lambda f, _h: (kp(f, "rElbow").y - kp(f, "rShoulder").y) * 100,
+    "elbowAngle": lambda f, _h: joint_angle(kp(f, "rShoulder"), kp(f, "rElbow"), kp(f, "rWrist")),
+    "releaseHeight": lambda f, h: kp(f, "rWrist").y / h,
+    "trunkTilt": _trunk_tilt,
+}
+"""接地・リリースの瞬間（1 フレーム）で測る指標の計算式。測る瞬間は AT_EVENT"""
+
+AT_EVENT: dict[MetricKey, str] = {
+    "strideRatio": "plant",
+    "frontKnee": "plant",
+    "elbowHeight": "release",
+    "elbowAngle": "release",
+    "releaseHeight": "release",
+    "trunkTilt": "release",
+}
+
+
+def _frame_of(key: MetricKey, e: Events) -> int:
+    return e.plant if AT_EVENT[key] == "plant" else e.release
+
+
 def compute_metrics(seq: PoseSequence, e: Events, extras: AnalysisExtras | None = None) -> MetricValues:
     ex = extras or AnalysisExtras()
-    plant = seq.frames[e.plant]
-    rel = seq.frames[e.release]
-    h = seq.height_m
 
-    shoulder_mid = mid(kp(rel, "lShoulder"), kp(rel, "rShoulder"))
-    hip_mid = mid(kp(rel, "lHip"), kp(rel, "rHip"))
-    tilt = math.atan2(shoulder_mid.x - hip_mid.x, shoulder_mid.y - hip_mid.y) * 180 / math.pi
+    def at(key: MetricKey) -> float:
+        return AT_FRAME[key](seq.frames[_frame_of(key, e)], seq.height_m)
 
     values: MetricValues = {
-        "elbowHeight": (kp(rel, "rElbow").y - kp(rel, "rShoulder").y) * 100,
-        "elbowAngle": joint_angle(kp(rel, "rShoulder"), kp(rel, "rElbow"), kp(rel, "rWrist")),
-        "releaseHeight": kp(rel, "rWrist").y / h,
-        "trunkTilt": tilt,
+        "elbowHeight": at("elbowHeight"),
+        "elbowAngle": at("elbowAngle"),
+        "releaseHeight": at("releaseHeight"),
+        "trunkTilt": at("trunkTilt"),
     }
     # 映っていない区間・見つからなかったイベントからは測らない
     if stride_seen(e):
         values["releaseTime"] = (e.release - e.stride_start) / seq.fps
     if stride_found(e):
-        values["strideRatio"] = abs(kp(plant, "lAnkle").x - kp(plant, "rAnkle").x) / h
-        values["frontKnee"] = joint_angle(kp(plant, "lHip"), kp(plant, "lKnee"), kp(plant, "lAnkle"))
+        values["strideRatio"] = at("strideRatio")
+        values["frontKnee"] = at("frontKnee")
     if stride_found(e) and e.stride_start >= max(1, js_round(MIN_SET_S * seq.fps)):
         heads = [head_center(f).y for f in seq.frames[: e.stride_start]]
         mean = sum(heads) / len(heads)
@@ -98,6 +125,25 @@ def compute_metrics(seq: PoseSequence, e: Events, extras: AnalysisExtras | None 
     if ex.sequence_gap_s is not None:
         values["sequenceGap"] = ex.sequence_gap_s * 1000
     return values
+
+
+def metric_uncertainty(seq: PoseSequence, e: Events, values: MetricValues) -> MetricValues:
+    """接地・リリースの瞬間で測った指標の、瞬間の時刻が半コマずれたときの変わり幅（前後のコマの値の差の半分）。
+
+    腕が速く動くリリースの瞬間は、fps が低いとコマの間で値が大きく変わり、どのコマを取ったかで値が決まってしまう。
+    values（compute_metrics の結果）にある指標だけを返す。判定に使うかの上限は画面（metrics.ts の tolerance）が持つ
+    """
+    last = len(seq.frames) - 1
+    out: MetricValues = {}
+    for m in METRICS:
+        fn = AT_FRAME.get(m.key)
+        if fn is None or m.key not in values:
+            continue
+        i = _frame_of(m.key, e)
+        a = fn(seq.frames[max(0, i - 1)], seq.height_m)
+        b = fn(seq.frames[min(last, i + 1)], seq.height_m)
+        out[m.key] = abs(b - a) / 2
+    return out
 
 
 def is_valid_for(d: MetricDef, angle: CameraAngle) -> bool:

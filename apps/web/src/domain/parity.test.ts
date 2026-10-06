@@ -6,13 +6,13 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { synthesizeThrow, type ThrowParams } from "../infrastructure/demo/synth";
-import { computeMetrics, type MetricValues } from "./metrics";
+import { computeMetrics, metricUncertainty, type MetricValues } from "./metrics";
 import { detectEvents, type Events } from "./phases";
 import { smoothSequence, type PoseSequence } from "./pose";
 
 const FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../packages/schema/fixtures/parity.v1.json");
 
-type Case = { name: string; params: Partial<ThrowParams>; sequence: SequenceJson; expected: { events: Events; metrics: MetricValues } };
+type Case = { name: string; params: Partial<ThrowParams>; sequence: SequenceJson; expected: { events: Events; metrics: MetricValues; uncertainty: MetricValues } };
 type SequenceJson = { schemaVersion: 1; keypointLayout: "coco17"; space: "world-2d"; fps: number; heightM: number; frames: { t: number; kp: [number, number, number][] }[] };
 
 const CASES: { name: string; params: Partial<ThrowParams> }[] = [
@@ -39,11 +39,12 @@ function fromJson(j: SequenceJson): PoseSequence {
   return { fps: j.fps, heightM: j.heightM, frames: j.frames.map((f) => ({ t: f.t, kp: f.kp.map(([x, y, c]) => ({ x, y, c })) })) };
 }
 
-/** 解析サービスと同じ手順：平滑化 → フェーズ分割 → 指標 */
+/** 解析サービスと同じ手順：平滑化 → フェーズ分割 → 指標 → 瞬間の時刻のずれでの変わり幅 */
 function run(seq: PoseSequence) {
   const smoothed = smoothSequence(seq);
   const events = detectEvents(smoothed);
-  return { events, metrics: computeMetrics(smoothed, events) };
+  const metrics = computeMetrics(smoothed, events);
+  return { events, metrics, uncertainty: metricUncertainty(smoothed, events, metrics) };
 }
 
 function build(): Case[] {
@@ -71,6 +72,7 @@ describe("両言語の共通データ（parity）", () => {
       const got = run(fromJson(c.sequence));
       expect(got.events).toEqual(c.expected.events);
       for (const [k, v] of Object.entries(c.expected.metrics)) expect(got.metrics[k as keyof MetricValues]).toBeCloseTo(v as number, 9);
+      for (const [k, v] of Object.entries(c.expected.uncertainty)) expect(got.uncertainty[k as keyof MetricValues]).toBeCloseTo(v as number, 9);
     });
   }
 });

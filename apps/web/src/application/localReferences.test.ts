@@ -84,6 +84,14 @@ describe("手元のお手本をデモと同じ形に写す", () => {
     expect(w.overall.r1).toBeGreaterThan(0);
   });
 
+  it("瞬間の時刻のずれで大きく変わる値（関節の取り違えなど）は、お手本ゾーンに入れない", () => {
+    const noisy = { ...analysis, reps: analysis.reps.map((r) => ({ ...r, metrics: { ...r.metrics, elbowAngle: r.index === 1 ? 170 : 110 }, uncertainty: { elbowAngle: r.index === 1 ? 40 : 2 } })) };
+    const refs = [toReference(record("r1", "v1"), footage("v1", true), noisy), toReference(record("r2", "v2"), footage("v2", true), noisy)];
+    const w = weighReferences(refs, { r1: NEUTRAL_MANUAL, r2: NEUTRAL_MANUAL });
+    expect(w.zones.elbowAngle!.p50).toBeCloseTo(110);
+    expect(w.samples["r1#1"]!.elbowAngle!.w).toBe(0);
+  });
+
   it("投げ始めごとの分布は、投げ始めが同じレップだけで作る", () => {
     const refs = [toReference(record("r1", "v1"), footage("v1", true), analysis), toReference(record("r2", "v2"), footage("v2", true), analysis)];
     const manual = { r1: NEUTRAL_MANUAL, r2: NEUTRAL_MANUAL };

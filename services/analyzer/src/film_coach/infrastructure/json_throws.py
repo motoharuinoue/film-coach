@@ -62,6 +62,7 @@ def throws_to_json(ta: ThrowAnalysis) -> dict[str, Any]:
                 "events": r.analysis.events.to_json(),
                 "phases": [{"key": p.key, "start": p.start, "end": p.end} for p in r.analysis.phases],
                 "metrics": {k: round(v, 4) for k, v in r.analysis.metrics.items()},
+                "uncertainty": {k: round(v, 4) for k, v in r.analysis.uncertainty.items()},
                 "approach": {
                     "kind": r.approach.kind,
                     "dropM": None if r.approach.drop_m is None else round(r.approach.drop_m, 3),
@@ -96,6 +97,8 @@ def throws_from_json(data: dict[str, Any]) -> ThrowAnalysis:
             events=events,
             phases=[Phase(p["key"], int(p["start"]), int(p["end"])) for p in r["phases"]],
             metrics={k: float(val) for k, val in r["metrics"].items()},
+            # 変わり幅を入れる前に解析した結果にはない
+            uncertainty={k: float(val) for k, val in r.get("uncertainty", {}).items()},
         )
         transform = WorldTransform(
             float(t["mPerPx"]), float(t["originX"]), float(t["groundY"]), t["direction"], float(t["ankleM"])

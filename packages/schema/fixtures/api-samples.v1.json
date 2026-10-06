@@ -1666,6 +1666,14 @@
      "trunkTilt": 6.9015,
      "headStability": 0.8667
     },
+    "uncertainty": {
+     "strideRatio": 0.0019,
+     "frontKnee": 0.3229,
+     "elbowHeight": 1.5706,
+     "elbowAngle": 8.7097,
+     "releaseHeight": 0.0333,
+     "trunkTilt": 1.2327
+    },
     "approach": {
      "kind": "drop",
      "dropM": 1.393

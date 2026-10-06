@@ -3,10 +3,16 @@
 
 import type { CameraAngle } from "../../domain/camera";
 import type { AnalyzedRep } from "../../domain/entities";
-import { computeMetrics, onlyValid } from "../../domain/metrics";
+import { computeMetrics, metricUncertainty, onlyValid } from "../../domain/metrics";
 import { detectEvents, toPhases } from "../../domain/phases";
 import { smoothSequence } from "../../domain/pose";
 import { rotationVelocity, synthesizeThrow, type SequenceTiming, type ThrowParams } from "./synth";
+
+/**
+ * デモの映像の fps。おすすめの撮り方（120 fps 以上のスロー撮影）で撮った想定にする。
+ * 60 fps 以下では、リリースの瞬間の肘角度やリリース点の高さが半コマで大きく変わり、判定できないことが多い
+ */
+export const DEMO_FPS = 120;
 
 /** 骨盤→体幹のピーク間隔 gap（秒）から、各部位のピーク時刻（リリース基準）を決める */
 function timingFor(gap: number): SequenceTiming {
@@ -23,9 +29,10 @@ export function analyzeSynthetic(input: {
   /** 腰と肩の捻り差（度）。後方・正面の映像のときだけ */
   hss?: number;
 }): AnalyzedRep {
-  const seq = smoothSequence(synthesizeThrow(input.params));
+  const seq = smoothSequence(synthesizeThrow(input.params, DEMO_FPS));
   const events = detectEvents(seq);
   const metrics = onlyValid(computeMetrics(seq, events, { hipShoulderSep: input.hss, sequenceGapS: input.gap }), input.camera);
+  const uncertainty = metricUncertainty(seq, events, metrics);
   return {
     id: input.id,
     index: input.index,
@@ -33,6 +40,7 @@ export function analyzeSynthetic(input: {
     events,
     phases: toPhases(events),
     metrics,
+    uncertainty,
     rotation: rotationVelocity(seq, events.release / seq.fps, timingFor(input.gap)),
     // 合成データはどれもドロップしてから投げる
     approach: "drop",

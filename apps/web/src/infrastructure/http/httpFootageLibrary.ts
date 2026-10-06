@@ -88,6 +88,7 @@ export function parseThrows(j: Json): ThrowAnalysis {
         events: r.events as ThrowRep["events"],
         phases: r.phases as ThrowRep["phases"],
         metrics: r.metrics as ThrowRep["metrics"],
+        uncertainty: r.uncertainty as ThrowRep["uncertainty"],
         approach: r.approach as ThrowRep["approach"],
         sequence: toSequence(r.sequence as Json),
       }),

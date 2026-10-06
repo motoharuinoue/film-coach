@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from film_coach.domain.metrics import compute_metrics
+from film_coach.domain.metrics import compute_metrics, metric_uncertainty
 from film_coach.domain.phases import detect_events
 from film_coach.domain.pose import smooth_sequence
 from film_coach.infrastructure.json_pose import sequence_from_json
@@ -24,3 +24,7 @@ def test_フェーズと指標がTypeScriptの結果と一致する(parity_cases
     assert set(metrics) == set(case["expected"]["metrics"])
     for key, expected in case["expected"]["metrics"].items():
         assert metrics[key] == pytest.approx(expected, abs=1e-9), f"{case['name']} の {key}"
+    uncertainty = metric_uncertainty(seq, events, metrics)
+    assert set(uncertainty) == set(case["expected"]["uncertainty"])
+    for key, expected in case["expected"]["uncertainty"].items():
+        assert uncertainty[key] == pytest.approx(expected, abs=1e-9), f"{case['name']} の {key} の変わり幅"

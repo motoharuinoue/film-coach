@@ -51,3 +51,12 @@ describe("zonesFor", () => {
     expect(zonesFor(set, "unknown").strideRatio!.p50).toBe(0.5);
   });
 });
+
+describe("瞬間の時刻のずれで値が大きく変わるとき", () => {
+  const z: Zone = { p10: 80, p25: 94, p50: 110, p75: 125, p90: 140 };
+
+  it("値は残し、判定とスコアは出さない", () => {
+    expect(evaluateMetric("elbowAngle", 155, undefined, z, 46)).toEqual({ key: "elbowAngle", value: 155, best: undefined, zone: z, status: "na", uncertainty: 46, imprecise: true });
+    expect(evaluateMetric("elbowAngle", 155, undefined, z, 4)).toMatchObject({ status: "flag", uncertainty: 4 });
+  });
+});

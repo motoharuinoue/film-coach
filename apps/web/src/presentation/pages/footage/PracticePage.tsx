@@ -5,11 +5,11 @@ import { IconAlertTriangle, IconArrowRight, IconLoader2, IconTarget, IconTrash }
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { judgeRep, statusOf } from "../../../application/judgeThrows";
+import { impreciseReason, judgeRep, statusOf } from "../../../application/judgeThrows";
 import { analyzeUnanalyzed, loadPractice, type PracticeView } from "../../../application/practice";
 import { STATUS_LABEL, zonesFor, type ZoneSet } from "../../../domain/judgement";
 import { CAMERA_LABEL } from "../../../domain/camera";
-import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
+import { formatMetric, isImprecise, METRIC_BY_KEY } from "../../../domain/metrics";
 import { metricSpreads, PRACTICE_KIND_LABEL, releasePoint, releaseSpread, type PracticeThrow } from "../../../domain/practice";
 import { mid, kp } from "../../../domain/pose";
 import { APPROACH_LABEL, isValidHeightCm, releaseFrame, type ThrowRep } from "../../../domain/throws";
@@ -157,10 +157,17 @@ function MetricTable({ view, selected, onSelect, zoneSet }: { view: PracticeView
                   <div className="text-[10px] text-faint">{d.unit || "比"}</div>
                 </td>
                 {s.values.map((v, i) => {
-                  const status = statusOf(s.key, v, zonesOf[i]!);
+                  const t = view.throws[i]!;
+                  const u = t.rep.uncertainty?.[s.key];
+                  const status = statusOf(s.key, v, zonesOf[i]!, u);
+                  const imprecise = v !== undefined && isImprecise(s.key, u);
                   return (
-                    <td key={i} className={cx("px-2 py-2 text-right font-mono text-xs", view.throws[i]!.order === selected && "bg-white/[0.04]", status === "na" ? "text-text/85" : STATUS_TEXT[status])} title={status === "na" ? undefined : STATUS_LABEL[status]}>
-                      {v === undefined ? "—" : v.toFixed(d.digits)}
+                    <td
+                      key={i}
+                      className={cx("px-2 py-2 text-right font-mono text-xs", t.order === selected && "bg-white/[0.04]", status === "na" ? "text-text/85" : STATUS_TEXT[status], imprecise && "text-faint")}
+                      title={imprecise ? impreciseReason(s.key, u!, t.rep.sequence.fps) : status === "na" ? undefined : STATUS_LABEL[status]}
+                    >
+                      {v === undefined ? "—" : `${v.toFixed(d.digits)}${imprecise ? "±" : ""}`}
                     </td>
                   );
                 })}
@@ -266,7 +273,7 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
             <MetricTable view={view} selected={current.order} onSelect={setSelected} zoneSet={refZones.zoneSet} />
             {refZones.refCount > 0 && (
               <p className="text-[11px] leading-relaxed text-faint">
-                値の色は、お手本ゾーン（重み付き四分位）での判定です：緑＝良好、黄＝注意、赤＝要改善。白はこの指標を測れるお手本が足りないものです。頭の上下動はドロップの有無で値の意味が変わるため、投げ始めが同じお手本とだけ比べ、投げ始めが分からない投球は判定しません。
+                値の色は、お手本ゾーン（重み付き四分位）での判定です：緑＝良好、黄＝注意、赤＝要改善。白はこの指標を測れるお手本が足りないもの、薄い「±」は接地・リリースの瞬間の前後で値が大きく変わるため判定しないもの（押さえると理由）です。頭の上下動はドロップの有無で値の意味が変わるため、投げ始めが同じお手本とだけ比べ、投げ始めが分からない投球は判定しません。
               </p>
             )}
           </Card>

@@ -18,6 +18,7 @@ export function toSession(view: PracticeView): Session | undefined {
     events: t.rep.events,
     phases: t.rep.phases,
     metrics: t.rep.metrics,
+    uncertainty: t.rep.uncertainty,
     // 回転の速さは 3D の骨格（M5）で測る。2D の映像からは出さない
     rotation: [],
     approach: t.rep.approach?.kind ?? "unknown",

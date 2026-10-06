@@ -28,6 +28,8 @@ export type AnalyzedRep = {
   events: Events;
   phases: Phase[];
   metrics: MetricValues;
+  /** 接地・リリースの瞬間で測った指標の、瞬間の時刻が半コマずれたときの変わり幅（metricUncertainty） */
+  uncertainty?: MetricValues;
   rotation: RotationCurve[];
   /** 投げ始め（手元のお手本だけ。デモの合成データは持たない） */
   approach?: Approach;
