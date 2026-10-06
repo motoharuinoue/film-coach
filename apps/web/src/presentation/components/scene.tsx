@@ -1,5 +1,6 @@
-import { useId, type ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
 import { BONES, headCenter, jointAngle, kp, type KeypointName, type PoseFrame, type Vec2 } from "../../domain/pose";
+import { fitCamera } from "./camera";
 
 // ワールド座標（m）→ SVG 座標（1600×900）
 export type Camera = { x0: number; x1: number; y0: number; y1: number };
@@ -12,6 +13,13 @@ export function project(cam: Camera, p: Vec2) {
 }
 
 export const scale = (cam: Camera, m: number) => (m / (cam.x1 - cam.x0)) * W;
+
+/** FieldScene の中の骨格・軌跡・角度は、cam を渡さなければシーンと同じ範囲で描く */
+const SceneCamera = createContext<Camera>(DEFAULT_CAM);
+const useCamera = (cam: Camera | undefined) => {
+  const scene = useContext(SceneCamera);
+  return cam ?? scene;
+};
 
 /** 横から見たフィールド。奥行きのあるヤードラインとスタジアムの光で雰囲気を出す */
 export function FieldScene({ cam = DEFAULT_CAM, children, className, hud }: { cam?: Camera; children?: ReactNode; className?: string; hud?: ReactNode }) {
@@ -59,7 +67,7 @@ export function FieldScene({ cam = DEFAULT_CAM, children, className, hud }: { ca
         <line key={l.yd} x1={l.x + 40} y1={far} x2={l.x - 50} y2={H} stroke="#e8f5ee" strokeOpacity={l.major ? 0.22 : 0.07} strokeWidth={l.major ? 5 : 2} />
       ))}
       <line x1={0} y1={ground} x2={W} y2={ground} stroke="#ffffff" strokeOpacity={0.05} strokeWidth={2} />
-      {children}
+      <SceneCamera.Provider value={cam}>{children}</SceneCamera.Provider>
       <rect width={W} height={H} fill={`url(#vig-${id})`} pointerEvents="none" />
       {hud}
     </svg>
@@ -74,7 +82,8 @@ const STYLE: Record<Variant, { color: string; glow: string; opacity: number }> =
   ref: { color: "#5AC8FA", glow: "glow-ice", opacity: 1 },
 };
 
-export function Skeleton({ frame, cam = DEFAULT_CAM, variant = "self", offset = { x: 0, y: 0 }, joints = true, width = 1 }: { frame: PoseFrame; cam?: Camera; variant?: Variant; offset?: Vec2; joints?: boolean; width?: number }) {
+export function Skeleton({ frame, cam: camProp, variant = "self", offset = { x: 0, y: 0 }, joints = true, width = 1 }: { frame: PoseFrame; cam?: Camera; variant?: Variant; offset?: Vec2; joints?: boolean; width?: number }) {
+  const cam = useCamera(camProp);
   const s = STYLE[variant];
   const P = (p: Vec2) => project(cam, { x: p.x + offset.x, y: p.y + offset.y });
   const head = P(headCenter(frame));
@@ -110,7 +119,8 @@ export function Skeleton({ frame, cam = DEFAULT_CAM, variant = "self", offset = 
 }
 
 /** 関節の角度を円弧とラベルで示す */
-export function AngleArc({ frame, a, b, c, cam = DEFAULT_CAM, label, color = "#FF7A1A", offset = { x: 0, y: 0 } }: { frame: PoseFrame; a: KeypointName; b: KeypointName; c: KeypointName; cam?: Camera; label?: string; color?: string; offset?: Vec2 }) {
+export function AngleArc({ frame, a, b, c, cam: camProp, label, color = "#FF7A1A", offset = { x: 0, y: 0 } }: { frame: PoseFrame; a: KeypointName; b: KeypointName; c: KeypointName; cam?: Camera; label?: string; color?: string; offset?: Vec2 }) {
+  const cam = useCamera(camProp);
   const P = (p: Vec2) => project(cam, { x: p.x + offset.x, y: p.y + offset.y });
   const A = P(kp(frame, a));
   const B = P(kp(frame, b));
@@ -143,7 +153,8 @@ export function AngleArc({ frame, a, b, c, cam = DEFAULT_CAM, label, color = "#F
 }
 
 /** 関節の軌跡（新しい点ほど濃い） */
-export function Trail({ frames, joint, from, to, cam = DEFAULT_CAM, color = "#FF7A1A", offset = { x: 0, y: 0 } }: { frames: PoseFrame[]; joint: KeypointName; from: number; to: number; cam?: Camera; color?: string; offset?: Vec2 }) {
+export function Trail({ frames, joint, from, to, cam: camProp, color = "#FF7A1A", offset = { x: 0, y: 0 } }: { frames: PoseFrame[]; joint: KeypointName; from: number; to: number; cam?: Camera; color?: string; offset?: Vec2 }) {
+  const cam = useCamera(camProp);
   const pts = frames.slice(Math.max(0, from), Math.max(0, to) + 1).map((f) => project(cam, { x: kp(f, joint).x + offset.x, y: kp(f, joint).y + offset.y }));
   if (pts.length < 2) return null;
   return (
@@ -177,7 +188,9 @@ export function Hud({ tl, tr, bl, br }: { tl?: string[]; tr?: string[]; bl?: str
 }
 
 /** 小さなサムネイル用：指定フレームの骨格だけを描く */
-export function PoseThumb({ frame, className, variant = "self", cam = { x0: -2.4, x1: 0.2, y0: -0.1, y1: 2.05 } }: { frame: PoseFrame; className?: string; variant?: Variant; cam?: Camera }) {
+export function PoseThumb({ frame, className, variant = "self", cam: camProp }: { frame: PoseFrame; className?: string; variant?: Variant; cam?: Camera }) {
+  // データによって座標の原点が違うので、骨格に合わせて範囲を決める
+  const cam = camProp ?? fitCamera([frame]);
   return (
     <FieldScene cam={cam} className={className}>
       <Skeleton frame={frame} cam={cam} variant={variant} joints={false} width={1.3} />

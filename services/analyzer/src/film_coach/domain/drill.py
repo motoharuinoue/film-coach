@@ -58,7 +58,7 @@ def check_drill(youtube_id: str, label: str, start_sec: int, targets: list[Drill
     if not targets or len(targets) > MAX_TARGETS:
         raise DrillError(f"直す指標を 1〜{MAX_TARGETS} 個選んでください")
     if any(t.metric not in METRIC_KEYS for t in targets):
-        raise DrillError("知らない指標が含まれています")
+        raise DrillError("対応していない指標が含まれています")
     if len({t.metric for t in targets}) != len(targets):
         raise DrillError("同じ指標が 2 回選ばれています")
     return label

@@ -49,7 +49,7 @@ function Picker() {
   if (!footage.mediaRetained) {
     return (
       <Card className="p-6 text-sm text-muted">
-        この映像は YouTube から取り込んだ区間で、解析のあとに元の動画を消しています（ADR-0005）。本人を選び直すときは、もう一度取り込んでください。
+        この映像は YouTube から取り込んだ区間で、規約と著作権に配慮して、解析のあとに元の動画を消しています。本人を選び直すときは、もう一度取り込んでください。
       </Card>
     );
   }
@@ -126,7 +126,7 @@ function Picker() {
                 {point.t.toFixed(1)} 秒の <span className="font-mono">({Math.round(point.x)}, {Math.round(point.y)})</span>
               </span>
             ) : (
-              <span className="text-muted">映像の中の本人を押してください</span>
+              <span className="text-muted">映像の中で本人をクリックしてください</span>
             )}
           </div>
           <div>
@@ -140,7 +140,7 @@ function Picker() {
             {running ? "追跡しています…" : "この人を追う"}
           </Button>
           {error && <p className="text-xs leading-relaxed text-flag">{error}</p>}
-          <p className="text-[11px] leading-relaxed text-faint">体の真ん中（胸のあたり）を押すと確実です。人の陰に隠れた短い間は、前後から補間してつなぎます。</p>
+          <p className="text-[11px] leading-relaxed text-faint">体の真ん中（胸のあたり）をクリックすると確実です。ほかの人の陰に隠れても、短い間なら前後から補間してつなぎます。</p>
         </Card>
 
         {running && (
@@ -176,7 +176,7 @@ function Picker() {
 export function FootagePick() {
   return (
     <div className="space-y-6">
-      <PageHeader title="① 取り込む：本人を選ぶ" sub="大勢が映る映像から、追いかける本人を 1 回押して選びます" />
+      <PageHeader title="① 取り込む：本人を選ぶ" sub="大勢が映る映像の中で、追いかける本人を一度クリックして選びます" />
       <PageGuide id="pick" />
       <AnalyzerGate>
         <Picker />

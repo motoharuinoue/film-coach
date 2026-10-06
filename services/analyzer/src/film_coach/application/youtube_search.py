@@ -86,7 +86,9 @@ def search_candidates(
     now = clock()
     status = quota_status(ledger, now)
     if status.remaining < SEARCH_COST:
-        raise QuotaExceeded(f"今日の無料枠（{status.limit} ユニット）を使い切りました。米国太平洋時間の 0 時に戻ります")
+        raise QuotaExceeded(
+            f"今日の無料枠（{status.limit} ユニット）を使い切りました。米国太平洋時間の 0 時に枠が戻ります"
+        )
     # 失敗しても使った扱いにする（無料枠を超えないよう、多めに数える）
     ledger.add(status.day, SEARCH_COST)
     try:

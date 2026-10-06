@@ -66,7 +66,7 @@ def test_お手本にできない映像(setup: tuple[FileReferenceStore, FileVid
     with pytest.raises(ReferenceError, match="投球がまだありません"):
         register_reference(refs, videos, api, ledger, bare.id, clock=lambda: NOW)
     register_reference(refs, videos, api, ledger, vid, clock=lambda: NOW)
-    with pytest.raises(ReferenceError, match="もうお手本として登録"):
+    with pytest.raises(ReferenceError, match="すでにお手本として登録"):
         register_reference(refs, videos, api, ledger, vid, clock=lambda: NOW)
     with pytest.raises(NotFoundError):
         register_reference(refs, videos, api, ledger, "0123456789ab", clock=lambda: NOW)

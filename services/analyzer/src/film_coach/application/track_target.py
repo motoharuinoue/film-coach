@@ -174,7 +174,8 @@ def track_target(
     seed = pick_track(tracker.tracks, hint_frame, hint.x, hint.y, cuts=cuts)
     if seed is None:
         raise TargetNotFoundError(
-            f"{hint.t:.2f} 秒の ({hint.x:.0f}, {hint.y:.0f}) に人が見つかりません。位置か時刻を変えてください"
+            f"{hint.t:.2f} 秒の、選んだ位置 ({hint.x:.0f}, {hint.y:.0f}) に人が見つかりません。"
+            "位置か時刻を変えて選び直してください"
         )
     chain: list[Track] = link_tracks(tracker.tracks, seed, cuts=cuts)
     # 人の陰に隠れた短い間は、前後の枠から補間する（場面の切り替わりはまたがない）

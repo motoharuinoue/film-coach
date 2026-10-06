@@ -4,17 +4,28 @@
 
 import type { FindingWriter } from "../../application/ports";
 import { outside, type MetricEvaluation } from "../../domain/judgement";
-import { METRIC_BY_KEY } from "../../domain/metrics";
+import { METRIC_BY_KEY, type MetricKey, unitSuffix } from "../../domain/metrics";
+
+/** 汎用の文章での言い方。範囲より上・下を表す語（既定は「大きい・小さい」）と、呼び方を変える指標だけ */
+const WORDING: Partial<Record<MetricKey, { title?: string; body?: string; high: string; low: string }>> = {
+  releaseTime: { body: "始動からリリースまでの時間", high: "長い", low: "短い" },
+  releaseHeight: { high: "高い", low: "低い" },
+  // 値は頭の上下動の大きさ。「頭の安定が大きい」（＝安定している）と読めないように、上下動と書く
+  headStability: { title: "頭の上下動", high: "大きい", low: "小さい" },
+};
 
 export class TemplateFindingWriter implements FindingWriter {
   write(e: MetricEvaluation): { title: string; body: string } {
     const d = METRIC_BY_KEY[e.key];
     const v = e.value!;
     const z = e.zone!;
-    const range = `お手本ゾーン（${z.p25.toFixed(d.digits)}〜${z.p75.toFixed(d.digits)}${d.unit}）`;
+    // 英字の単位（cm・ms・s）は数値との間に半角スペースを入れる（° は詰める）
+    const unit = unitSuffix(d.unit);
+    const num = (x: number) => `${x.toFixed(d.digits)}${unit}`;
+    const range = `お手本ゾーン（${z.p25.toFixed(d.digits)}〜${num(z.p75)}）`;
     const s = outside(v, z);
     // 自己ベストがあれば、比べる手がかりとして添える（良し悪しは範囲で決める）
-    const best = e.best !== undefined ? `自己ベストのときは ${e.best.toFixed(d.digits)}${d.unit} でした。` : "";
+    const best = e.best !== undefined ? `自己ベストのときは ${num(e.best)} でした。` : "";
     switch (e.key) {
       case "strideRatio":
         return s === "high"
@@ -30,27 +41,30 @@ export class TemplateFindingWriter implements FindingWriter {
         return s === "high"
           ? {
               title: "リリースで肘が上がりすぎている",
-              body: `リリースの瞬間の肘が肩のラインから ${Math.round(v)} cm で、${range}より高い位置にあります。腕の振りが窮屈になり、リリースの位置が安定しにくくなります。`,
+              body: `リリースの瞬間、肘の高さが肩のラインから ${Math.round(v)} cm で、${range}より高くなっています。腕の振りが窮屈になり、リリースの位置が安定しにくくなります。`,
             }
           : {
               title: "リリースで肘が下がっている",
-              body: `リリースの瞬間の肘が肩のラインから ${Math.round(v)} cm で、${range}より低い位置にあります。ボールが横から出やすく、高さと回転が安定しません。`,
+              body: `リリースの瞬間、肘の高さが肩のラインから ${Math.round(v)} cm で、${range}より低くなっています。ボールが横から出やすく、高さと回転が安定しません。`,
             };
       case "sequenceGap":
         return s === "high"
           ? {
               title: "骨盤と体幹の回転の間が空きすぎている",
-              body: `骨盤と体幹の回転のピークの間隔が ${Math.round(v)} ms で、${range}より長くなっています。下半身で作った力が、体幹に伝わるまでに逃げやすくなります。`,
+              body: `骨盤と体幹の回転ピークの間隔が ${Math.round(v)} ms で、${range}より長くなっています。下半身で作った力が、体幹に伝わるまでに逃げやすくなります。`,
             }
           : {
               title: "骨盤と体幹が同時に回っている",
-              body: `骨盤と体幹の回転のピークの間隔が ${Math.round(v)} ms で、${range}より短くなっています。下半身から順に力を伝えられていません。`,
+              body: `骨盤と体幹の回転ピークの間隔が ${Math.round(v)} ms で、${range}より短くなっています。下半身から順に力を伝えられていません。`,
             };
-      default:
+      default: {
+        const w = WORDING[e.key] ?? { high: "大きい", low: "小さい" };
+        const word = s === "high" ? w.high : w.low;
         return {
-          title: `${d.short}がお手本の範囲より${s === "high" ? "大きい" : "小さい"}`,
-          body: `${d.label}が ${v.toFixed(d.digits)}${d.unit} で、${range}より${s === "high" ? "大きく" : "小さく"}なっています。${best}大きいほど・小さいほど良いのではなく、この範囲に入るかを見ています。`,
+          title: `${w.title ?? d.short}がお手本の範囲より${word}`,
+          body: `${w.body ?? d.label}が ${num(v)} で、${range}より${word.replace(/い$/, "く")}なっています。${best}${w.high}ほど良い・${w.low}ほど良いというものではなく、この範囲に入るかどうかを見ています。`,
         };
+      }
     }
   }
 }

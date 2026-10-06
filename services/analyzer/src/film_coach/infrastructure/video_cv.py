@@ -323,7 +323,7 @@ def _jpeg(img: Any, max_width: int) -> bytes:
         img = cv2.resize(img, (max_width, int(h * max_width / w)), interpolation=cv2.INTER_AREA)
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
     if not ok:
-        raise ValueError("JPEG にできませんでした")
+        raise ValueError("JPEG に変換できませんでした")
     return bytes(buf.tobytes())
 
 

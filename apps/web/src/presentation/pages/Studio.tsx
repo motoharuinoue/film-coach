@@ -18,6 +18,7 @@ import { impreciseReason, noZoneReason } from "../../application/judgeThrows";
 import { PHASE_LABEL, phaseAt } from "../../domain/phases";
 import { jointAngle, kp, speedSeries } from "../../domain/pose";
 import { PhaseBar, TimeChart, ZoneBar } from "../components/charts";
+import { fitCamera } from "../components/camera";
 import { AngleArc, FieldScene, Hud, Skeleton, Trail } from "../components/scene";
 import { Badge, Button, Card, Kbd, SectionTitle, Segmented, StatusIcon, Toggle, cx } from "../components/ui";
 import { PageGuide } from "../guide/PageGuide";
@@ -68,6 +69,8 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
   const rows = coach.evaluate(rep, session.camera, bench);
   const top = coach.findings(rep, session.camera, bench)[0];
   const curves = rep.rotation;
+  // 投球の区間を通して同じ範囲で描く（座標の原点は、デモの合成データと手元の映像とで違う）
+  const cam = useMemo(() => fitCamera(rep.seq.frames, 4), [rep]);
   const wrist = useMemo(() => speedSeries(rep.seq, "rWrist"), [rep]);
   const ghostWrist = useMemo(() => {
     if (!ghost) return undefined;
@@ -92,6 +95,7 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
             <div className="relative">
               <FieldScene
                 className="block w-full"
+                cam={cam}
                 hud={
                   <Hud
                     tl={[repLabel(rep.index).toUpperCase(), `${CAMERA_LABEL[session.camera]} · ${rep.seq.fps} FPS`]}
@@ -203,11 +207,11 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
                   ]}
                 />
               ) : (
-                <p className="rounded-lg border border-line bg-white/[0.02] px-3 py-6 text-center text-xs text-muted">骨盤・体幹・腕の回転の速さは、横からの 2D の映像では測れません。3D の骨格（M5）で測ります。</p>
+                <p className="rounded-lg border border-line bg-white/[0.02] px-3 py-6 text-center text-xs text-muted">骨盤・体幹・腕の回転の速さは、横から撮った 2D の映像では測れません。3D の骨格を推定できるようにしてから測る予定です。</p>
               )}
               <p className="mt-2 text-xs text-muted">
                 骨盤 → 体幹のピーク間隔 <span className="font-mono text-text">{formatMetric("sequenceGap", rep.metrics.sequenceGap)}</span>（お手本{" "}
-                <span className="font-mono text-ice">{zones.sequenceGap ? `${Math.round(zones.sequenceGap.p25)}〜${Math.round(zones.sequenceGap.p75)} ms` : "—"}</span>）。{source === "demo" ? "デモでは回転速度を合成しています（M5 の 3D 化で実測）。" : ""}
+                <span className="font-mono text-ice">{zones.sequenceGap ? `${Math.round(zones.sequenceGap.p25)}〜${Math.round(zones.sequenceGap.p75)} ms` : "—"}</span>）。{source === "demo" ? "デモでは回転の速さを合成しています（実際の映像では、3D の骨格を推定できるようにしてから測ります）。" : ""}
               </p>
             </Card>
             <Card className="p-4">
@@ -218,7 +222,7 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
                 markers={markers}
                 series={[
                   { label: "手首の速さ", values: wrist, color: "#FF7A1A", width: 2.5 },
-                  ...(ghostWrist ? [{ label: "比較対象", values: ghostWrist, color: "#5AC8FA", dashed: true }] : []),
+                  ...(ghostWrist ? [{ label: "ゴースト", values: ghostWrist, color: "#5AC8FA", dashed: true }] : []),
                 ]}
               />
               <div className="mt-2 flex items-center justify-between text-xs text-muted">

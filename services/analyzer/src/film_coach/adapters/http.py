@@ -288,7 +288,9 @@ def create_app(deps: HttpDeps) -> FastAPI:
         record_or_404(video_id)
         path = deps.store.media(video_id)
         if path is None:
-            raise HTTPException(410, "元の動画は残していません（YouTube の区間は解析のあとに消しています）")
+            raise HTTPException(
+                410, "元の動画が残っていません（YouTube から取り込んだ区間は、解析のあとに消しています）"
+            )
         return FileResponse(path, media_type="video/mp4" if path.suffix != ".mov" else "video/quicktime")
 
     @app.get("/api/videos/{video_id}/outputs/{name}")
@@ -331,7 +333,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     def start_track(video_id: str, body: TrackRequest) -> dict[str, Any]:
         record = record_or_404(video_id)
         if record.track_status == "running":
-            raise HTTPException(409, "この動画の追跡はすでに動いています")
+            raise HTTPException(409, "この動画の追跡は、すでに実行中です")
         if not record.media_retained or deps.store.media(video_id) is None:
             raise HTTPException(410, "元の動画が残っていないので、追跡をやり直せません。もう一度取り込んでください")
 
@@ -480,7 +482,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
 
     def drill_store() -> DrillStore:
         if deps.drills is None:
-            raise HTTPException(503, "ドリル動画の置き場所がありません")
+            raise HTTPException(503, "ドリル動画の保存先がありません")
         return deps.drills
 
     def drill_view(d: Drill) -> dict[str, Any]:
@@ -508,7 +510,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
 
     def annotation_store() -> AnnotationStore:
         if deps.annotations is None:
-            raise HTTPException(503, "正解の置き場所がありません")
+            raise HTTPException(503, "正解の保存先がありません")
         return deps.annotations
 
     @app.get("/api/evaluation")

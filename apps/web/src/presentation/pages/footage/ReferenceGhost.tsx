@@ -8,28 +8,18 @@ import { Link } from "react-router";
 import { compareMetrics, ghostCandidates, type GhostCandidate } from "../../../application/ghost";
 import { alignedFrame, anchors, applyFit, fitTo, type Alignable } from "../../../domain/align";
 import { zonesFor, type ZoneSet } from "../../../domain/judgement";
-import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
+import { formatMetric, METRIC_BY_KEY, unitSuffix } from "../../../domain/metrics";
 import { PHASE_LABEL, phaseAt } from "../../../domain/phases";
-import { kp, mid, type PoseFrame } from "../../../domain/pose";
 import { APPROACH_LABEL, isApproachGroup, type ThrowRep } from "../../../domain/throws";
 import { PhaseBar } from "../../components/charts";
-import { FieldScene, Hud, Skeleton, type Camera } from "../../components/scene";
+import { fitCamera } from "../../components/camera";
+import { FieldScene, Hud, Skeleton } from "../../components/scene";
 import { Button, Card, SectionTitle, Segmented, StatusIcon, cx } from "../../components/ui";
 import { usePlayback } from "../../hooks/usePlayback";
 import type { LibraryView } from "../../state/library";
 
 type Mode = "overlay" | "side";
 const RATES = ["0.1", "0.25", "0.5", "1"] as const;
-
-/** 自分と重ねたお手本の骨盤が入るように、横の範囲を決める（縦横比は 16:9） */
-function frameCamera(frames: PoseFrame[]): Camera {
-  const xs = frames.map((f) => mid(kp(f, "lHip"), kp(f, "rHip")).x);
-  const lo = Math.min(...xs);
-  const hi = Math.max(...xs);
-  const width = Math.max(4, hi - lo + 1.8);
-  const c = (lo + hi) / 2;
-  return { x0: c - width / 2, x1: c + width / 2, y0: -0.15, y1: -0.15 + (width * 9) / 16 };
-}
 
 function why(c: GhostCandidate, approach: ThrowRep["approach"], picked: boolean) {
   if (picked) return "選んだお手本と重ねています。";
@@ -53,7 +43,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
   const cam = useMemo(() => {
     const frames = [...rep.sequence.frames];
     if (other && fit) for (let i = 0; i < rep.sequence.frames.length; i++) frames.push(applyFit(other.seq.frames[alignedFrame(self, other, i)]!, fit));
-    return frameCamera(frames);
+    return fitCamera(frames, 4);
     // 自分の投球と、重ねるお手本が変わったときだけ計算し直す（self・other・fit はこの 2 つから決まる）
   }, [rep, current]);
 
@@ -96,7 +86,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
       </SectionTitle>
       <p className="text-xs leading-relaxed text-muted">
         {why(current, rep.approach, pickedId !== undefined)}
-        お手本の身長 {Math.round(other.seq.heightM * 100)} cm を、あなたの {Math.round(self.seq.heightM * 100)} cm に合わせて{fit.scale < 1 ? "縮め" : "広げ"}、接地のときの後ろ足の位置で重ねています。時間は、フェーズの区切り（{anchors(self, other).length} か所）で合わせています。
+        お手本の骨格を、身長（{Math.round(other.seq.heightM * 100)} cm）が自分（{Math.round(self.seq.heightM * 100)} cm）と同じになるように{fit.scale < 1 ? "縮小し" : "拡大し"}、接地のときの後ろ足の位置で重ねています。時間は、フェーズの区切り（{anchors(self, other).length} か所）で合わせています。
       </p>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -110,7 +100,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
             { value: "side", label: "並べる" },
           ]}
         />
-        <Segmented label="再生の速さ" size="sm" value={String(pb.rate) as (typeof RATES)[number]} onChange={(v) => pb.setRate(Number(v))} options={RATES.map((r) => ({ value: r, label: `${r}×` }))} />
+        <Segmented label="再生速度" size="sm" value={String(pb.rate) as (typeof RATES)[number]} onChange={(v) => pb.setRate(Number(v))} options={RATES.map((r) => ({ value: r, label: `${r}×` }))} />
         <span className="ml-auto flex items-center gap-3 text-xs text-muted">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-4 rounded-full bg-turf" /> 自分
@@ -156,7 +146,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
           <input type="range" min={0} max={rep.sequence.frames.length - 1} value={pb.frame} onChange={(e) => pb.seek(+e.target.value)} className="min-w-40 flex-1" aria-label="再生位置" />
           {onSeekSelf && (
             <button type="button" className="text-xs text-ice hover:underline" onClick={() => onSeekSelf(pb.frame)}>
-              自分の映像をこの瞬間へ
+              自分の映像でこの瞬間を見る
             </button>
           )}
           {clip && (
@@ -186,7 +176,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
                   <td className="py-2">{d.label}</td>
                   <td className="py-2 text-right font-mono text-turf">{formatMetric(r.key, r.self)}</td>
                   <td className="py-2 text-right font-mono text-ice">{formatMetric(r.key, r.other)}</td>
-                  <td className={cx("py-2 text-right font-mono", r.diff === undefined ? "text-faint" : "text-text")}>{r.diff === undefined ? "—" : `${r.diff > 0 ? "+" : ""}${r.diff.toFixed(d.digits)}${d.unit}`}</td>
+                  <td className={cx("py-2 text-right font-mono", r.diff === undefined ? "text-faint" : "text-text")}>{r.diff === undefined ? "—" : `${r.diff > 0 ? "+" : ""}${r.diff.toFixed(d.digits)}${unitSuffix(d.unit)}`}</td>
                   <td className="py-2 pl-4">{r.self !== undefined && <StatusIcon status={r.status} />}</td>
                 </tr>
               );
@@ -194,7 +184,7 @@ export function ReferenceGhost({ rep, view, zoneSet, onSeekSelf }: { rep: ThrowR
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] leading-relaxed text-faint">差は良し悪しではありません。お手本 1 本との違いを見るためのもので、判定は、自分の値がお手本ゾーン（重み付きの分布）に入るかで決めています。</p>
+      <p className="text-[11px] leading-relaxed text-faint">差の大小は良し悪しを表しません。お手本 1 本との違いを見るためのもので、判定は、自分の値がお手本ゾーン（重み付きの分布）に入るかどうかで決めています。</p>
     </Card>
   );
 }

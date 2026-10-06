@@ -151,14 +151,16 @@ def analyze_throws(
     body_px = height_m / tf.m_per_px
     if body_px < SMALL_BODY * track.video.height:
         warnings.append(
-            f"本人が小さく映っています（身長が約 {body_px:.0f} px、画面の高さの {body_px / track.video.height:.0%}）。"
+            f"本人が小さく映っています（映像上の身長が約 {body_px:.0f} px、"
+            f"画面の高さの {body_px / track.video.height:.0%}）。"
             f"全身が画面の高さの {SMALL_BODY:.0%} 以上になるように近づいて撮ると、関節の位置が正確になります"
         )
     if not reps:
-        warnings.append("投球が見つかりません。横から全身が映った、投げ終わりまでの映像か確かめてください")
+        warnings.append("投球が見つかりません。横から全身が映っていて、投げ終わりまで入った映像かを確かめてください")
         if SLOW_HINT <= slow_peak < MIN_PEAK:
             warnings.append(
-                f"肩より上で腕を振っていますが、投球にしては遅い動きです（手首の速さ 毎秒 身長の {slow_peak:.1f} 倍）。"
+                "肩より上で腕を振っていますが、投球にしては遅い動きです"
+                f"（手首の速さが 1 秒あたり身長の {slow_peak:.1f} 倍）。"
                 "スロー再生の映像なら、スロー再生の倍率を選んで計算し直してください"
             )
     return ThrowAnalysis(track.video, height_m, camera, hand, reps, warnings, slowmo, approach)

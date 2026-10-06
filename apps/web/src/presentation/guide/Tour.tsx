@@ -13,12 +13,12 @@ type TourStep = { route: string; target: string; title: string; body: string };
 function steps(sid: string): TourStep[] {
   return [
     { route: "/", target: "nav-steps", title: "この順に使います", body: "① 取り込む → ② 見る → ③ 直す → ④ 続ける。サイドバーはこの流れで並んでいます。" },
-    { route: "/", target: "home-score", title: "最新のスコア", body: "お手本ゾーン（YouTube のお手本を重み付けした分布）を満点とした点数です。前回比と、自己ベストとの差も出ます。" },
-    { route: "/", target: "home-next", title: "次に直すこと", body: "いちばん外れている指標です。画像を押すと、分析スタジオでその根拠の場面が開きます。" },
+    { route: "/", target: "home-score", title: "最新のスコア", body: "お手本ゾーン（YouTube のお手本を重み付けした分布）の内側を満点とし、外れるほど下がる点数です。前回比と、自己ベストとの差も出ます。" },
+    { route: "/", target: "home-next", title: "次に直すこと", body: "お手本ゾーンからいちばん外れている指標です。画像を押すと、分析スタジオでその根拠の場面が開きます。" },
     { route: `/sessions/${sid}/studio`, target: "studio-video", title: "② 骨格で見る", body: "投球に骨格・角度・手首の軌跡を重ねています。「ゴースト」で自己ベストかお手本の骨格も重ねられます。" },
-    { route: `/sessions/${sid}/studio`, target: "studio-timeline", title: "フェーズとコマ送り", body: "帯を押すとそのフェーズへ移動します。Space で再生、← → で 1 コマずつ進みます。" },
+    { route: `/sessions/${sid}/studio`, target: "studio-timeline", title: "フェーズとコマ送り", body: "帯を押すとそのフェーズへ移動します。Space で再生と停止、← → で 1 コマずつ前後に移動します。" },
     { route: `/sessions/${sid}/studio`, target: "studio-metrics", title: "指標カード", body: "自分の値・自己ベスト・お手本ゾーンを並べています。カードを押すと、その判定の根拠の場面へ移動します。" },
-    { route: `/sessions/${sid}/report`, target: "report-findings", title: "③ 改善点を読む", body: "改善点トップ 3 に、目標の値と練習ドリルの動画が付きます。PDF にも出力できます。" },
+    { route: `/sessions/${sid}/report`, target: "report-findings", title: "③ 改善点を読む", body: "改善点トップ 3 に、目標の範囲と練習ドリルの動画が付きます。PDF にも出力できます。" },
     { route: "/references", target: "references-detail", title: "判定の基準を整える", body: "お手本ごとの重みの内訳です。除外やピン留めをすると、すべての画面の判定が変わります。" },
   ];
 }

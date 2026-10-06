@@ -196,7 +196,7 @@ function EventsStep({ target, t, draft, onChange }: { target: EvaluationTarget; 
             フレーム {f}（{(f / v.fps).toFixed(2)} 秒）
           </span>
         </div>
-        <p className="text-[11px] text-faint">← → で 1 フレーム、Shift を押しながらで 5 フレーム動きます。</p>
+        <p className="text-[11px] text-faint">← → で 1 フレーム、Shift を押しながらだと 5 フレームずつ動きます。</p>
       </div>
       <div className="space-y-3">
         {(["plant", "release"] as const).map((key) => {

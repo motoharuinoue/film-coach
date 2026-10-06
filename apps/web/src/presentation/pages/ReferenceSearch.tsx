@@ -28,7 +28,7 @@ function NoKey() {
       <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted">
         <li>Google Cloud のコンソールでプロジェクトを作り、「YouTube Data API v3」を有効にする</li>
         <li>「認証情報」で API キーを作り、「API の制限」を YouTube Data API v3 だけにする</li>
-        <li>ターミナルで次を実行し、聞かれたらキーを貼り付ける（キーはこの Mac のキーチェーンにだけ置かれます）</li>
+        <li>ターミナルで次を実行し、聞かれたらキーを貼り付ける（キーはこの Mac のキーチェーンにだけ保存されます）</li>
       </ol>
       <pre className="overflow-x-auto rounded-lg border border-line bg-ink p-3 font-mono text-xs text-text/90">security add-generic-password -a "$USER" -s film-coach-youtube -w</pre>
       <p className="text-[11px] text-faint">キーは画面にもログにも出しません。無料枠は 1 日 10,000 ユニット（検索 1 回で {SEARCH_COST} ユニット）です。</p>
@@ -51,7 +51,7 @@ function QuotaMeter({ quota }: { quota: QuotaStatus }) {
         <div className={cx("h-full rounded-full", ratio > 0.8 ? "bg-flag" : ratio > 0.5 ? "bg-caution" : "bg-turf")} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
       </div>
       <div className="text-faint">
-        あと検索 {Math.floor(quota.remaining / SEARCH_COST)} 回 · {resets} に戻ります
+        あと検索 {Math.floor(quota.remaining / SEARCH_COST)} 回 · {resets} にリセットされます
       </div>
     </div>
   );
@@ -191,7 +191,7 @@ function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (foot
             {busy ? "取り込んでいます…" : "取り込んで、お手本の選手を選ぶ"}
           </Button>
           {error && <p className="text-xs text-flag">{error}</p>}
-          <p className="text-[11px] leading-relaxed text-faint">区間だけを取得し、骨格と指標を出したら元の動画は消します。残すのは骨格・指標と出典だけです（ADR-0005）。</p>
+          <p className="text-[11px] leading-relaxed text-faint">区間だけを取得し、骨格と指標を出したら元の動画は消します。YouTube の規約と著作権に配慮して、残すのは骨格・指標と出典だけにしています。</p>
             </>
           )}
         </div>
@@ -280,11 +280,11 @@ function Search() {
 
       {result && (
         <section className="space-y-3">
-          <SectionTitle right={<span className="text-[11px] text-faint">候補を押すと、埋め込みで確かめて区間を選べます</span>}>
+          <SectionTitle right={<span className="text-[11px] text-faint">候補を押すと、埋め込みプレイヤーで確かめて区間を選べます</span>}>
             「{result.query}」の候補 {result.candidates.length} 件{result.creativeCommonsOnly && "（Creative Commons のみ）"}
           </SectionTitle>
           {result.candidates.length === 0 ? (
-            <p className="text-sm text-muted">見つかりませんでした。言葉を変えて探してください。</p>
+            <p className="text-sm text-muted">見つかりませんでした。検索語を変えて探してください。</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {result.candidates.map((c) => (

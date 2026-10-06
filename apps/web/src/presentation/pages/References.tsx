@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { CAMERA_LABEL } from "../../domain/camera";
 import { KIND_LABEL, type Reference, type ReferenceKind } from "../../domain/entities";
-import { isImprecise, isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
+import { isImprecise, isValidFor, METRIC_BY_KEY, METRICS, type MetricKey, unitSuffix } from "../../domain/metrics";
 import { APPROACH_GROUPS, APPROACH_LABEL, type Approach, type ApproachGroup } from "../../domain/throws";
 import { popularity, weightedQuantile } from "../../domain/weighting";
 import { FactorBars, Histogram } from "../components/charts";
-import { FieldScene, Skeleton } from "../components/scene";
+import { fitCamera } from "../components/camera";
+import { FieldScene, PoseThumb, Skeleton } from "../components/scene";
 import { Badge, Button, Card, DemoNote, PageHeader, SectionTitle, Segmented, Toggle, cx } from "../components/ui";
 import { usePlayback } from "../hooks/usePlayback";
 import { PageGuide } from "../guide/PageGuide";
@@ -89,9 +90,9 @@ export function References() {
         <Card className="max-w-2xl space-y-3 p-6">
           <h2 className="font-semibold">手元のお手本はまだありません</h2>
           <ol className="list-decimal space-y-1 pl-5 text-sm leading-relaxed text-muted">
-            <li>「YouTube で探す」で候補を探し、投げている場面を区間で取り込む</li>
+            <li>「YouTube で探す」で候補を探し、投げている場面の区間を取り込む</li>
             <li>お手本の選手を選んで追跡し、「見る」画面で選手の身長を入れて投球を解析する</li>
-            <li>「見る」画面の「お手本として登録」で登録する</li>
+            <li>「見る」画面で「お手本として登録」を押す</li>
           </ol>
           <Link to="/references/search" className="inline-block">
             <Button variant="primary">
@@ -177,7 +178,7 @@ export function References() {
             <DemoNote>チャンネル・動画はすべて架空のデモデータです。手元の解析サービスにつなぐと、「YouTube で探す」で取り込んだお手本を使えます。</DemoNote>
           ) : (
             local.library?.broken.length ? (
-              <p className="text-xs text-caution">元の映像か投球の解析結果が読めないお手本が {local.library.broken.length} 件あります（{local.library.broken.map((b) => b.title).join("、")}）。</p>
+              <p className="text-xs text-caution">元の映像か投球の解析結果を読み込めないお手本が {local.library.broken.length} 件あります（{local.library.broken.map((b) => b.title).join("、")}）。</p>
             ) : null
           )}
         </div>
@@ -199,9 +200,7 @@ function RefThumb({ r }: { r: Reference }) {
   const rep = r.reps[0]!;
   return (
     <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg border border-line">
-      <FieldScene className="block h-full w-full" cam={{ x0: -2.4, x1: 0.2, y0: -0.1, y1: 2.05 }}>
-        <Skeleton frame={rep.seq.frames[rep.events.release]!} variant="ref" cam={{ x0: -2.4, x1: 0.2, y0: -0.1, y1: 2.05 }} joints={false} width={1.4} />
-      </FieldScene>
+      <PoseThumb frame={rep.seq.frames[rep.events.release]!} variant="ref" className="block h-full w-full" />
       <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 font-mono text-[10px]">{r.duration}</span>
       <IconBrandYoutube size={14} className="absolute top-1 left-1 text-flag" aria-hidden />
     </div>
@@ -227,6 +226,8 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
   };
   const rep = r.reps[0]!;
   const pb = usePlayback(rep.seq.frames.length, rep.seq.fps, { autoplay: true, initialRate: 0.5 });
+  // 投球の区間を通して同じ範囲で描く（座標の原点はお手本ごとに違う）
+  const cam = useMemo(() => fitCamera(rep.seq.frames, 4), [rep]);
   const parts = view.weights.parts[r.id]?.[metric];
   const pop = popularity(r.stats);
   const def = METRIC_BY_KEY[metric];
@@ -238,7 +239,7 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
   return (
     <Card className="space-y-5 p-5" data-tour="references-detail">
       <div className="overflow-hidden rounded-xl border border-line">
-        <FieldScene className="block w-full">
+        <FieldScene className="block w-full" cam={cam}>
           <Skeleton frame={rep.seq.frames[pb.frame]!} variant="ref" />
         </FieldScene>
       </div>
@@ -265,7 +266,7 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
         {record ? (
           <div className="mt-3 space-y-2">
             <p className="text-[11px] leading-relaxed text-faint">
-              統計は {new Date(record.stats.fetchedAt).toLocaleString("ja-JP")} に取得しました。お手本の選手の身長 {record.playerHeightCm} cm で解析しています。元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。
+              統計は {new Date(record.stats.fetchedAt).toLocaleString("ja-JP")} に取得しました。お手本の選手の身長を {record.playerHeightCm} cm として解析しています。元の動画は解析のあとに消し、骨格・指標と出典だけを残しています。
             </p>
             <div className="flex flex-wrap gap-2">
               <Link to={`/footage/${record.videoId}`}>
@@ -305,9 +306,9 @@ function ReferenceDetail({ view, r, metric, setMetric }: { view: LibraryView; r:
           {!valid
             ? `${CAMERA_LABEL[r.stats.camera]}の映像なので、「${def.short}」には使いません（Q = 0）。`
             : !measured
-              ? `この映像では「${def.short}」を測れていないため、使っていません（ステップの前が映っていない など）。`
+              ? `この映像では「${def.short}」を測れていないため、使っていません（ステップの前が映っていないなど）。`
               : imprecise && !r.reps.some((x) => x.metrics[metric] !== undefined && !isImprecise(metric, x.uncertainty?.[metric]))
-                ? `${def.at === "plant" ? "接地" : "リリース"}の瞬間の前後で値が ±${imprecise.uncertainty![metric]!.toFixed(def.digits)}${def.unit} 変わる（関節の取り違えや fps の不足）ため、「${def.short}」には使っていません。`
+                ? `${def.at === "plant" ? "接地" : "リリース"}の瞬間の前後で値が ±${imprecise.uncertainty![metric]!.toFixed(def.digits)}${unitSuffix(def.unit)} 変わるため、「${def.short}」には使っていません（原因は関節の取り違えや fps の不足です）。`
               : parts && parts.K < 0.35
               ? `「${def.short}」の値が他のお手本から大きく外れているため、一致度 K で重みを下げています。`
               : `${CAMERA_LABEL[r.stats.camera]}の映像で、「${def.short}」の判定に使っています。`}
@@ -390,7 +391,7 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-white/[0.02] px-3 py-2">
           <Segmented label="投げ始め" size="sm" value={group} onChange={setGroup} options={APPROACH_GROUPS.map((g) => ({ value: g, label: APPROACH_LABEL[g] }))} />
           <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-muted">
-            「{def.short}」はドロップの有無で値の意味が変わるため、投げ始めが同じお手本だけで分布を作り、自分の投球も投げ始めが同じものとだけ比べます。
+            「{def.short}」はドロップの有無で値の意味が変わるため、投げ始めが同じお手本だけで分布を作り、自分の投球も、投げ始めが同じお手本とだけ比べます。
             {unknown > 0 && `投げ始めの分からないお手本（${unknown} レップ）は入れていません。`}
           </p>
         </div>
@@ -401,12 +402,12 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
           <dl className="space-y-3 text-sm">
             <div>
               <dt className="text-xs text-muted">お手本ゾーン（重み付き四分位）</dt>
-              <dd className="font-mono text-ice">{zone ? `${zone.p25.toFixed(def.digits)}〜${zone.p75.toFixed(def.digits)}${def.unit}` : "—"}</dd>
+              <dd className="font-mono text-ice">{zone ? `${zone.p25.toFixed(def.digits)}〜${zone.p75.toFixed(def.digits)}${unitSuffix(def.unit)}` : "—"}</dd>
             </div>
             {popularityOnly && (
               <div>
                 <dt className="text-xs text-muted">人気度だけの場合</dt>
-                <dd className="font-mono text-caution">{popZone ? `${popZone.p25.toFixed(def.digits)}〜${popZone.p75.toFixed(def.digits)}${def.unit}` : "—"}</dd>
+                <dd className="font-mono text-caution">{popZone ? `${popZone.p25.toFixed(def.digits)}〜${popZone.p75.toFixed(def.digits)}${unitSuffix(def.unit)}` : "—"}</dd>
               </div>
             )}
             <div>
@@ -416,8 +417,8 @@ function Distribution({ view, metric, setMetric }: { view: LibraryView; metric: 
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted">今回のあなた</dt>
-              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${def.unit}` : view.source === "local" ? "「見る」・練習の画面で比べます" : "判定不可"}</dd>
+              <dt className="text-xs text-muted">今回のあなたの値</dt>
+              <dd className="font-mono text-pylon">{you !== undefined ? `${you.toFixed(def.digits)}${unitSuffix(def.unit)}` : view.source === "local" ? "「見る」・練習の画面で比べます" : "判定不可"}</dd>
             </div>
           </dl>
         </div>

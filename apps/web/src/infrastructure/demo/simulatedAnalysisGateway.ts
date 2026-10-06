@@ -2,7 +2,7 @@
 
 import type { AnalysisGateway, AnalysisInput, AnalysisProgress, AnalysisResult, SessionRepository } from "../../application/ports";
 
-const STAGES = ["動画の正規化（H.264 / 一定 fps）", "人物検出（RTMDet）", "追跡（ByteTrack）", "骨格推定（RTMPose）", "平滑化", "フェーズ分割", "指標の計算", "判定（自己ベスト・お手本ゾーン）"];
+const STAGES = ["動画の正規化（H.264 / 固定 fps）", "人物検出（RTMDet）", "追跡（ByteTrack）", "骨格推定（RTMPose）", "平滑化", "フェーズ分割", "指標の計算", "判定（自己ベスト・お手本ゾーン）"];
 const POSE_STAGE = 3;
 
 export class SimulatedAnalysisGateway implements AnalysisGateway {

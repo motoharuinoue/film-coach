@@ -3,7 +3,7 @@ import { useState } from "react";
 import { CAMERA_LABEL } from "../../domain/camera";
 import type { Session } from "../../domain/entities";
 import { deviation } from "../../domain/judgement";
-import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey } from "../../domain/metrics";
+import { isValidFor, METRIC_BY_KEY, METRICS, type MetricKey, unitSuffix } from "../../domain/metrics";
 import { TrendChart } from "../components/charts";
 import { Badge, Card, PageHeader, SectionTitle, cx } from "../components/ui";
 import { PageGuide } from "../guide/PageGuide";
@@ -82,7 +82,7 @@ export function Progress() {
               <IconTrophy size={20} className="shrink-0 text-caution" aria-hidden />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-xs text-muted">{m.label}</div>
-                <div className="font-display text-xl">{best ? `${best.value.toFixed(m.digits)}${m.unit}` : "—"}</div>
+                <div className="font-display text-xl">{best ? `${best.value.toFixed(m.digits)}${unitSuffix(m.unit)}` : "—"}</div>
               </div>
               {best && <Badge>{formatDate(best.date)}</Badge>}
             </div>

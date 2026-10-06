@@ -3,7 +3,7 @@
 import { pickFindings } from "../domain/coaching";
 import type { AnalyzedRep } from "../domain/entities";
 import { outside, type MetricEvaluation } from "../domain/judgement";
-import { METRIC_BY_KEY, type MetricKey } from "../domain/metrics";
+import { METRIC_BY_KEY, type MetricKey, unitSuffix } from "../domain/metrics";
 import type { DrillPick, FindingWriter, ReferenceRepository } from "./ports";
 
 export type Finding = {
@@ -29,7 +29,7 @@ export function buildFindings(rep: AnalyzedRep, evals: MetricEvaluation[], write
       key: e.key,
       severity: e.status as Finding["severity"],
       ...writer.write(e),
-      target: `${e.zone!.p25.toFixed(d.digits)}〜${e.zone!.p75.toFixed(d.digits)}${d.unit}`,
+      target: `${e.zone!.p25.toFixed(d.digits)}〜${e.zone!.p75.toFixed(d.digits)}${unitSuffix(d.unit)}`,
       drill,
       frame: d.at === "range" ? rep.events.setStart : rep.events[d.at],
       evaluation: e,

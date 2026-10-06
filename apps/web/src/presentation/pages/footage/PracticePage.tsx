@@ -273,7 +273,7 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
             <MetricTable view={view} selected={current.order} onSelect={setSelected} zoneSet={refZones.zoneSet} />
             {refZones.refCount > 0 && (
               <p className="text-[11px] leading-relaxed text-faint">
-                値の色は、お手本ゾーン（重み付き四分位）での判定です：緑＝良好、黄＝注意、赤＝要改善。白はこの指標を測れるお手本が足りないもの、薄い「±」は接地・リリースの瞬間の前後で値が大きく変わるため判定しないもの（押さえると理由）です。頭の上下動はドロップの有無で値の意味が変わるため、投げ始めが同じお手本とだけ比べ、投げ始めが分からない投球は判定しません。
+                値の色は、お手本ゾーン（重み付き四分位）での判定です：緑＝良好、黄＝注意、赤＝要改善。白はこの指標を測れるお手本が足りないもの、薄い「±」は接地・リリースの瞬間の前後で値が大きく変わるため判定しないもの（カーソルを合わせると理由を表示）です。頭の上下動はドロップの有無で値の意味が変わるため、投げ始めが同じお手本とだけ比べ、投げ始めが分からない投球は判定しません。
               </p>
             )}
           </Card>
@@ -294,7 +294,7 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
               <ReleaseGhosts throws={view.throws} selected={current.order} />
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-muted">
-                  <span className="text-turf">#{current.order}</span>（{current.footageName} の #{current.rep.index}）を緑、ほかを薄い青で描いています。骨盤の位置をそろえています
+                  <span className="text-turf">#{current.order}</span>（{current.footageName} の #{current.rep.index}）を緑、ほかを薄い青で描いています。骨盤の位置をそろえています。
                 </span>
                 <Link to={releaseLink(current)} className="inline-flex items-center gap-1 text-ice hover:underline">
                   映像で見る <IconArrowRight size={13} aria-hidden />

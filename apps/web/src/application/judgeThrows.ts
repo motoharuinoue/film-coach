@@ -2,7 +2,7 @@
 // 判定とスコアの規則はデモと同じ（domain/judgement.ts）。基準だけを、手元のお手本から作ったゾーンに替える。
 
 import { evaluateMetric, zonesFor, type MetricEvaluation, type Status, type ZoneSet, type Zones } from "../domain/judgement";
-import { fpsNeeded, METRIC_BY_KEY, METRICS, type MetricDef, type MetricKey, type MetricValues } from "../domain/metrics";
+import { fpsNeeded, METRIC_BY_KEY, METRICS, type MetricDef, type MetricKey, type MetricValues, unitSuffix } from "../domain/metrics";
 import { APPROACH_LABEL, isApproachGroup, type Approach, type ThrowRep } from "../domain/throws";
 
 /** 投球のスコアを出すのに要る、判定できた指標の数 */
@@ -49,5 +49,5 @@ export function impreciseReason(key: MetricKey, uncertainty: number, fps: number
   const moment = d.at === "plant" ? "接地" : "リリース";
   const need = fpsNeeded(key, uncertainty, fps);
   const hint = need ? `${need} fps 以上で撮ると測れることがあります` : "関節の位置が安定していないか、240 fps でも足りません";
-  return `${moment}の瞬間の前後で ±${uncertainty.toFixed(d.digits)}${d.unit} 変わるため、判定しません（${hint}）`;
+  return `${moment}の瞬間の前後で ±${uncertainty.toFixed(d.digits)}${unitSuffix(d.unit)} 変わるため、判定しません（${hint}）`;
 }

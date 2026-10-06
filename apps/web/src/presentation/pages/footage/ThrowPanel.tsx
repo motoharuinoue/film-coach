@@ -4,7 +4,7 @@
 import { IconAlertTriangle, IconLoader2, IconRefresh, IconRulerMeasure, IconTarget } from "@tabler/icons-react";
 import { useState } from "react";
 import { CAMERA_LABEL, type CameraAngle } from "../../../domain/camera";
-import { formatMetric, invalidReason, isValidFor, METRICS, MIN_SET_S, type MetricKey } from "../../../domain/metrics";
+import { formatMetric, invalidReason, isValidFor, METRICS, MIN_SET_S, type MetricKey, unitSuffix } from "../../../domain/metrics";
 import {
   APPROACH_LABEL,
   APPROACH_MODE_LABEL,
@@ -32,7 +32,7 @@ const UNMEASURED: Partial<Record<MetricKey, string>> = {
   releaseTime: "ステップの始まりが映っていないか、ステップが見つからないため測っていません",
   strideRatio: "ステップが見つからないため測っていません",
   frontKnee: "ステップが見つからないため測っていません",
-  headStability: `ステップの前の構えが映っている長さが足りないため測っていません（${MIN_SET_S} 秒以上必要）`,
+  headStability: `ステップの前の構えが映っている時間が短いため測っていません（${MIN_SET_S} 秒以上必要）`,
 };
 
 const APPROACH_MODES: ApproachMode[] = ["auto", "drop", "standing"];
@@ -105,7 +105,7 @@ function HeightForm({
       </Button>
       {text && !ok && (
         <span className="text-xs text-flag">
-          {HEIGHT_CM.min}〜{HEIGHT_CM.max} cm で入れてください
+          {HEIGHT_CM.min}〜{HEIGHT_CM.max} cm の範囲で入れてください
         </span>
       )}
     </form>
@@ -140,7 +140,7 @@ function ApproachLine({ rep, analysis }: { rep: ThrowRep; analysis: ThrowAnalysi
   const a = rep.approach;
   const how = analysis.approachMode === "auto" ? "骨格から見分けました" : "指定した投げ始めです";
   const why = !a
-    ? "投げ始めを見分ける前に解析した結果です。計算し直すと見分けます"
+    ? "投げ始めを見分けられるようになる前に解析した結果です。計算し直すと見分けます"
     : a.kind === "unknown"
       ? a.dropM === null
         ? "横から撮った映像でないと、ドロップの有無を測れません"
@@ -182,7 +182,7 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
                   <ZoneBar zone={zone} value={rep.metrics[d.key]} />
                   <div className="font-mono text-[10px] text-ice">
                     お手本ゾーン {zone.p25.toFixed(d.digits)}〜{zone.p75.toFixed(d.digits)}
-                    {d.unit}
+                    {unitSuffix(d.unit)}
                   </div>
                 </div>
               ) : (
@@ -191,7 +191,7 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
               <p className="mt-2 text-[11px] leading-relaxed text-faint">{d.hint}</p>
               {s && (
                 <p className="mt-1 font-mono text-[11px] text-muted">
-                  全 {s.n} 本：平均 {formatMetric(d.key, s.mean)}（{s.min.toFixed(d.digits)}〜{s.max.toFixed(d.digits)}）
+                  全 {s.n} 球：平均 {formatMetric(d.key, s.mean)}（{s.min.toFixed(d.digits)}〜{s.max.toFixed(d.digits)}）
                 </p>
               )}
             </div>
@@ -202,7 +202,7 @@ function MetricGrid({ analysis, rep, zones }: { analysis: ThrowAnalysis; rep: Th
         <ul className="space-y-1 text-[11px] text-faint">
           {unmeasured.map((d) => (
             <li key={d.key}>
-              <span className="text-muted">{d.label}</span>：{!isValidFor(d, analysis.camera) ? invalidReason(d, analysis.camera) : UNMEASURED[d.key] ?? "まだ測っていません（骨盤と体幹の回転は、3D の骨格（M5）で測ります）"}
+              <span className="text-muted">{d.label}</span>：{!isValidFor(d, analysis.camera) ? invalidReason(d, analysis.camera) : UNMEASURED[d.key] ?? "まだ測っていません。骨盤と体幹の回転は、3D の骨格を推定できるようにしてから測る予定です"}
             </li>
           ))}
         </ul>
@@ -271,8 +271,8 @@ export function ThrowPanel({
         <SectionTitle>投球の解析</SectionTitle>
         <p className="text-sm leading-relaxed text-muted">
           {forReference
-            ? "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。お手本の選手の身長を入れてください（分からなければ 188 cm）。縮尺と cm の指標に使います。"
-            : "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。横から全身が映った映像が向いています。身長は縮尺と cm の指標に使い、この端末の中にだけ保存します。"}
+            ? "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。お手本の選手の身長を入れてください（分からなければ 188 cm）。縮尺と cm 単位の指標に使います。"
+            : "追跡した骨格から投球を見つけ、1 球ずつフェーズと QB 指標を出します。横から全身が映った映像が向いています。身長は縮尺と cm 単位の指標に使い、この端末の中にだけ保存します。"}
         </p>
         <HeightForm initial={heightCm} busy={busy} label="投球を見つける" heightLabel={forReference ? "お手本の選手の身長（cm）" : undefined} onSubmit={onAnalyze} />
         {error && <p className="text-xs text-flag">{error}</p>}
@@ -325,11 +325,11 @@ export function ThrowPanel({
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs text-muted">
         <IconRulerMeasure size={15} aria-hidden />
         身長 <span className="font-mono text-text">{height} cm</span>・{CAMERA_LABEL[analysis.camera]}
-        {analysis.slowmo > 1 && `・${analysis.slowmo} 倍のスロー再生`} で計算しました
+        {analysis.slowmo > 1 && `・${analysis.slowmo} 倍のスロー再生`}で計算しました
         {!editing && (
           <button type="button" className="text-ice hover:underline" onClick={() => setEditing(true)}>
             <IconRefresh size={13} className="mr-0.5 inline" aria-hidden />
-            変えて計算し直す
+            条件を変えて計算し直す
           </button>
         )}
       </div>

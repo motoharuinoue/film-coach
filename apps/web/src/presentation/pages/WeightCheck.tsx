@@ -3,7 +3,7 @@
 import { IconLoader2 } from "@tabler/icons-react";
 import { useEffect, useRef, useState } from "react";
 import { validateReferences } from "../../application/references";
-import { METRIC_BY_KEY } from "../../domain/metrics";
+import { METRIC_BY_KEY, unitSuffix } from "../../domain/metrics";
 import { SCHEME_LABEL, SCHEMES, type Scheme, type WeightValidation } from "../../domain/weightValidation";
 import { Card, SectionTitle, Segmented, cx } from "../components/ui";
 import type { LibraryView } from "../state/library";
@@ -115,7 +115,7 @@ export function WeightCheck({ view }: { view: LibraryView }) {
                             <div>{def.short}</div>
                             <div className="text-[10px] text-faint">
                               値の幅 {m.range.toFixed(def.digits)}
-                              {def.unit}
+                              {unitSuffix(def.unit)}
                             </div>
                           </td>
                           <td className="px-2 py-2 text-right text-muted">{m.groups} 本</td>
@@ -136,7 +136,7 @@ export function WeightCheck({ view }: { view: LibraryView }) {
       )}
       <ul className="list-disc space-y-1 pl-5 text-[11px] leading-relaxed text-faint">
         <li>ゾーンの揺れ：お手本の動画を、重複を許して同じ本数だけ選び直し、重みとゾーンを計算し直すことを {ITERATIONS.toLocaleString()} 回くり返します（ブートストラップ）。四分位（25・50・75%）の標準偏差の平均です。</li>
-        <li>外れ値によるずれ：再生数 500 万回・登録者数 200 万人の動画が、既存のお手本の最大値よりさらに値の幅 {near} つ分（{far} つ分）大きい値を持つとして加え、四分位が動いた量の平均を求めます。撮影の角度・画質・レップの数は、既存のお手本と同じにします。</li>
+        <li>外れ値によるずれ：再生数 500 万回・登録者数 200 万人の動画が、既存のお手本の最大値よりさらに値の幅 {near} つ分（{far} つ分）大きい値を持つと仮定して加え、四分位が動いた量の平均を求めます。撮影の角度・画質・レップの数は、既存のお手本と同じにします。</li>
         <li>測れたお手本が 3 本未満の指標と、投げ始めごとに分布を作る指標（頭の上下動）は除きます。</li>
       </ul>
     </Card>

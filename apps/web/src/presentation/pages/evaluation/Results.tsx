@@ -112,12 +112,12 @@ export function Results({ data, onRefresh, busy }: { data: Evaluation; onRefresh
               </tbody>
             </table>
             <p className="mt-2 text-[11px] leading-relaxed text-faint">
-              かたよりは、指標に使う骨格の点が、正解から見てどちらにずれているかの平均です（前・上が正）。部位ごとに一定の向きへずれているときは、モデルと正解とで点の付け方が違います。
+              かたよりは、指標に使う骨格の点が、正解から見てどちらにずれているかの平均です（前・上がプラス）。部位ごとに一定の向きへずれているときは、モデルと正解とで点の付け方が違います。
             </p>
           </section>
 
           <section className="overflow-x-auto">
-            <h3 className="mb-2 text-xs text-muted">瞬間（正解のフレームとの差。正なら解析が遅い）</h3>
+            <h3 className="mb-2 text-xs text-muted">瞬間（正解のフレームとの差。プラスなら解析のほうが遅い）</h3>
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-line text-[11px] text-muted">

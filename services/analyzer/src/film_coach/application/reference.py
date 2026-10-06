@@ -50,7 +50,7 @@ def _stats(api: YouTubeSearch, ledger: QuotaLedger, youtube_id: str, clock: Cloc
     now = clock()
     status = quota_status(ledger, now)
     if status.remaining < VIDEO_COST:
-        raise QuotaExceeded("今日の無料枠を使い切りました。米国太平洋時間の 0 時に戻ります")
+        raise QuotaExceeded("今日の無料枠を使い切りました。米国太平洋時間の 0 時に枠が戻ります")
     ledger.add(status.day, VIDEO_COST)
     found = api.video(youtube_id)
     if found is None:
@@ -79,7 +79,7 @@ def register_reference(
     if record.youtube is None:
         raise ReferenceError("お手本にできるのは、YouTube から取り込んだ映像だけです")
     if any(r.video_id == footage_id for r in refs.list()):
-        raise ReferenceError("この映像は、もうお手本として登録しています")
+        raise ReferenceError("この映像は、すでにお手本として登録しています")
     throws = videos.load_throws(footage_id)
     if throws is None or not throws.reps:
         raise ReferenceError("投球がまだありません。お手本の選手を追跡して、投球を解析してください")

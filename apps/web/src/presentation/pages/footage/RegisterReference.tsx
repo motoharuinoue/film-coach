@@ -46,7 +46,7 @@ export function RegisterReference({ footage, throws }: { footage: Footage; throw
       {registered ? (
         <>
           <p className="flex items-center gap-1.5 text-sm text-turf">
-            <IconCheck size={16} aria-hidden /> {KIND_LABEL[registered.kind]}として登録しています
+            <IconCheck size={16} aria-hidden /> {KIND_LABEL[registered.kind]}として登録済みです
           </p>
           <Link to="/references" className="inline-block">
             <Button>
@@ -59,7 +59,7 @@ export function RegisterReference({ footage, throws }: { footage: Footage; throw
       ) : (
         <>
           <p className="text-xs leading-relaxed text-muted">
-            この映像の投球 {throws.reps.length} 球を、判定の基準（お手本の分布）に加えます。お手本の選手の身長 {heightCm} cm で解析した値を使います。
+            この映像の投球 {throws.reps.length} 球を、判定の基準（お手本の分布）に加えます。お手本の選手の身長を {heightCm} cm として解析した値を使います。
           </p>
           <Segmented
             label="お手本の種類"

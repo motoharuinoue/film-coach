@@ -121,7 +121,9 @@ def save_annotation(
     record = store.get(video_id)
     x = _load(store, record) if record else None
     if x is None:
-        raise NotFoundError(f"映像 {video_id} には正解を付けられません（投球まで解析した、自分の映像だけに付けます）")
+        raise NotFoundError(
+            f"映像 {video_id} には正解を付けられません（付けられるのは、投球まで解析した自分の映像だけです）"
+        )
     info = x.track.video
     frames = sorted(frames, key=lambda f: f.frame)
     annotation = Annotation(video_id, tuple(throws), tuple(frames), library._now())

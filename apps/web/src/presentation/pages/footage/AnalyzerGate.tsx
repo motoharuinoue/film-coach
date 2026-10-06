@@ -39,7 +39,7 @@ export function AnalyzerGate({ children }: { children: ReactNode }) {
     return (
       <div className="flex items-center gap-2 py-16 text-sm text-muted">
         <IconLoader2 size={18} className="animate-spin" aria-hidden />
-        解析サービスを確かめています…
+        解析サービスへの接続を確かめています…
       </div>
     );
   }
@@ -52,7 +52,7 @@ export function AnalyzerGate({ children }: { children: ReactNode }) {
             <h2 className="font-semibold">自分の映像は、手元の解析サービスで扱います</h2>
           </div>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            この公開デモには解析サービスがないので、仮データで動いています。自分の映像を解析するときは、リポジトリを手元に置いて次のように起動します。映像は手元から外に出ません。
+            この公開デモには解析サービスがないので、デモデータ（架空）で動いています。自分の映像を解析するときは、リポジトリを手元にクローンして、次のように起動します。映像は手元から外に出ません。
           </p>
           <Commands />
         </>

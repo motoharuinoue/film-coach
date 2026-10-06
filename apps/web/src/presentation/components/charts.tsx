@@ -280,7 +280,7 @@ export function ZoneBar({ zone, value, best, className }: { zone?: Zone; value?:
 const FACTORS: { k: keyof WeightParts; label: string; hint: string }[] = [
   { k: "P", label: "人気度", hint: "補正した高評価率 × 再生数" },
   { k: "C", label: "チャンネル", hint: "登録者数・信頼チャンネル" },
-  { k: "Q", label: "解析品質", hint: "検出の信頼度・角度・画質" },
+  { k: "Q", label: "解析品質", hint: "検出の信頼度・撮影角度・画質" },
   { k: "K", label: "一致度", hint: "他のお手本との一致" },
   { k: "M", label: "手動調整", hint: "ピン留め・除外・星" },
 ];
