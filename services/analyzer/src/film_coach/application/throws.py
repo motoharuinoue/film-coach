@@ -12,7 +12,7 @@ from dataclasses import dataclass, replace
 from ..domain.camera import CameraAngle
 from ..domain.library import VideoInfo
 from ..domain.pose import KP, smooth_sequence
-from ..domain.throws import find_throws
+from ..domain.throws import MIN_PEAK, find_throws, peak_overhead_speed
 from ..domain.world import (
     Hand,
     ImagePoint,
@@ -26,7 +26,11 @@ from .analyze_pose import RepAnalysis, analyze_pose
 from .track_target import TargetFrame, TargetTrack
 
 MIN_RUN_S = 0.8
-"""投球を探す、骨格が続いた区間の最短の長さ（秒）"""
+"""投球を探す、骨格が続いた区間の最短の長さ（実際の時間の秒）"""
+MAX_SLOWMO = 16
+"""スロー再生の倍率の上限"""
+SLOW_HINT = 0.8
+"""投球が見つからなくても、肩より上の手首がこれ以上の速さ（身長/秒）で動いていれば、スロー再生を疑う"""
 SMALL_BODY = 0.4
 """本人が小さく映っているとみなす、画像の高さに対する身長の比率。これより小さいと関節の位置が粗い"""
 
@@ -53,6 +57,8 @@ class ThrowAnalysis:
     reps: list[ThrowRep]
     warnings: list[str]
     """解析の結果を読むときの注意（本人が小さく映っている、投球が見つからない など）"""
+    slowmo: float = 1.0
+    """スロー再生の倍率（1 は等速）。速さと時間は、実際の時間に直して計算する"""
 
 
 def stabilized(track: TargetTrack) -> list[TargetFrame]:
@@ -90,9 +96,17 @@ def _poses(frames: list[TargetFrame], fps: float) -> list[list[ImagePoint]]:
     return repair_low_confidence([f.keypoints for f in frames if f.keypoints is not None], fps)
 
 
-def analyze_throws(track: TargetTrack, height_m: float, camera: CameraAngle = "side") -> ThrowAnalysis:
-    """投球を見つけて、1 本ずつ解析する。投球が見つからなければ reps は空"""
-    fps = track.video.fps
+def analyze_throws(
+    track: TargetTrack, height_m: float, camera: CameraAngle = "side", slowmo: float = 1.0
+) -> ThrowAnalysis:
+    """投球を見つけて、1 本ずつ解析する。投球が見つからなければ reps は空。
+
+    slowmo はスロー再生の倍率。YouTube のお手本はスロー再生の映像が多いので、時間を実際の時間に直す
+    （映像の 1 秒は、実際には 1/slowmo 秒）。フレーム番号は映像のままにする。
+    """
+    if not 1 <= slowmo <= MAX_SLOWMO:
+        raise ValueError(f"スロー再生の倍率は 1〜{MAX_SLOWMO} にしてください")
+    fps = track.video.fps * slowmo
     runs = _runs(stabilized(track), set(track.cuts))
     every = [f for run in runs for f in run]
     if not every:
@@ -100,11 +114,13 @@ def analyze_throws(track: TargetTrack, height_m: float, camera: CameraAngle = "s
     tf, hand = estimate_transform(_poses(every, fps), fps, height_m)
 
     reps: list[ThrowRep] = []
+    slow_peak = 0.0
     for run in runs:
         if len(run) < MIN_RUN_S * fps:
             continue
         poses = _poses(run, fps)
-        whole = smooth_sequence(to_world(poses, [f.t for f in run], fps, height_m, tf, hand))
+        whole = smooth_sequence(to_world(poses, [f.t / slowmo for f in run], fps, height_m, tf, hand))
+        slow_peak = max(slow_peak, peak_overhead_speed(whole))
         for w in find_throws(whole):
             part = run[w.start : w.end + 1]
             part_poses = poses[w.start : w.end + 1]
@@ -113,7 +129,7 @@ def analyze_throws(track: TargetTrack, height_m: float, camera: CameraAngle = "s
             origin = (first[KP["lHip"]][0] + first[KP["rHip"]][0]) / 2
             rep_tf = replace(tf, origin_x=origin)
             t0 = part[0].t
-            seq = to_world(part_poses, [f.t - t0 for f in part], fps, height_m, rep_tf, hand)
+            seq = to_world(part_poses, [(f.t - t0) / slowmo for f in part], fps, height_m, rep_tf, hand)
             reps.append(ThrowRep(len(reps) + 1, part[0].index, part[-1].index, rep_tf, analyze_pose(seq, camera)))
     warnings: list[str] = []
     body_px = height_m / tf.m_per_px
@@ -124,4 +140,9 @@ def analyze_throws(track: TargetTrack, height_m: float, camera: CameraAngle = "s
         )
     if not reps:
         warnings.append("投球が見つかりません。横から全身が映った、投げ終わりまでの映像か確かめてください")
-    return ThrowAnalysis(track.video, height_m, camera, hand, reps, warnings)
+        if SLOW_HINT <= slow_peak < MIN_PEAK:
+            warnings.append(
+                f"肩より上で腕を振っていますが、投球にしては遅い動きです（手首の速さ 毎秒 身長の {slow_peak:.1f} 倍）。"
+                "スロー再生の映像なら、スロー再生の倍率を選んで計算し直してください"
+            )
+    return ThrowAnalysis(track.video, height_m, camera, hand, reps, warnings, slowmo)

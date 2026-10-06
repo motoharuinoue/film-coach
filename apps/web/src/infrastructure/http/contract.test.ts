@@ -98,7 +98,10 @@ describe("画面の読み込み処理", () => {
 describe("投球の解析の読み込み", () => {
   it("投球ごとのイベント・フェーズ・指標と、骨格の列を名前付きの値にする", () => {
     const a = parseThrows(samples.throws!);
-    expect(a).toMatchObject({ hand: "right", heightM: 1.8, camera: "side", warnings: [] });
+    expect(a).toMatchObject({ hand: "right", heightM: 1.8, camera: "side", warnings: [], slowmo: 1 });
+    // スロー再生の倍率を入れる前の結果も読める（等速とみなす）
+    const { slowmo: _s, ...old } = samples.throws as Record<string, unknown>;
+    expect(parseThrows(old).slowmo).toBe(1);
     expect(a.reps).toHaveLength(1);
     const r = a.reps[0]!;
     expect(r.start).toBeLessThan(r.start + r.events.release);

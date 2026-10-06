@@ -1,5 +1,6 @@
 """画像の座標をワールド 2D に直し、投球を見つけて解析する。合成データを画像に写して確かめる（モデルも動画もいらない）"""
 
+from itertools import pairwise
 from typing import Any
 
 import pytest
@@ -257,3 +258,40 @@ def test_カメラが動いても_見積もった動きを打ち消して同じ�
     # 打ち消さなければ、骨盤の動き（ドロップ）が狂う
     raw = analyze_throws(track_of(panned, 60), 1.8)
     assert [r.analysis.events for r in raw.reps] != [r.analysis.events for r in still.reps]
+
+
+def stretch(poses: list[Pose], k: int) -> list[Pose]:
+    """k 倍のスロー再生：フレームの間を線形補間して、同じ fps のまま k 倍の長さにする"""
+    out: list[Pose] = []
+    for a, b in pairwise(poses):
+        for j in range(k):
+            r = j / k
+            out.append(
+                [(pa[0] + (pb[0] - pa[0]) * r, pa[1] + (pb[1] - pa[1]) * r, pa[2]) for pa, pb in zip(a, b, strict=True)]
+            )
+    out.append(poses[-1])
+    return out
+
+
+def test_スロー再生の映像は_倍率を入れれば等速と同じ結果になる(base_sequence: PoseSequence) -> None:
+    rep = project(base_sequence)
+    normal = analyze_throws(track_of([rep[0]] * 60 + rep, 60), 1.8)
+    slow = [rep[0]] * 240 + stretch(rep, 4)
+    # 倍率を入れなければ、手首が遅すぎて投球に見えない。スロー再生を疑う注意を出す
+    missed = analyze_throws(track_of(slow, 60), 1.8)
+    assert missed.reps == [] and any("スロー再生" in w for w in missed.warnings)
+    found = analyze_throws(track_of(slow, 60), 1.8, slowmo=4)
+    assert len(found.reps) == 1 and found.slowmo == 4
+    got, want = found.reps[0].analysis.metrics, normal.reps[0].analysis.metrics
+    # リリースの時刻（実際の時間）は 2 フレーム（2/60 秒）以内で合う。どちらも構えの 1 秒のあとに投げている。
+    # 平滑化はフレームの数で幅を取るので、4 倍細かいと実際の時間では幅が 1/4 になり、速さのピークが少しずれる
+    t_normal = (normal.reps[0].start + normal.reps[0].analysis.events.release) / 60
+    t_slow = (found.reps[0].start + found.reps[0].analysis.events.release) / (60 * 4)
+    assert t_slow == pytest.approx(t_normal, abs=2 / 60)
+    # 接地のときの値と、始動からリリースまでの時間（実際の時間に直している）は合う
+    for key in ("strideRatio", "frontKnee"):
+        assert got[key] == pytest.approx(want[key], rel=0.05), key
+    assert got["releaseTime"] == pytest.approx(want["releaseTime"], abs=0.05)
+    # リリースの瞬間の値（手首の高さ・肘角度）は、腕が速く動くので、半フレームのずれで数 % 変わる
+    with pytest.raises(ValueError, match="倍率"):
+        analyze_throws(track_of(slow, 60), 1.8, slowmo=0.5)

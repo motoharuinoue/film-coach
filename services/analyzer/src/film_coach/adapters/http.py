@@ -137,6 +137,7 @@ class ReferencePatch(BaseModel):
 class ThrowsRequest(BaseModel):
     heightCm: float = Field(ge=120, le=230, description="選手の身長（cm）")
     camera: CameraAngle = "side"
+    slowmo: float = Field(default=1, ge=1, le=16, description="スロー再生の倍率（1 は等速）")
 
 
 class TrackRequest(BaseModel):
@@ -256,7 +257,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
         """追跡した骨格から投球を見つけて、1 本ずつ指標を出す。骨格だけを使うので、すぐに終わる"""
         record_or_404(video_id)
         try:
-            analyze_footage_throws(deps.store, video_id, body.heightCm / 100, body.camera)
+            analyze_footage_throws(deps.store, video_id, body.heightCm / 100, body.camera, body.slowmo)
         except NotFoundError as e:
             raise HTTPException(409, str(e)) from e
         except NotEnoughPoseError as e:

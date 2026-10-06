@@ -28,6 +28,7 @@ const analysis = (reps: ThrowRep[]): ThrowAnalysis => ({
   hand: "right",
   reps,
   warnings: [],
+  slowmo: 1,
 });
 
 describe("投球", () => {

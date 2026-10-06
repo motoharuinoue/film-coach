@@ -5,7 +5,7 @@ import { IconAlertTriangle, IconLoader2, IconRefresh, IconRulerMeasure, IconTarg
 import { useState } from "react";
 import { CAMERA_LABEL, type CameraAngle } from "../../../domain/camera";
 import { formatMetric, invalidReason, isValidFor, METRICS } from "../../../domain/metrics";
-import { HEIGHT_CM, isValidHeightCm, releaseFrame, spread, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
+import { HEIGHT_CM, isValidHeightCm, releaseFrame, SLOWMO_OPTIONS, spread, type ThrowAnalysis, type ThrowRep } from "../../../domain/throws";
 import { judgeMetrics, MIN_JUDGED_FOR_SCORE, type ThrowJudgement } from "../../../application/judgeThrows";
 import { judge, type Zones } from "../../../domain/judgement";
 import { PhaseBar, ZoneBar } from "../../components/charts";
@@ -18,6 +18,7 @@ const ANGLES: CameraAngle[] = ["side", "behind", "front"];
 function HeightForm({
   initial,
   initialCamera = "side",
+  initialSlowmo = 1,
   busy,
   label,
   heightLabel = "身長（cm）",
@@ -25,13 +26,15 @@ function HeightForm({
 }: {
   initial?: number;
   initialCamera?: CameraAngle;
+  initialSlowmo?: number;
   busy: boolean;
   label: string;
   heightLabel?: string;
-  onSubmit: (cm: number, camera: CameraAngle) => void;
+  onSubmit: (cm: number, camera: CameraAngle, slowmo: number) => void;
 }) {
   const [text, setText] = useState(initial ? String(initial) : "");
   const [camera, setCamera] = useState<CameraAngle>(initialCamera);
+  const [slowmo, setSlowmo] = useState(String(initialSlowmo));
   const cm = Number(text);
   const ok = isValidHeightCm(cm);
   return (
@@ -39,7 +42,7 @@ function HeightForm({
       className="flex flex-wrap items-end gap-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (ok && !busy) onSubmit(cm, camera);
+        if (ok && !busy) onSubmit(cm, camera, Number(slowmo));
       }}
     >
       <div>
@@ -62,6 +65,10 @@ function HeightForm({
       <div>
         <span className="mb-1 block text-xs text-muted">撮った角度</span>
         <Segmented label="撮った角度" size="sm" value={camera} onChange={setCamera} options={ANGLES.map((a) => ({ value: a, label: CAMERA_LABEL[a] }))} />
+      </div>
+      <div>
+        <span className="mb-1 block text-xs text-muted">スロー再生</span>
+        <Segmented label="スロー再生の倍率" size="sm" value={slowmo} onChange={setSlowmo} options={SLOWMO_OPTIONS.map((k) => ({ value: String(k), label: k === 1 ? "等速" : `${k} 倍` }))} />
       </div>
       <Button type="submit" variant="primary" disabled={!ok || busy}>
         {busy ? <IconLoader2 size={16} className="animate-spin" aria-hidden /> : <IconTarget size={16} aria-hidden />}
@@ -195,7 +202,7 @@ export function ThrowPanel({
   frame: number;
   fps: number;
   selected: number;
-  onAnalyze: (cm: number, camera: CameraAngle) => void;
+  onAnalyze: (cm: number, camera: CameraAngle, slowmo: number) => void;
   onPick: (rep: ThrowRep) => void;
   onSeekFrame: (frame: number) => void;
 }) {
@@ -260,7 +267,8 @@ export function ThrowPanel({
 
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3 text-xs text-muted">
         <IconRulerMeasure size={15} aria-hidden />
-        身長 <span className="font-mono text-text">{height} cm</span> で計算しました
+        身長 <span className="font-mono text-text">{height} cm</span>・{CAMERA_LABEL[analysis.camera]}
+        {analysis.slowmo > 1 && `・${analysis.slowmo} 倍のスロー再生`} で計算しました
         {!editing && (
           <button type="button" className="text-ice hover:underline" onClick={() => setEditing(true)}>
             <IconRefresh size={13} className="mr-0.5 inline" aria-hidden />
@@ -275,8 +283,9 @@ export function ThrowPanel({
           label="計算し直す"
           heightLabel={forReference ? "お手本の選手の身長（cm）" : undefined}
           initialCamera={analysis.camera}
-          onSubmit={(cm, camera) => {
-            onAnalyze(cm, camera);
+          initialSlowmo={analysis.slowmo}
+          onSubmit={(cm, camera, slowmo) => {
+            onAnalyze(cm, camera, slowmo);
             setEditing(false);
           }}
         />

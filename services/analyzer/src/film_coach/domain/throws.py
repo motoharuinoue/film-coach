@@ -108,6 +108,13 @@ def is_overhead(seq: PoseSequence, peak: int, min_conf: float = 0.3) -> bool:
     return False
 
 
+def peak_overhead_speed(seq: PoseSequence) -> float:
+    """手首が肩より上にあるときの、投げる手首の速さの最大（身長/秒）。投球が見つからないときの手がかりにする"""
+    speed = speed_series(seq, "rWrist")
+    found = [speed[i] for i in range(len(speed)) if is_overhead(seq, i)]
+    return max(found, default=0.0) / seq.height_m
+
+
 def find_throws(
     seq: PoseSequence,
     min_peak: float = MIN_PEAK,

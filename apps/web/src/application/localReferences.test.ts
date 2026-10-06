@@ -46,6 +46,7 @@ const analysis: ThrowAnalysis = {
   camera: "side",
   hand: "right",
   warnings: [],
+  slowmo: 1,
   reps: [1, 2].map((index) => ({
     index,
     start: 100 * index,

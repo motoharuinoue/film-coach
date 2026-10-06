@@ -187,13 +187,13 @@ def run_tracking(
 
 
 def analyze_footage_throws(
-    store: VideoStore, video_id: str, height_m: float, camera: CameraAngle = "side"
+    store: VideoStore, video_id: str, height_m: float, camera: CameraAngle = "side", slowmo: float = 1.0
 ) -> ThrowAnalysis:
     """追跡の済んだ映像から投球を見つけて解析し、保存する。骨格だけを使うので、元の動画が消えていても動く"""
     get_record(store, video_id)
     track = store.load_track(video_id)
     if track is None:
         raise NotFoundError("まだ本人を追跡していません。先に本人を選んで追跡してください")
-    throws = analyze_throws(track, height_m, camera)
+    throws = analyze_throws(track, height_m, camera, slowmo)
     store.save_throws(video_id, throws)
     return throws

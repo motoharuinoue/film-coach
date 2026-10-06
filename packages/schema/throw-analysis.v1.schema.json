@@ -70,6 +70,7 @@
     "heightM": { "type": "number", "exclusiveMinimum": 0, "description": "選手の身長（m）。縮尺と、身長比の指標に使う" },
     "camera": { "enum": ["side", "behind", "front", "endzone", "sideline"] },
     "hand": { "enum": ["right", "left"], "description": "投げる腕。左投げは左右の関節を入れ替えて、右投げの規則で計算する" },
+    "slowmo": { "type": "number", "minimum": 1, "maximum": 16, "description": "スロー再生の倍率（1 は等速。なければ 1）。速さと時間は実際の時間に直して計算している" },
     "warnings": {
       "type": "array",
       "description": "解析の結果を読むときの注意（本人が小さく映っている、投球が見つからない など）",

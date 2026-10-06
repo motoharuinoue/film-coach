@@ -25,6 +25,7 @@ const analysis = (n: number): ThrowAnalysis => ({
   camera: "side",
   hand: "right",
   warnings: [],
+  slowmo: 1,
   reps: Array.from({ length: n }, (_, i) => ({
     index: i + 1,
     start: 0,
