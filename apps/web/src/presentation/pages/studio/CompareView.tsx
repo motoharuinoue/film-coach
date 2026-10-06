@@ -1,6 +1,6 @@
 import { IconPlayerPause, IconPlayerPlay } from "@tabler/icons-react";
 import { useMemo, useState } from "react";
-import { alignedFrame, alignOffset } from "../../../domain/align";
+import { alignedFrame, applyFit, fitTo } from "../../../domain/align";
 import type { AnalyzedRep, Session } from "../../../domain/entities";
 import { formatMetric, METRIC_BY_KEY } from "../../../domain/metrics";
 import { PHASE_LABEL, phaseAt } from "../../../domain/phases";
@@ -28,15 +28,14 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
   }, [targetId, bench.best, coach]);
 
   const self = rep.seq.frames[pb.frame]!;
-  const other = target ? target.seq.frames[alignedFrame(rep, target, pb.frame)]! : undefined;
-  const offset = target ? alignOffset(rep, target) : { x: 0, y: 0 };
+  const other = target ? applyFit(target.seq.frames[alignedFrame(rep, target, pb.frame)]!, fitTo(rep, target)) : undefined;
   const evals = coach.evaluate(rep, session.camera, bench);
   const phase = PHASE_LABEL[phaseAt(rep.phases, pb.frame)];
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted">リリースの瞬間で時間を合わせ、接地時の後ろ足で位置を合わせて比べます</p>
+        <p className="text-sm text-muted">フェーズの区切りで時間を合わせ、身長をそろえ、接地時の後ろ足で位置を合わせて比べます</p>
         <div className="flex flex-wrap items-center gap-3">
           <Segmented
             label="比較の表示"
@@ -61,7 +60,7 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
       {mode === "overlay" ? (
         <Card className="overflow-hidden">
           <FieldScene className="block w-full" hud={<Hud tl={[`今回 ${repLabel(rep.index)}`, target ? `比較：${target.label}` : ""]} tr={[phase]} bl={[`${self.t.toFixed(3)}s`]} />}>
-            {other && <Skeleton frame={other} variant="ref" offset={offset} />}
+            {other && <Skeleton frame={other} variant="ref" />}
             <Skeleton frame={self} />
           </FieldScene>
         </Card>
@@ -74,7 +73,7 @@ export function CompareView({ session, rep }: { session: Session; rep: AnalyzedR
           </Card>
           <Card className="overflow-hidden">
             <FieldScene className="block w-full" hud={<Hud tl={[target?.label ?? "—"]} tr={[phase]} />}>
-              {other && <Skeleton frame={other} variant="ref" offset={offset} />}
+              {other && <Skeleton frame={other} variant="ref" />}
             </FieldScene>
           </Card>
         </div>

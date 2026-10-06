@@ -10,7 +10,7 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { alignedFrame, alignOffset, type Alignable } from "../../domain/align";
+import { alignedFrame, applyFit, fitTo, type Alignable } from "../../domain/align";
 import { CAMERA_LABEL } from "../../domain/camera";
 import type { AnalyzedRep, Session } from "../../domain/entities";
 import { formatMetric, invalidReason, METRIC_BY_KEY } from "../../domain/metrics";
@@ -99,7 +99,7 @@ function AnalysisView({ session, rep }: { session: Session; rep: AnalyzedRep }) 
                   />
                 }
               >
-                {ghost && <Skeleton frame={ghost.seq.frames[alignedFrame(rep, ghost, pb.frame)]!} variant="ghost" offset={alignOffset(rep, ghost)} />}
+                {ghost && <Skeleton frame={applyFit(ghost.seq.frames[alignedFrame(rep, ghost, pb.frame)]!, fitTo(rep, ghost))} variant="ghost" />}
                 {layers.trail && <Trail frames={rep.seq.frames} joint="rWrist" from={rep.events.strideStart} to={Math.min(pb.frame, rep.events.followStart + 8)} />}
                 {layers.skeleton && <Skeleton frame={frame} />}
                 {layers.angles && (pb.frame >= rep.events.plant - 6 ? <AngleArc frame={frame} a="rShoulder" b="rElbow" c="rWrist" label="肘" /> : null)}

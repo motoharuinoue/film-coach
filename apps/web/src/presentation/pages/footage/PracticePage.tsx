@@ -21,6 +21,7 @@ import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
 import { useReferenceZones } from "../../state/library";
 import { AnalyzerGate } from "./AnalyzerGate";
+import { ReferenceGhost } from "./ReferenceGhost";
 
 const GHOST_CAM: Camera = { x0: -2.0, x1: 2.0, y0: -0.15, y1: 2.1 };
 
@@ -269,6 +270,16 @@ function Practice({ onTitle }: { onTitle: (name: string) => void }) {
               </p>
             )}
           </Card>
+
+          {refZones.view && (
+            <ReferenceGhost
+              key={current.order}
+              rep={current.rep}
+              view={refZones.view}
+              zoneSet={refZones.zoneSet}
+              onSeekSelf={(f) => navigate(`/footage/${current.footageId}?t=${((current.rep.start + f) / current.fps).toFixed(2)}`)}
+            />
+          )}
 
           <div className="grid gap-5 xl:grid-cols-2">
             <Card className="space-y-3 p-5">

@@ -30,6 +30,8 @@ export type AnalyzedRep = {
   rotation: RotationCurve[];
   /** 投げ始め（手元のお手本だけ。デモの合成データは持たない） */
   approach?: Approach;
+  /** 元の映像の中の位置（手元のお手本だけ）。骨格のフレーム i は、映像のフレーム frame0 + i */
+  clip?: { videoId: string; frame0: number; videoFps: number };
 };
 
 export type SessionKind = "drill" | "game";

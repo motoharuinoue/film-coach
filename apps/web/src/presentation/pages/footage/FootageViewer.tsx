@@ -12,6 +12,7 @@ import { useServices } from "../../services";
 import { useAnalyzer } from "../../state/analyzer";
 import { useReferenceZones } from "../../state/library";
 import { AnalyzerGate } from "./AnalyzerGate";
+import { ReferenceGhost } from "./ReferenceGhost";
 import { RegisterReference } from "./RegisterReference";
 import { ThrowPanel } from "./ThrowPanel";
 
@@ -77,6 +78,7 @@ function Viewer() {
   const yt = footage.youtube;
   const frame = Math.round(t * fps);
   const now = throws && throwAt(throws, frame);
+  const current = throws?.reps.find((r) => r.index === selected) ?? throws?.reps[0];
   const seekFrame = (f: number) => setSeekTo({ t: f / fps, key: Date.now() });
   const pick = (r: ThrowRep) => {
     setSelected(r.index);
@@ -164,6 +166,9 @@ function Viewer() {
           onPick={pick}
           onSeekFrame={seekFrame}
         />
+        {footage.source === "upload" && refZones.view && current && (
+          <ReferenceGhost key={current.index} rep={current} view={refZones.view} zoneSet={refZones.zoneSet} onSeekSelf={(f) => seekFrame(current.start + f)} />
+        )}
       </div>
 
       <aside className="space-y-4">

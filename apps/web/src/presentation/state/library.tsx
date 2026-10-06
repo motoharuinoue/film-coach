@@ -52,11 +52,11 @@ export function useDemoLibrary(): LibraryView {
 
 const same = (a: ManualAdjust, b: ManualAdjust) => a.pinned === b.pinned && a.excluded === b.excluded && a.stars === b.stars;
 
-/** 自分の投球の判定に使う、手元のお手本のゾーン一式。お手本がなければ空 */
-export function useReferenceZones(): { zoneSet: ZoneSet; refCount: number; loading: boolean } {
+/** 自分の投球の判定と重ね表示に使う、手元のお手本（ゾーン一式とお手本そのもの）。お手本がなければゾーンは空 */
+export function useReferenceZones(): { zoneSet: ZoneSet; refCount: number; loading: boolean; view?: LibraryView } {
   const { view, loading } = useLocalLibrary();
   const zoneSet = view?.byApproach ? zoneSetOf(view.weights, view.byApproach) : EMPTY_ZONE_SET;
-  return { zoneSet, refCount: view?.refs.length ?? 0, loading };
+  return { zoneSet, refCount: view?.refs.length ?? 0, loading, view };
 }
 
 /** 手元のお手本。解析サービスにつながっていなければ view は undefined */
