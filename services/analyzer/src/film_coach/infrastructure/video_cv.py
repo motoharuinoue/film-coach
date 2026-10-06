@@ -309,3 +309,83 @@ class OpenCvFrameGrabber:
         if not ok:
             raise ValueError("JPEG にできませんでした")
         return bytes(buf.tobytes())
+
+
+HEAD = (0, 1, 2, 3, 4)
+"""顔の関節（鼻・両目・両耳）"""
+
+
+def body_mask(shape: tuple[int, int], result: TargetFrame, min_conf: float = 0.3) -> Any:
+    """本人の体の形（手足の線・胴体・頭・ボールを持つ手のまわり）。骨格がなければ枠。どちらもなければ空"""
+    h, w = shape
+    mask = np.zeros((h, w), np.uint8)
+    b = result.box
+    if b is None:
+        return mask
+    pts = result.keypoints
+    if pts is None or sum(c >= min_conf for _, _, c in pts) < 8:
+        cv2.rectangle(mask, (int(b.x1), int(b.y1)), (int(b.x2), int(b.y2)), 255, -1)
+        return mask
+    thick = max(6, int(b.h * 0.11))
+    ok = [c >= min_conf for _, _, c in pts]
+    xy = [(int(x), int(y)) for x, y, _ in pts]
+    for a, c in BONES:
+        if ok[a] and ok[c]:
+            cv2.line(mask, xy[a], xy[c], 255, thick, cv2.LINE_AA)
+    torso = [xy[i] for i in (5, 6, 12, 11) if ok[i]]
+    if len(torso) >= 3:
+        cv2.fillPoly(mask, [np.array(torso, np.int32)], 255)
+    head = [xy[i] for i in HEAD if ok[i]]
+    if head:
+        cx, cy = np.mean(head, axis=0)
+        cv2.circle(mask, (int(cx), int(cy)), max(8, int(b.h * 0.1)), 255, -1)
+    # 手首（ボール）と足首（足）のまわり
+    for i, r in ((9, 0.09), (10, 0.09), (15, 0.06), (16, 0.06)):
+        if ok[i]:
+            cv2.circle(mask, xy[i], max(6, int(b.h * r)), 255, -1)
+    return mask
+
+
+def anonymize_frame(img: Any, result: TargetFrame, min_conf: float = 0.3) -> Any:
+    """本人の体の外（背景と周りの人）を強くぼかし、本人の顔をモザイクにする。本人を見失ったら全体をぼかす"""
+    h, w = img.shape[:2]
+    # 小さくしてからぼかすと、強くぼかしても速い
+    small = cv2.resize(img, (max(1, w // 8), max(1, h // 8)), interpolation=cv2.INTER_AREA)
+    blurred = cv2.resize(cv2.GaussianBlur(small, (0, 0), 6), (w, h), interpolation=cv2.INTER_LINEAR)
+    b = result.box
+    if b is None:
+        return blurred
+    # 境目はなめらかにつなぐ
+    mask = cv2.GaussianBlur(body_mask((h, w), result, min_conf).astype(np.float32) / 255, (0, 0), max(2.0, b.h * 0.02))[
+        ..., None
+    ]
+    out = (img * mask + blurred * (1 - mask)).astype(np.uint8)
+    # 顔：信頼できる顔の関節の中心。なければ枠の上の方
+    pts = [(x, y) for x, y, c in (result.keypoints[i] for i in HEAD) if c >= min_conf] if result.keypoints else []
+    if pts:
+        cx, cy = float(np.mean([p[0] for p in pts])), float(np.mean([p[1] for p in pts]))
+    else:
+        cx, cy = b.cx, b.y1 + b.h * 0.09
+    r = max(8, int(b.h * 0.085))
+    x1, y1, x2, y2 = max(0, int(cx - r)), max(0, int(cy - r)), min(w, int(cx + r)), min(h, int(cy + r))
+    if x2 > x1 and y2 > y1:
+        face = out[y1:y2, x1:x2]
+        tiny = cv2.resize(face, (max(1, (x2 - x1) // 10), max(1, (y2 - y1) // 10)), interpolation=cv2.INTER_AREA)
+        mosaic = cv2.resize(tiny, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
+        disc = np.zeros(face.shape[:2], np.uint8)
+        cv2.circle(disc, (int(cx) - x1, int(cy) - y1), r, 255, -1)
+        face[disc > 0] = mosaic[disc > 0]
+    return out
+
+
+class AnonymizedVideoWriter:
+    """本人以外と顔をぼかした動画（公開用）。H.264 の mp4 で書き出す"""
+
+    def __init__(self, dest: Path, info: VideoInfo) -> None:
+        self._mp4 = _Mp4Writer(dest, info.fps, (info.width, info.height))
+
+    def write(self, frame: Frame, result: TargetFrame) -> None:
+        self._mp4.write(anonymize_frame(np.asarray(frame), result))
+
+    def close(self) -> None:
+        self._mp4.close()
