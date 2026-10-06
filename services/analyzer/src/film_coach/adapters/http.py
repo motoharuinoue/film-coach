@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from ..application import dto
 from ..application.drill import DrillStore, create_drill, delete_drill, list_drills
+from ..application.evaluation import AnnotationStore, evaluate, evaluation_targets, save_annotation
 from ..application.jobs import JobRunner
 from ..application.library import (
     FrameGrabber,
@@ -67,8 +68,10 @@ from ..application.youtube_search import (
 from ..domain.approach import ApproachMode
 from ..domain.camera import CameraAngle
 from ..domain.drill import MAX_LABEL, MAX_TARGETS, Drill, DrillError, DrillSide, DrillTarget
+from ..domain.evaluation import AnnotationError, FrameLabel, ThrowLabel
 from ..domain.library import VideoInfo, VideoRecord
 from ..domain.metrics import MetricKey
+from ..domain.pose import KeypointName
 from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
 from ..domain.reference import Manual, Reference, ReferenceError, ReferenceKind
 from ..domain.world import NotEnoughPoseError
@@ -104,6 +107,8 @@ class HttpDeps:
     """カメラの動きを見積もる（追跡ごとに新しく作る）"""
     drills: DrillStore | None = None
     """改善点に添えるドリル動画の登録"""
+    annotations: AnnotationStore | None = None
+    """精度の評価のために付けた正解"""
 
 
 class YouTubeImport(BaseModel):
@@ -148,6 +153,24 @@ class DrillRequest(BaseModel):
     targets: list[DrillTargetBody] = Field(max_length=MAX_TARGETS)
 
 
+class ThrowLabelBody(BaseModel):
+    rep: int = Field(ge=1)
+    plant: int | None = Field(default=None, ge=0)
+    release: int | None = Field(default=None, ge=0)
+
+
+class FrameLabelBody(BaseModel):
+    frame: int = Field(ge=0)
+    points: dict[str, tuple[float, float] | None] = Field(
+        description="関節ごとの位置（元の映像のピクセル）。null は見えない"
+    )
+
+
+class AnnotationRequest(BaseModel):
+    throws: list[ThrowLabelBody] = Field(max_length=50)
+    frames: list[FrameLabelBody] = Field(max_length=500)
+
+
 class ReferencePatch(BaseModel):
     kind: ReferenceKind | None = None
     trustedChannel: bool | None = None
@@ -177,7 +200,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=deps.allowed_origins,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type"],
     )
 
@@ -211,6 +234,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     @app.exception_handler(PracticeError)
     @app.exception_handler(ReferenceError)
     @app.exception_handler(DrillError)
+    @app.exception_handler(AnnotationError)
     async def bad_request(_req: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
@@ -245,10 +269,15 @@ def create_app(deps: HttpDeps) -> FastAPI:
         return view(record_or_404(video_id))
 
     @app.get("/api/videos/{video_id}/frame")
-    def frame(video_id: str, t: float = Query(0.0, ge=0)) -> Response:
+    def frame(
+        video_id: str,
+        t: float = Query(0.0, ge=0),
+        i: int | None = Query(None, ge=0, description="フレーム番号（指定したら t より優先）"),
+        maxWidth: int = Query(1280, ge=320, le=3840),
+    ) -> Response:
         record_or_404(video_id)
         try:
-            return Response(frame_jpeg(deps.store, deps.grabber, video_id, t), media_type="image/jpeg")
+            return Response(frame_jpeg(deps.store, deps.grabber, video_id, t, i, maxWidth), media_type="image/jpeg")
         except NotFoundError as e:
             raise HTTPException(410, str(e)) from e
         except ValueError as e:
@@ -476,6 +505,30 @@ def create_app(deps: HttpDeps) -> FastAPI:
         except NotFoundError as e:
             raise HTTPException(404, str(e)) from e
         return Response(status_code=204)
+
+    def annotation_store() -> AnnotationStore:
+        if deps.annotations is None:
+            raise HTTPException(503, "正解の置き場所がありません")
+        return deps.annotations
+
+    @app.get("/api/evaluation")
+    def evaluation() -> dict[str, Any]:
+        """精度の評価：正解を付ける映像と、付けた正解から求めた誤差"""
+        store = annotation_store()
+        return dto.evaluation_to_json(evaluation_targets(deps.store, store), evaluate(deps.store, store))
+
+    @app.put("/api/videos/{video_id}/annotation")
+    def put_annotation(video_id: str, body: AnnotationRequest) -> dict[str, Any]:
+        """映像に付けた正解を、まるごと置き換える"""
+        record_or_404(video_id)
+        throws = [ThrowLabel(t.rep, t.plant, t.release) for t in body.throws]
+        # 関節の名前は、保存の前に domain の check_annotation で確かめる
+        frames = [FrameLabel(f.frame, {cast(KeypointName, j): p for j, p in f.points.items()}) for f in body.frames]
+        try:
+            a = save_annotation(deps.store, annotation_store(), video_id, throws, frames)
+        except NotFoundError as e:
+            raise HTTPException(409, str(e)) from e
+        return dto.annotation_to_json(a)
 
     @app.get("/api/practices")
     def practices() -> list[dict[str, Any]]:

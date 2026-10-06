@@ -33,6 +33,7 @@ const router = createHashRouter([
       { path: "/references", ...page(() => import("./pages/References"), "References") },
       { path: "/references/search", ...page(() => import("./pages/ReferenceSearch"), "ReferenceSearch") },
       { path: "/progress", ...page(() => import("./pages/Progress"), "Progress") },
+      { path: "/evaluation", ...page(() => import("./pages/evaluation/EvaluationPage"), "EvaluationPage") },
       { path: "/footage", ...page(() => import("./pages/footage/FootageList"), "FootageList") },
       { path: "/footage/:id/pick", ...page(() => import("./pages/footage/FootagePick"), "FootagePick") },
       { path: "/footage/practices/:id", ...page(() => import("./pages/footage/PracticePage"), "PracticePage") },

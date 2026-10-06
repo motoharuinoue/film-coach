@@ -77,6 +77,10 @@ class FrameGrabber(Protocol):
         """t 秒のフレームを JPEG にする"""
         ...
 
+    def jpeg_of_frame(self, path: Path, index: int, max_width: int = 1280) -> bytes:
+        """index 番目のフレーム（追跡と同じく、先頭から順に読んだときの番号）を JPEG にする"""
+        ...
+
 
 class YouTubeFetcher(Protocol):
     def metadata(self, video_id: str) -> YouTubeSource:
@@ -139,11 +143,19 @@ def import_youtube(
     return record
 
 
-def frame_jpeg(store: VideoStore, grabber: FrameGrabber, video_id: str, t: float) -> bytes:
+def frame_jpeg(
+    store: VideoStore, grabber: FrameGrabber, video_id: str, t: float, index: int | None = None, max_width: int = 1280
+) -> bytes:
+    """t 秒のフレームの JPEG。index を指定したら、そのフレーム番号の JPEG。
+
+    正解を付けるときは、追跡と同じフレームを出すため、フレーム番号で指定する
+    """
     path = store.media(video_id)
     if path is None:
         raise NotFoundError("元の動画が残っていません（YouTube から取り込んだ区間は、解析のあとに消しています）")
-    return grabber.jpeg_at(path, t)
+    if index is not None:
+        return grabber.jpeg_of_frame(path, index, max_width)
+    return grabber.jpeg_at(path, t, max_width)
 
 
 def get_record(store: VideoStore, video_id: str) -> VideoRecord:

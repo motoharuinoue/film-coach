@@ -83,6 +83,9 @@ class FakeGrabber:
     def jpeg_at(self, path: Path, t: float, max_width: int = 1280) -> bytes:
         return b"\xff\xd8jpeg" + str(t).encode()
 
+    def jpeg_of_frame(self, path: Path, index: int, max_width: int = 1280) -> bytes:
+        return b"\xff\xd8frame" + str(index).encode()
+
 
 class FakeFetcher:
     def __init__(self) -> None:

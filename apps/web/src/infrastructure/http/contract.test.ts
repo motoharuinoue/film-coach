@@ -10,7 +10,8 @@ import addFormats from "ajv-formats";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { trackFootage } from "../../application/footage";
 import { toReference } from "../../application/localReferences";
-import { HttpFootageLibrary, parseDrill, parseFootage, parsePractice, parseReference, parseThrows, parseTrack } from "./httpFootageLibrary";
+import { LABEL_JOINTS, isFrameDone, progressOf } from "../../domain/evaluation";
+import { HttpFootageLibrary, parseAnnotation, parseDrill, parseEvaluation, parseFootage, parsePractice, parseReference, parseThrows, parseTrack } from "./httpFootageLibrary";
 
 const SCHEMA = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/schema");
 const read = (name: string) => JSON.parse(readFileSync(resolve(SCHEMA, name), "utf8")) as Record<string, unknown>;
@@ -27,6 +28,10 @@ const validPractice = ajv.compile(read("practice.v1.schema.json"));
 const validYouTubeSearch = ajv.compile(read("youtube-search.v1.schema.json"));
 const validReference = ajv.compile(read("reference.v1.schema.json"));
 const validDrill = ajv.compile(read("drill.v1.schema.json"));
+// 精度の評価は、正解を annotation.v1 で参照する
+ajv.addSchema(read("annotation.v1.schema.json"));
+const validAnnotation = ajv.compile({ $ref: "annotation.v1.schema.json" });
+const validEvaluation = ajv.compile(read("evaluation.v1.schema.json"));
 
 const withoutLinks = (v: Record<string, unknown>) => {
   const { links: _links, ...rest } = v;
@@ -52,6 +57,11 @@ describe("API の見本が JSON Schema に合う", () => {
 
   it("YouTube の検索", () => {
     expect(validYouTubeSearch(samples.youtubeSearch), JSON.stringify(validYouTubeSearch.errors)).toBe(true);
+  });
+
+  it("精度の評価：正解と、正解から求めた誤差", () => {
+    expect(validAnnotation(samples.annotation), JSON.stringify(validAnnotation.errors)).toBe(true);
+    expect(validEvaluation(samples.evaluation), JSON.stringify(validEvaluation.errors)).toBe(true);
   });
 
   it("練習", () => {
@@ -305,5 +315,37 @@ describe("HTTP の実装（fetch と EventSource を差し替える）", () => {
       { url: `${base}/${r.id}/refresh`, method: "POST", body: undefined },
       { url: `${base}/${r.id}`, method: "DELETE", body: undefined },
     ]);
+  });
+});
+
+describe("精度の評価の読み込み", () => {
+  it("正解を付ける映像・投球・フレームと、付けた正解を読む", () => {
+    const e = parseEvaluation(samples.evaluation!);
+    expect(e.joints).toEqual([...LABEL_JOINTS]);
+    expect(e.thresholdsCm).toEqual([5, 10]);
+    const t = e.targets[0]!;
+    expect(t.hand).toBe("right");
+    const x = t.throws[0]!;
+    expect(x.start).toBeLessThanOrEqual(x.plant);
+    // 正解を付けるフレームには、区間の 25・50・75% に加えて、正解の接地・リリースが入る
+    const a = t.annotation!;
+    expect(x.frames).toEqual(expect.arrayContaining([a.throws[0]!.plant, a.throws[0]!.release]));
+    expect(a.frames.every((f) => isFrameDone(f))).toBe(true);
+    expect(progressOf(t, a)).toEqual({ events: 1, eventsTotal: 1, frames: x.frames.length, framesTotal: x.frames.length });
+  });
+
+  it("誤差：関節は cm、瞬間はミリ秒、指標は 1 フレームで測る 6 つ", () => {
+    const { report } = parseEvaluation(samples.evaluation!);
+    expect(report.joints.raw!.mean).toBeGreaterThan(0);
+    expect(report.joints.raw!.within).toHaveLength(2);
+    expect(report.details.events.find((x) => x.event === "release")!.frames).toBe(1);
+    expect(Object.keys(report.metrics).sort()).toEqual(["elbowAngle", "elbowHeight", "frontKnee", "releaseHeight", "strideRatio", "trunkTilt"]);
+  });
+
+  it("保存の依頼は、画面の AnnotationInput と同じ形", () => {
+    const req = samples.annotationRequest as unknown as { throws: unknown[]; frames: unknown[] };
+    const a = parseAnnotation(samples.annotation!);
+    expect(a.throws).toEqual(req.throws);
+    expect(a.frames.map((f) => f.frame)).toEqual((req.frames as { frame: number }[]).map((f) => f.frame));
   });
 });

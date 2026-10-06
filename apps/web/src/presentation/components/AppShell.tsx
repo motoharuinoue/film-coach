@@ -1,4 +1,4 @@
-import { IconBrandGithub, IconBrandYoutube, IconHome, IconMovie, IconRoute } from "@tabler/icons-react";
+import { IconBrandGithub, IconBrandYoutube, IconHome, IconMovie, IconRoute, IconTarget } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { NavLink, Outlet, ScrollRestoration, useLocation } from "react-router";
@@ -144,6 +144,14 @@ function Shell() {
             <SideLink to="/references">
               <IconBrandYoutube size={17} stroke={1.75} className="relative" aria-hidden />
               <span className="relative whitespace-nowrap">お手本ライブラリ</span>
+            </SideLink>
+          </div>
+
+          <div className="flex gap-1 lg:mt-5 lg:block">
+            <div className="hidden px-3 pb-2 text-[11px] text-faint lg:block">解析の確かさ</div>
+            <SideLink to="/evaluation">
+              <IconTarget size={17} stroke={1.75} className="relative" aria-hidden />
+              <span className="relative whitespace-nowrap">精度の評価</span>
             </SideLink>
           </div>
           {/* 狭い画面ではサイドバーの下部が出ないので、ここに表示するデータとツアーを置く */}

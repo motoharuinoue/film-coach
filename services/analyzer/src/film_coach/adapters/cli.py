@@ -11,6 +11,7 @@ from typing import TextIO
 
 from ..application.analyze_pose import RepAnalysis, analyze_pose
 from ..application.anonymize import TrackMismatchError, anonymize_video
+from ..application.evaluation import EvaluationReport
 from ..application.ports import AnalysisWriter, ModelStore, PoseSequenceReader
 from ..application.throws import ThrowAnalysis, analyze_throws
 from ..application.track_target import (
@@ -27,8 +28,9 @@ from ..application.track_target import (
 )
 from ..domain.approach import APPROACH_LABEL
 from ..domain.camera import CAMERA_ANGLES, CameraAngle
+from ..domain.evaluation import ErrorStats
 from ..domain.library import VideoInfo
-from ..domain.metrics import METRICS
+from ..domain.metrics import METRIC_BY_KEY, METRICS
 from ..domain.phases import PHASE_LABEL
 from ..domain.world import NotEnoughPoseError
 
@@ -56,6 +58,8 @@ class CliDeps:
     """場面の切り替わりを見つける（追跡ごとに新しく作る）"""
     motion: Callable[[], CameraMotionEstimator] | None = None
     """カメラの動きを見積もる（追跡ごとに新しく作る）"""
+    evaluate: Callable[[], EvaluationReport] | None = None
+    """手元の映像に付けた正解と、解析の結果を比べる"""
 
 
 def _point(text: str) -> tuple[float, float]:
@@ -108,7 +112,55 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("serve", help="画面から使う HTTP の解析サービスを起動する（127.0.0.1 だけで待ち受ける）")
     s.add_argument("--port", type=int, default=8787)
+
+    sub.add_parser("evaluate", help="手元の映像に付けた正解（data/annotations/）と解析の結果を比べ、誤差を表にする")
     return p
+
+
+GROUP_LABEL = {
+    "head": "頭（鼻）",
+    "shoulder": "肩",
+    "elbow": "肘",
+    "wrist": "手首",
+    "hip": "股関節",
+    "knee": "膝",
+    "ankle": "足首",
+}
+EVENT_LABEL = {"plant": "接地", "release": "リリース"}
+
+
+def print_evaluation(r: EvaluationReport, out: TextIO) -> None:
+    """精度の評価を Markdown の表にする（README に載せる形）"""
+    out.write(f"正解：映像 {r.videos} 本、投球 {r.throws} 球、関節を付けたフレーム {r.frames} 枚\n\n")
+    if r.joints_final is None:
+        out.write("正解がまだありません。画面の「精度の評価」で付けてください\n")
+        return
+    th = " | ".join(f"{t:g} cm 以内" for t in r.thresholds_cm)
+
+    def row(name: str, s: ErrorStats | None, unit: str = " cm", digits: int = 1) -> str:
+        if s is None:
+            return f"| {name} | — | — | — |" + " — |" * len(r.thresholds_cm) + "\n"
+        within = " | ".join(f"{w:.0%}" for w in s.within)
+        cells = f"{s.mean:.{digits}f}{unit} | {s.median:.{digits}f}{unit} | {s.p90:.{digits}f}{unit}"
+        return f"| {name} | {cells} |" + (f" {within} |" if within else "") + "\n"
+
+    out.write(
+        f"| 関節の位置 | 平均 | 中央値 | 90% 点 | {th} |\n|---|---|---|---|" + "---|" * len(r.thresholds_cm) + "\n"
+    )
+    out.write(row("モデルの出力", r.joints_raw))
+    out.write(row("指標に使う骨格", r.joints_final))
+    out.write(f"\n| 部位（指標に使う骨格） | 平均 | 中央値 | 90% 点 | {th} |\n|---|---|---|---|")
+    out.write("---|" * len(r.thresholds_cm) + "\n")
+    for g, s in r.groups_final.items():
+        out.write(row(GROUP_LABEL[g], s))
+    out.write("\n| 瞬間（解析との差） | 平均 | 中央値 | 90% 点 |\n|---|---|---|---|\n")
+    for k, s in r.events.items():
+        out.write(row(EVENT_LABEL[k], s, " ms", 0))
+    out.write("\n| 指標 | 解析の値との差（平均） | うち骨格の誤差による分（平均） |\n|---|---|---|\n")
+    for m, total in r.metrics_total.items():
+        d = METRIC_BY_KEY[m]
+        cells = ["—" if x is None else f"{x.mean:.{d.digits + 1}f}{d.unit}" for x in (total, r.metrics_pose[m])]
+        out.write(f"| {d.label} | {cells[0]} | {cells[1]} |\n")
 
 
 def print_analysis(a: RepAnalysis, out: TextIO) -> None:
@@ -181,6 +233,13 @@ def run(argv: list[str], deps: CliDeps, out: TextIO = sys.stdout) -> int:
     if args.command == "serve":
         out.write(f"解析サービスを起動します：http://127.0.0.1:{args.port}/api/health\n")
         deps.serve("127.0.0.1", args.port)
+        return 0
+
+    if args.command == "evaluate":
+        if deps.evaluate is None:
+            out.write("正解の置き場所がありません\n")
+            return 1
+        print_evaluation(deps.evaluate(), out)
         return 0
 
     if args.command == "anonymize":

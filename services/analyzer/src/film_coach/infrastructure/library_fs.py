@@ -1,5 +1,6 @@
 """VideoStore と PracticeStore のファイル実装。data/library/<id>/ に、記録・元の動画・解析結果を置く。
-練習（映像のまとめ）は data/practices/<id>.json、お手本の登録は data/references/<id>.json に置く。
+練習（映像のまとめ）は data/practices/<id>.json、お手本の登録は data/references/<id>.json、
+精度の評価のために付けた正解は data/annotations/<映像の id>.json に置く。
 
 data/library/<id>/
   record.json        記録（video-record.v1.schema.json）
@@ -23,6 +24,7 @@ from ..application import dto
 from ..application.throws import ThrowAnalysis
 from ..application.track_target import TargetTrack
 from ..domain.drill import Drill
+from ..domain.evaluation import Annotation
 from ..domain.library import VideoRecord
 from ..domain.practice import Practice
 from ..domain.reference import Reference
@@ -35,6 +37,7 @@ RECORD_SCHEMA = "video-record.v1.schema.json"
 PRACTICE_SCHEMA = "practice.v1.schema.json"
 REFERENCE_SCHEMA = "reference.v1.schema.json"
 DRILL_SCHEMA = "drill.v1.schema.json"
+ANNOTATION_SCHEMA = "annotation.v1.schema.json"
 _ID = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -242,3 +245,17 @@ class FileReferenceStore:
 
     def delete(self, reference_id: str) -> bool:
         return self._dir.delete(reference_id)
+
+
+class FileAnnotationStore:
+    """精度の評価のために付けた正解を data/annotations/<映像の id>.json に置く"""
+
+    def __init__(self, root: Path | None = None) -> None:
+        self._dir = _JsonDir(root or data_dir() / "annotations", ANNOTATION_SCHEMA)
+
+    def get(self, video_id: str) -> Annotation | None:
+        data = self._dir.read(video_id)
+        return dto.annotation_from_json(data) if data else None
+
+    def save(self, annotation: Annotation) -> None:
+        self._dir.write(annotation.video_id, dto.annotation_to_json(annotation))

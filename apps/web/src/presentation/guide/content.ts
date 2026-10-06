@@ -10,7 +10,7 @@ export const STEPS: { key: StepKey; no: number; title: string; desc: string }[] 
   { key: "keep", no: 4, title: "続ける", desc: "日ごとの変化を追う" },
 ];
 
-export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer" | "practice" | "referenceSearch";
+export type GuideId = "home" | "new" | "reps" | "studio" | "report" | "progress" | "references" | "footage" | "pick" | "viewer" | "practice" | "referenceSearch" | "evaluation";
 
 export type Guide = {
   step?: StepKey;
@@ -101,5 +101,13 @@ export const GUIDES: Record<GuideId, Guide> = {
   references: {
     purpose: "判定の基準になるお手本（YouTube の動画）を管理する画面です。",
     actions: ["お手本を選ぶと、右に重みの内訳（P・C・Q・K・M）が出ます", "ピン留め・除外・星で調整すると、すべての画面の判定が変わります", "下の分布で、お手本の中での自分の位置を確かめられます", "いちばん下の「重み付けの検証」で、重みの付け方ごとのお手本ゾーンの安定性を比べられます"],
+  },
+  evaluation: {
+    purpose: "自分の映像に、関節の位置と接地・リリースの瞬間を手で付けて、解析の結果がどれだけ正しいかを測る画面です。",
+    actions: [
+      "① 瞬間：コマ送りで、前足が着いたフレームとボールが離れたフレームを選びます",
+      "② 関節：示された関節を順にクリックします。見えない関節は「見えない」を押します",
+      "正解を付けているあいだは、解析の骨格と瞬間を見せません（正解が引っ張られないように）",
+    ],
   },
 };

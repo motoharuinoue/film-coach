@@ -80,6 +80,18 @@ uv run film-coach throws ../../data/outputs/clip/track.json --height 180
 
 手持ちで撮った 30fps の投球ドリル 4 本（1080p、本人が画面の高さの約半分）で、4 本とも投球を 1 本ずつ見つけ、セット・ステップ・接地・リリースが映像と合うことを目で確かめました。ステップ幅は 4 本とも身長の 0.42〜0.45 倍でそろっています。
 
+### 精度の評価
+
+画面の「精度の評価」で、自分の映像に関節の位置と接地・リリースの瞬間の正解を付けると、解析の結果との誤差を求めます。同じ結果を、README に載せる表の形で出せます。
+
+```bash
+uv run film-coach evaluate
+```
+
+- 関節の位置：正解の点との距離（cm）。モデルの出力そのものと、補正・平滑化を経て指標に使う骨格の 2 つを比べる
+- 瞬間：正解のフレームとの差（ミリ秒）
+- 指標：正解の骨格を正解の瞬間で測った値（手で測った値）との差。そのうち骨格の誤差による分も分けて出す
+
 ### 公開用に、本人以外をぼかし、本人の顔にモザイクをかける
 
 ```bash
@@ -106,7 +118,7 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | POST | `/api/videos` | 動画のアップロード（multipart、mp4 / mov / m4v、2 GB まで） |
 | POST | `/api/videos/youtube` | YouTube の区間の取り込み（`{url, start, end}`、60 秒まで） |
 | GET | `/api/videos/{id}` | 記録（`video-record.v1.schema.json`）と、使える URL |
-| GET | `/api/videos/{id}/frame?t=秒` | 本人を指すためのフレーム（JPEG、幅 1280 まで） |
+| GET | `/api/videos/{id}/frame?t=秒` | 本人を指すためのフレーム（JPEG、幅 1280 まで）。`i=フレーム番号` を付けると、そのフレームを先頭から順に読んで返す（正解を付けるとき、追跡と同じフレームを出すため）。`maxWidth` で幅の上限を変えられる |
 | GET | `/api/videos/{id}/media` | 元の動画（Range 対応）。YouTube の区間は解析のあとに消すので 410 |
 | POST | `/api/videos/{id}/track` | 追跡の開始（`{t, x, y, label}`、座標は元の動画のピクセル）。202 でジョブを返す |
 | GET | `/api/jobs/{jobId}/events` | 進み具合（SSE：`state` → `progress` → `done` / `failed`） |
@@ -128,6 +140,8 @@ uv run film-coach serve   # http://127.0.0.1:8787/api/health
 | POST | `/api/practices` | 練習を作る（`{name, date, kind, camera, memo, videoIds}`、映像は 50 本まで）。`data/practices/<id>.json` に置く |
 | GET | `/api/practices/{id}` | 練習（`practice.v1.schema.json`） |
 | DELETE | `/api/practices/{id}` | 練習を消す。まとめを消すだけで、映像と解析結果は残す |
+| GET | `/api/evaluation` | 精度の評価（`evaluation.v1.schema.json`）：正解を付けられる映像（自分でアップロードし、投球まで解析したもの）と、付けた正解から求めた誤差 |
+| PUT | `/api/videos/{id}/annotation` | 映像に付けた正解（`{throws: [{rep, plant, release}], frames: [{frame, points}]}`）をまるごと置き換える。`data/annotations/<id>.json` に置く |
 
 - 解析は 1 本ずつ裏で動かします（ONNX Runtime が CPU を使い切るため）
 - YouTube から取り込んだ区間は、追跡が終わったら元の動画を消し、枠・骨格と出典だけを残します。元の動画の複製になる確認用の動画も作りません（ADR-0005）
