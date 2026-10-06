@@ -22,6 +22,7 @@ from typing import Any, BinaryIO
 from ..application import dto
 from ..application.throws import ThrowAnalysis
 from ..application.track_target import TargetTrack
+from ..domain.drill import Drill
 from ..domain.library import VideoRecord
 from ..domain.practice import Practice
 from ..domain.reference import Reference
@@ -33,6 +34,7 @@ from .schema import validate
 RECORD_SCHEMA = "video-record.v1.schema.json"
 PRACTICE_SCHEMA = "practice.v1.schema.json"
 REFERENCE_SCHEMA = "reference.v1.schema.json"
+DRILL_SCHEMA = "drill.v1.schema.json"
 _ID = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -197,6 +199,26 @@ class FilePracticeStore:
 
     def delete(self, practice_id: str) -> bool:
         return self._dir.delete(practice_id)
+
+
+class FileDrillStore:
+    """ドリル動画の登録を data/drills/<id>.json に置く"""
+
+    def __init__(self, root: Path | None = None) -> None:
+        self._dir = _JsonDir(root or data_dir() / "drills", DRILL_SCHEMA)
+        self.root = self._dir.root
+
+    def new_id(self) -> str:
+        return uuid.uuid4().hex[:12]
+
+    def save(self, drill: Drill) -> None:
+        self._dir.write(drill.id, dto.drill_to_json(drill))
+
+    def list(self) -> list[Drill]:
+        return [dto.drill_from_json(d) for i in self._dir.ids() if (d := self._dir.read(i))]
+
+    def delete(self, drill_id: str) -> bool:
+        return self._dir.delete(drill_id)
 
 
 class FileReferenceStore:

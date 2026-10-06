@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from pydantic import BaseModel, Field
 
 from ..application import dto
+from ..application.drill import DrillStore, create_drill, delete_drill, list_drills
 from ..application.jobs import JobRunner
 from ..application.library import (
     FrameGrabber,
@@ -65,7 +66,9 @@ from ..application.youtube_search import (
 )
 from ..domain.approach import ApproachMode
 from ..domain.camera import CameraAngle
+from ..domain.drill import MAX_LABEL, MAX_TARGETS, Drill, DrillError, DrillSide, DrillTarget
 from ..domain.library import VideoInfo, VideoRecord
+from ..domain.metrics import MetricKey
 from ..domain.practice import MAX_MEMO, MAX_NAME, MAX_VIDEOS, Practice, PracticeError, PracticeKind
 from ..domain.reference import Manual, Reference, ReferenceError, ReferenceKind
 from ..domain.world import NotEnoughPoseError
@@ -99,6 +102,8 @@ class HttpDeps:
     """お手本の登録"""
     motion: Callable[[], CameraMotionEstimator] | None = None
     """カメラの動きを見積もる（追跡ごとに新しく作る）"""
+    drills: DrillStore | None = None
+    """改善点に添えるドリル動画の登録"""
 
 
 class YouTubeImport(BaseModel):
@@ -127,6 +132,20 @@ class ReferenceRequest(BaseModel):
     kind: ReferenceKind = "model"
     trustedChannel: bool = False
     playerHeightCm: float | None = Field(default=None, ge=120, le=230)
+
+
+class DrillTargetBody(BaseModel):
+    metric: MetricKey
+    side: DrillSide = "any"
+
+
+class DrillRequest(BaseModel):
+    youtubeId: str
+    title: str = Field(default="", max_length=200)
+    channel: str = Field(default="", max_length=200)
+    startSec: int = Field(default=0, ge=0)
+    label: str = Field(max_length=MAX_LABEL)
+    targets: list[DrillTargetBody] = Field(max_length=MAX_TARGETS)
 
 
 class ReferencePatch(BaseModel):
@@ -191,6 +210,7 @@ def create_app(deps: HttpDeps) -> FastAPI:
     @app.exception_handler(SegmentError)
     @app.exception_handler(PracticeError)
     @app.exception_handler(ReferenceError)
+    @app.exception_handler(DrillError)
     async def bad_request(_req: Request, exc: Exception) -> JSONResponse:
         return JSONResponse({"detail": str(exc)}, status_code=400)
 
@@ -425,6 +445,34 @@ def create_app(deps: HttpDeps) -> FastAPI:
         """お手本の登録だけを消す。元の映像と解析結果は残す"""
         try:
             delete_reference(reference_store(), reference_id)
+        except NotFoundError as e:
+            raise HTTPException(404, str(e)) from e
+        return Response(status_code=204)
+
+    def drill_store() -> DrillStore:
+        if deps.drills is None:
+            raise HTTPException(503, "ドリル動画の置き場所がありません")
+        return deps.drills
+
+    def drill_view(d: Drill) -> dict[str, Any]:
+        return {**dto.drill_to_json(d), "links": {"self": f"/api/drills/{d.id}"}}
+
+    @app.get("/api/drills")
+    def drills() -> list[dict[str, Any]]:
+        """改善点に添えるドリル動画（新しい順）"""
+        return [drill_view(d) for d in list_drills(drill_store())]
+
+    @app.post("/api/drills", status_code=201)
+    def new_drill(body: DrillRequest) -> dict[str, Any]:
+        """ドリル動画を登録する。動画は取り込まず、YouTube の動画 ID と開始位置だけを残す"""
+        targets = [DrillTarget(t.metric, t.side) for t in body.targets]
+        d = create_drill(drill_store(), body.youtubeId, body.title, body.channel, body.startSec, body.label, targets)
+        return drill_view(d)
+
+    @app.delete("/api/drills/{drill_id}", status_code=204)
+    def remove_drill(drill_id: str) -> Response:
+        try:
+            delete_drill(drill_store(), drill_id)
         except NotFoundError as e:
             raise HTTPException(404, str(e)) from e
         return Response(status_code=204)

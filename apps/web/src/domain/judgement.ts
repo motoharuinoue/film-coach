@@ -40,6 +40,12 @@ export function judge(value: number | undefined, zone: Zone | undefined): Status
   return "flag";
 }
 
+/** 値がお手本ゾーン（四分位）のどちら側に外れているか。内側か、値・ゾーンがなければ undefined */
+export function outside(value: number | undefined, zone: Zone | undefined): "low" | "high" | undefined {
+  if (value === undefined || !zone) return undefined;
+  return value < zone.p25 ? "low" : value > zone.p75 ? "high" : undefined;
+}
+
 /** 四分位範囲を 1 としたときの、四分位の外側への距離 */
 export function deviation(value: number | undefined, zone: Zone | undefined) {
   if (value === undefined || !zone) return 0;

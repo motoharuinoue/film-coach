@@ -3,6 +3,9 @@
 
 import type { CoachData } from "../../application/coach";
 import type { ReferenceRepository, SessionRepository } from "../../application/ports";
+import { pickDrill } from "../../domain/drill";
+import type { MetricKey } from "../../domain/metrics";
+import { formatTime } from "../../domain/youtube";
 
 export class MemorySessionRepository implements SessionRepository {
   constructor(private readonly data: CoachData) {}
@@ -28,8 +31,9 @@ export class MemoryReferenceRepository implements ReferenceRepository {
   get(id: string) {
     return this.data.references.find((r) => r.id === id);
   }
-  /** 改善点に紐付けるドリル動画は、お手本の分類（ドリル解説）と指標の対応を付けてから推薦する（M3） */
-  drillFor() {
-    return undefined;
+  /** 登録したドリル動画から、その指標の外れた側を直すものを選ぶ */
+  drillFor(key: MetricKey, side: "low" | "high") {
+    const d = pickDrill(this.data.drills, key, side);
+    return d && { label: d.label, channel: d.channel, at: formatTime(d.startSec), youtubeId: d.youtubeId, startSec: d.startSec };
   }
 }

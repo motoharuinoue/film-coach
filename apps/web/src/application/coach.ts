@@ -1,6 +1,7 @@
 // プレゼンテーション層に見せる窓口。ポートを受け取り、ユースケースをまとめて提供する。
 
 import type { CameraAngle } from "../domain/camera";
+import type { Drill } from "../domain/drill";
 import type { AnalyzedRep, BestRep, Player, Reference, Session } from "../domain/entities";
 import { zonesFor, type ZoneSet, type Zones } from "../domain/judgement";
 import type { ManualAdjust } from "../domain/weighting";
@@ -22,6 +23,8 @@ export type CoachData = {
   sessions: Session[];
   focus: { session: Session; rep: AnalyzedRep };
   references: Reference[];
+  /** 改善点に添えるドリル動画 */
+  drills: Drill[];
 };
 
 export class CoachService {

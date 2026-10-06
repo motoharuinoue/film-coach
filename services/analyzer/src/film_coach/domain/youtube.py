@@ -13,6 +13,11 @@ MAX_SEGMENT_SEC = 60
 """区間の上限。規約への配慮（ADR-0005）と解析時間のため、必要な部分だけを取り込む"""
 
 
+def is_youtube_id(text: str) -> bool:
+    """YouTube の動画 ID（11 文字）の形か"""
+    return bool(_ID.match(text))
+
+
 def parse_youtube_id(text: str) -> str | None:
     """watch / youtu.be / shorts / embed / live の URL から動画 ID を取り出す"""
     try:

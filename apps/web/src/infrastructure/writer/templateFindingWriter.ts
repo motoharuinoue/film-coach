@@ -3,13 +3,8 @@
 // 文章は、値がお手本ゾーンのどちら側に外れたかで書き分け、範囲との関係で説明する。
 
 import type { FindingWriter } from "../../application/ports";
-import type { MetricEvaluation } from "../../domain/judgement";
+import { outside, type MetricEvaluation } from "../../domain/judgement";
 import { METRIC_BY_KEY } from "../../domain/metrics";
-
-/** お手本ゾーン（四分位）のどちら側に外れているか。内側なら undefined */
-function side(v: number, p25: number, p75: number): "low" | "high" | undefined {
-  return v < p25 ? "low" : v > p75 ? "high" : undefined;
-}
 
 export class TemplateFindingWriter implements FindingWriter {
   write(e: MetricEvaluation): { title: string; body: string } {
@@ -17,7 +12,7 @@ export class TemplateFindingWriter implements FindingWriter {
     const v = e.value!;
     const z = e.zone!;
     const range = `お手本ゾーン（${z.p25.toFixed(d.digits)}〜${z.p75.toFixed(d.digits)}${d.unit}）`;
-    const s = side(v, z.p25, z.p75);
+    const s = outside(v, z);
     // 自己ベストがあれば、比べる手がかりとして添える（良し悪しは範囲で決める）
     const best = e.best !== undefined ? `自己ベストのときは ${e.best.toFixed(d.digits)}${d.unit} でした。` : "";
     switch (e.key) {

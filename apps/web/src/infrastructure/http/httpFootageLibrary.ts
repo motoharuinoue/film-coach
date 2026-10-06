@@ -2,6 +2,7 @@
 // API の JSON（packages/schema の video-record.v1 / target-track.v1 / throw-analysis.v1 / practice.v1）を、ドメインの型に読み替える。
 
 import type { FootageLibrary, TrackingHandlers, TrackingProgress, TrackingSummary } from "../../application/ports";
+import type { Drill, DrillInput } from "../../domain/drill";
 import type { Footage, FootageLinks, ImagePoint, TargetTrack, TrackBox, TrackFrame, TrackHint } from "../../domain/footage";
 import type { PoseSequence } from "../../domain/pose";
 import type { Practice, PracticeInput } from "../../domain/practice";
@@ -103,6 +104,19 @@ export function parsePractice(j: Json): Practice {
     camera: j.camera as Practice["camera"],
     memo: String(j.memo ?? ""),
     videoIds: (j.videoIds as string[]) ?? [],
+    createdAt: String(j.createdAt),
+  };
+}
+
+export function parseDrill(j: Json): Drill {
+  return {
+    id: String(j.id),
+    youtubeId: String(j.youtubeId),
+    title: String(j.title),
+    channel: String(j.channel),
+    startSec: Number(j.startSec),
+    label: String(j.label),
+    targets: (j.targets as Drill["targets"]).map((t) => ({ metric: t.metric, side: t.side })),
     createdAt: String(j.createdAt),
   };
 }
@@ -264,6 +278,24 @@ export class HttpFootageLibrary implements FootageLibrary {
 
   async deleteReference(id: string) {
     await this.json(`/api/references/${encodeURIComponent(id)}`, { method: "DELETE" });
+  }
+
+  async drills() {
+    return ((await this.json("/api/drills")) as unknown as Json[]).map(parseDrill);
+  }
+
+  async createDrill(input: DrillInput) {
+    return parseDrill(
+      await this.json("/api/drills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      }),
+    );
+  }
+
+  async deleteDrill(id: string) {
+    await this.json(`/api/drills/${encodeURIComponent(id)}`, { method: "DELETE" });
   }
 
   follow(events: string, handlers: TrackingHandlers) {

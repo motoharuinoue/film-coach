@@ -7,10 +7,11 @@ import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { creator, popularity } from "../../domain/weighting";
-import { checkSegment, defaultSegment, formatTime, MAX_SEGMENT_SEC, SEARCH_COST, type QuotaStatus, type YouTubeCandidate, type YouTubeSearchResult } from "../../domain/youtube";
-import { Badge, Button, Card, PageHeader, SectionTitle, Toggle, cx } from "../components/ui";
+import { checkSegment, defaultSegment, formatTime, MAX_SEGMENT_SEC, parseTime, SEARCH_COST, type QuotaStatus, type YouTubeCandidate, type YouTubeSearchResult } from "../../domain/youtube";
+import { Badge, Button, Card, PageHeader, SectionTitle, Segmented, Toggle, cx } from "../components/ui";
 import { PageGuide } from "../guide/PageGuide";
 import { useAnalyzer } from "../state/analyzer";
+import { DrillForm } from "./drills";
 import { AnalyzerGate } from "./footage/AnalyzerGate";
 
 const SUGGESTIONS = ["QB throwing mechanics", "quarterback footwork drill", "QB drop back drill", "quarterback release side view"];
@@ -111,6 +112,10 @@ function CandidateCard({ c, open, onOpen }: { c: YouTubeCandidate; open: boolean
 
 function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (footageId: string) => void }) {
   const { lib } = useAnalyzer();
+  // お手本として区間を取り込むか、ドリル動画として（取り込まずに）登録するか
+  const [mode, setMode] = useState<"reference" | "drill">("reference");
+  const [drillStart, setDrillStart] = useState("0:00");
+  const drillSec = parseTime(drillStart);
   const seg0 = defaultSegment(c.durationSec);
   const [start, setStart] = useState(formatTime(seg0.start));
   const [end, setEnd] = useState(formatTime(seg0.end));
@@ -141,15 +146,29 @@ function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (foot
       <Card className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="aspect-video overflow-hidden rounded-xl border border-line bg-black">
           <iframe
-            key={`${c.videoId}-${seg.ok ? seg.start : 0}`}
+            key={mode === "drill" ? `${c.videoId}-drill-${drillSec ?? 0}` : `${c.videoId}-${seg.ok ? seg.start : 0}`}
             title={`${c.title} の埋め込みプレイヤー`}
-            src={`https://www.youtube-nocookie.com/embed/${c.videoId}?rel=0${seg.ok ? `&start=${seg.start}&end=${seg.end}` : ""}`}
+            src={`https://www.youtube-nocookie.com/embed/${c.videoId}?rel=0${mode === "drill" ? `&start=${drillSec ?? 0}` : seg.ok ? `&start=${seg.start}&end=${seg.end}` : ""}`}
             className="h-full w-full"
             allow="encrypted-media; picture-in-picture"
             allowFullScreen
           />
         </div>
         <div className="space-y-4">
+          <Segmented
+            label="この動画の使い方"
+            size="sm"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "reference", label: "お手本として取り込む" },
+              { value: "drill", label: "ドリル動画として登録" },
+            ]}
+          />
+          {mode === "drill" ? (
+            <DrillForm c={c} start={drillStart} onStart={setDrillStart} />
+          ) : (
+            <>
           <SectionTitle>この区間を取り込む</SectionTitle>
           <p className="text-xs leading-relaxed text-muted">投げている場面を {MAX_SEGMENT_SEC} 秒以内で指定します。横から全身が映った場面が向いています。</p>
           <div className="grid grid-cols-2 gap-3">
@@ -173,6 +192,8 @@ function ImportPanel({ c, onImported }: { c: YouTubeCandidate; onImported: (foot
           </Button>
           {error && <p className="text-xs text-flag">{error}</p>}
           <p className="text-[11px] leading-relaxed text-faint">区間だけを取得し、骨格と指標を出したら元の動画は消します。残すのは骨格・指標と出典だけです（ADR-0005）。</p>
+            </>
+          )}
         </div>
       </Card>
     </motion.div>

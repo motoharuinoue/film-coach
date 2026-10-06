@@ -7,6 +7,7 @@ import { formatMetric, METRIC_BY_KEY, METRICS, type MetricKey } from "../../doma
 import { ScoreRing, Sparkline } from "../components/charts";
 import { PoseThumb } from "../components/scene";
 import { Badge, Button, Card, CountUp, SectionTitle, StatusPill } from "../components/ui";
+import { DrillLink } from "../components/drill";
 import { PageGuide } from "../guide/PageGuide";
 import { useCoach } from "../state/benchmarks";
 import { formatDate, repLabel } from "../state/session";
@@ -127,17 +128,7 @@ export function Home() {
               <div className="mt-3 text-xs text-muted">
                 目標：<span className="font-mono text-ice">{top.target}</span>
               </div>
-              {top.drill && (
-                <div className="mt-auto flex items-center gap-3 rounded-xl border border-line bg-white/[0.03] p-3">
-                  <IconBrandYoutube size={20} className="shrink-0 text-flag" aria-hidden />
-                  <div className="min-w-0 text-xs">
-                    <div className="truncate text-text">{top.drill.label}</div>
-                    <div className="truncate text-muted">
-                      {coach.reference(top.drill.refId)?.channel} · {top.drill.at} から
-                    </div>
-                  </div>
-                </div>
-              )}
+              {top.drill && <DrillLink drill={top.drill} className="mt-auto" />}
               <Link to={`/sessions/${current.id}/report`} className="mt-4 inline-flex items-center gap-1 text-sm text-turf hover:underline">
                 レポートを見る <IconArrowRight size={15} aria-hidden />
               </Link>

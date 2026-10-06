@@ -1,4 +1,4 @@
-// 手元の解析サービスのデータ（お手本・練習・お手本の手動調整）を全画面で共有する。
+// 手元の解析サービスのデータ（お手本・練習・お手本の手動調整・ドリル動画）を全画面で共有する。
 // ほかの画面で解析・登録した結果を映すため、画面を移るたびに読み直す（AppShell から reload を呼ぶ）。
 // 練習があれば、ホーム・レップ・スタジオ・レポート・推移も手元のデータで見られる（表示するデータはデモと切り替えられる）。
 
@@ -7,6 +7,7 @@ import type { Benchmarks, CoachService } from "../../application/coach";
 import { focusOf, loadLocalSessions, localPlayer, type LocalSessions } from "../../application/localData";
 import { loadLocalReferences, type LocalLibrary } from "../../application/localReferences";
 import { NEUTRAL_MANUAL, weighByApproach, weighReferences, zoneSetOf, type ReferenceWeights } from "../../application/references";
+import type { Drill, DrillInput } from "../../domain/drill";
 import type { ApproachGroup } from "../../domain/throws";
 import type { ManualAdjust } from "../../domain/weighting";
 import { usePersistentState } from "../hooks/usePersistentState";
@@ -18,6 +19,10 @@ export type DataSource = "demo" | "local";
 type Ctx = {
   library?: LocalLibrary;
   sessions?: LocalSessions;
+  /** 改善点に添えるドリル動画（新しい順） */
+  drills: Drill[];
+  addDrill: (input: DrillInput) => Promise<Drill>;
+  removeDrill: (id: string) => Promise<void>;
   manual: Record<string, ManualAdjust>;
   weights?: ReferenceWeights;
   byApproach?: Record<ApproachGroup, ReferenceWeights>;
@@ -42,6 +47,7 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
   const { lib, status } = useAnalyzer();
   const [library, setLibrary] = useState<LocalLibrary>();
   const [sessions, setSessions] = useState<LocalSessions>();
+  const [drills, setDrills] = useState<Drill[]>([]);
   const [manual, setManual] = useState<Record<string, ManualAdjust>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -54,9 +60,10 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
     if (!lib || status !== "online") return;
     setLoading(true);
     try {
-      const [l, s] = await Promise.all([loadLocalReferences(lib), loadLocalSessions(lib)]);
+      const [l, s, d] = await Promise.all([loadLocalReferences(lib), loadLocalSessions(lib), lib.drills()]);
       setLibrary(l);
       setSessions(s);
+      setDrills(d);
       setManual(Object.fromEntries(l.records.map((r) => [r.id, r.manual])));
       setError(undefined);
     } catch (e) {
@@ -79,6 +86,22 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
     },
     [lib],
   );
+  const addDrill = useCallback(
+    async (input: DrillInput) => {
+      const d = await lib!.createDrill(input);
+      setDrills((xs) => [d, ...xs]);
+      return d;
+    },
+    [lib],
+  );
+  const removeDrill = useCallback(
+    async (id: string) => {
+      await lib!.deleteDrill(id);
+      setDrills((xs) => xs.filter((d) => d.id !== id));
+    },
+    [lib],
+  );
+
   const reset = useCallback(() => {
     for (const [id, m] of Object.entries(latest.current)) if (!same(m, NEUTRAL_MANUAL)) update(id, NEUTRAL_MANUAL);
   }, [update]);
@@ -89,12 +112,12 @@ export function LocalDataProvider({ children }: { children: ReactNode }) {
     if (!library || !sessions || !weights || !byApproach) return undefined;
     const focus = focusOf(sessions.sessions, zoneSetOf(weights, byApproach));
     if (!focus) return undefined;
-    const coach = services.localCoach({ player: localPlayer(services.profile.heightCm(), sessions.hand), sessions: sessions.sessions, focus, references: library.refs });
+    const coach = services.localCoach({ player: localPlayer(services.profile.heightCm(), sessions.hand), sessions: sessions.sessions, focus, references: library.refs, drills });
     return { coach, bench: coach.benchmarks(manual) };
-  }, [library, sessions, weights, byApproach, manual, services]);
+  }, [library, sessions, drills, weights, byApproach, manual, services]);
 
   return (
-    <LocalDataContext.Provider value={{ library, sessions, manual, weights, byApproach, local, update, reset, reload, loading, error, preferred, setPreferred }}>
+    <LocalDataContext.Provider value={{ library, sessions, drills, addDrill, removeDrill, manual, weights, byApproach, local, update, reset, reload, loading, error, preferred, setPreferred }}>
       {children}
     </LocalDataContext.Provider>
   );

@@ -27,7 +27,10 @@ export class DemoReferenceRepository implements ReferenceRepository {
   get(id: string) {
     return demoReferences.find((r) => r.id === id);
   }
+  /** デモでは、指標ごとに決めたお手本（架空の動画）を、外れた側によらず添える */
   drillFor(key: MetricKey) {
-    return demoDrills[key];
+    const d = demoDrills[key];
+    const ref = d && this.get(d.refId);
+    return d && ref ? { label: d.label, channel: ref.channel, at: ref.segment.start } : undefined;
   }
 }
